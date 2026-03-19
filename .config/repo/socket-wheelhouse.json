@@ -1,0 +1,10 @@
+{
+  "$schema": "./socket-wheelhouse-schema.json",
+  "schemaVersion": 1,
+  "repoName": "meander",
+  "repo": { "type": "solo" },
+  "build": { "from": "npm-registry", "type": "js" },
+  "vite": {
+    "allowEsbuild": "esbuild is a direct devDep powering the opt-in minify pass (src/minify.mts transforms inline <script> bodies via dynamic import, skipping when absent) and the deploy-val bundle step (src/deploy-val.mts); the build bundler is rolldown"
+  }
+}

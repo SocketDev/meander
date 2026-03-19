@@ -1,0 +1,6 @@
+{
+  "$schema": "../fleet/lockstep.schema.json",
+  "area": "meander",
+  "description": "Lock-step manifest. meander is a single npm package with no submodule upstreams or sibling language ports — empty rows is the expected state.",
+  "rows": []
+}

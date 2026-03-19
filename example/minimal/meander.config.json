@@ -1,0 +1,13 @@
+{
+  "slug": "example",
+  "title": "Minimal meander example",
+  "parts": [
+    {
+      "id": 1,
+      "title": "The app",
+      "objective": "Show how meander pairs prose comments with the code that follows.",
+      "keywords": ["app", "greet"],
+      "files": ["src/app.ts"]
+    }
+  ]
+}

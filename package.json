@@ -1,0 +1,159 @@
+{
+  "name": "@socketsecurity/meander",
+  "version": "1.3.0",
+  "description": "Walkthrough generator — annotated code walkthroughs with comments, hosted on Val Town",
+  "keywords": [
+    "code-tour",
+    "comments",
+    "documentation",
+    "static-site-generator",
+    "val-town",
+    "walkthrough"
+  ],
+  "homepage": "https://github.com/SocketDev/meander#readme",
+  "bugs": {
+    "url": "https://github.com/SocketDev/meander/issues"
+  },
+  "license": "MIT",
+  "author": "Dale Bustad <github@dale.link>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SocketDev/meander.git"
+  },
+  "bin": {
+    "meander": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "node scripts/repo/build.mts",
+    "check": "node scripts/fleet/check.mts",
+    "clean": "node -e \"require('node:fs').rmSync('node_modules/.cache', { recursive: true, force: true })\"",
+    "cover": "node scripts/fleet/cover.mts",
+    "dev": "node scripts/repo/dev.mts",
+    "fix": "node scripts/fleet/fix.mts",
+    "lint": "node scripts/fleet/lint.mts",
+    "test": "node scripts/fleet/test.mts",
+    "test:fuzz": "node scripts/repo/fuzz.mts",
+    "type": "node node_modules/typescript/bin/tsc --noEmit -p .config/fleet/tsconfig.check.json",
+    "update": "node scripts/fleet/update.mts",
+    "prepublishOnly": "echo 'ERROR: Use GitHub Actions workflow for publishing' && exit 1",
+    "check:paths": "node scripts/fleet/check/paths-are-canonical.mts",
+    "ci:local": "node scripts/fleet/agent-ci-skip-locks.mts run --all --quiet --pause-on-failure --github-token",
+    "doctor:auth": "node scripts/fleet/check/setup-is-prompt-less.mts",
+    "format": "node scripts/fleet/format.mts",
+    "format:check": "node scripts/fleet/format.mts --check",
+    "lockstep": "node scripts/fleet/lockstep.mts",
+    "lockstep:emit-mirror-globs": "node scripts/fleet/lockstep-emit-mirror-globs.mts",
+    "lockstep:emit-schema": "node scripts/fleet/lockstep-emit-schema.mts",
+    "prepare": "node scripts/fleet/install-git-hooks.mts && node scripts/fleet/prepare.mts",
+    "security": "node scripts/fleet/security.mts",
+    "setup-security-tools": "node .claude/hooks/fleet/setup-security-tools/install.mts",
+    "sync-oxlint-rules": "node scripts/fleet/sync-oxlint-rules.mts",
+    "sync-package-manager-pins": "node scripts/fleet/sync-package-manager-pins.mts",
+    "weekly-update": "node scripts/fleet/weekly-update.mts",
+    "weekly-update:ci": "node scripts/fleet/weekly-update-workflow.mts run",
+    "doctor": "node scripts/fleet/doctor.mts",
+    "gen:llms-txt": "node scripts/fleet/gen/llms-txt.mts --no-ai",
+    "setup:brew": "node scripts/fleet/setup/brew.mts",
+    "setup:go": "node scripts/fleet/setup/go.mts",
+    "setup:mcp": "node scripts/fleet/setup/mcp.mts",
+    "setup:python": "node scripts/fleet/setup/python.mts",
+    "setup:refero": "node scripts/fleet/setup/refero.mts",
+    "setup:rust": "node scripts/fleet/setup/rust.mts",
+    "npm:publish": "node scripts/fleet/publish-pipeline.mts",
+    "socket-wheelhouse:emit-schema": "node scripts/fleet/socket-wheelhouse-emit-schema.mts"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "catalog:",
+    "@valtown/sdk": "1.14.0",
+    "marked": "18.0.7",
+    "node-html-parser": "7.1.0",
+    "svgo": "4.0.2"
+  },
+  "devDependencies": {
+    "@redwoodjs/agent-ci": "catalog:",
+    "@shadscan/cli": "catalog:",
+    "@socketregistry/packageurl-js": "catalog:",
+    "@socketregistry/packageurl-js-stable": "catalog:",
+    "@socketsecurity/lib": "catalog:",
+    "@socketsecurity/lib-stable": "catalog:",
+    "@socketsecurity/sdk": "catalog:",
+    "@socketsecurity/sdk-stable": "catalog:",
+    "@types/mdast": "catalog:",
+    "@types/node": "catalog:",
+    "@types/semver": "catalog:",
+    "@types/shell-quote": "catalog:",
+    "@typescript/native-preview": "7.0.0-dev.20260415.1",
+    "@vitest/coverage-v8": "catalog:",
+    "@vitest/ui": "catalog:",
+    "@vitiate/core": "catalog:",
+    "c8": "catalog:",
+    "chrome-devtools-mcp": "catalog:",
+    "ecc-agentshield": "1.4.0",
+    "esbuild": "0.25.12",
+    "fast-check": "catalog:",
+    "fast-glob": "3.3.3",
+    "magic-string": "catalog:",
+    "markdownlint-cli2": "catalog:",
+    "mdast-util-from-markdown": "catalog:",
+    "mermaid": "11.16.0",
+    "micromark": "catalog:",
+    "neosanitize": "catalog:",
+    "nock": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "playwright-core": "catalog:",
+    "portless": "catalog:",
+    "puppeteer": "24.43.1",
+    "regjsparser": "catalog:",
+    "rolldown": "catalog:",
+    "semver": "catalog:",
+    "shell-quote": "catalog:",
+    "taze": "catalog:",
+    "type-coverage": "2.29.7",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitiate": "catalog:",
+    "yoctocolors-cjs": "2.1.3"
+  },
+  "typeCoverage": {
+    "atLeast": 99,
+    "cache": true,
+    "detail": true,
+    "ignoreAsAssertion": true,
+    "ignoreCatch": true,
+    "ignoreNonNullAssertion": true,
+    "ignoreUnreadAnys": true,
+    "is": 99,
+    "strict": true
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": ">=11.0.0 <12.0.0",
+      "onFail": "error"
+    }
+  },
+  "engines": {
+    "node": ">=24",
+    "npm": ">=12.0.1",
+    "pnpm": ">=11.0.5"
+  },
+  "allowScripts": {
+    "cpu-features": false,
+    "esbuild": true,
+    "protobufjs": false,
+    "puppeteer": false,
+    "ssh2": false
+  }
+}

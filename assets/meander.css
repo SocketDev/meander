@@ -1,0 +1,2983 @@
+/* Cross-fade on same-origin navigation (View Transitions API).
+ * Non-supporting browsers ignore the rule; no polyfill shipped.
+ * The UA honors prefers-reduced-motion on the transition itself. */
+@view-transition {
+  navigation: auto;
+}
+
+:root,
+html[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-elev: #f5f6f8;
+  --bg-card: #ffffff;
+  --bg-tint: #eef0f4;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --border: #e0e0e0;
+  --border-strong: #c6cbd3;
+  --code-bg: #0d1117;
+  --ok: #16a34a;
+  /* Column split ratio (percent) the splitter handle writes back
+   * via inline style on :root. 50 = balanced. */
+  --col-split: 50;
+  /* Spacing scale — every padding/gap/margin in this stylesheet
+   * should snap to one of these. Modular 4px scale with 12/14/24
+   * intermediate stops for the in-between visual rhythm the
+   * original ad-hoc spacing landed on. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  /* Sticky topbar height — used by scroll-padding-top so anchor
+   * jumps land below the chrome instead of behind it. Matches
+   * the topbar's actual rendered height (12 + 12 padding +
+   * ~32 content); kept conservative so cross-part navigation
+   * doesn't undershoot. */
+  --topbar-offset: 88px;
+  /* Native UA palette signal — picks the right scrollbar /
+   * form-control styling automatically, and short-circuits the
+   * brief light flash some browsers paint before our CSS loads. */
+  color-scheme: light;
+}
+
+/* Follow OS preference when no explicit data-theme pick. Script
+ * bootstrap resolves 'system' to 'light' or 'dark' on load, so
+ * this block is a fallback for pre-JS paint. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --bg-elev: #121212;
+    --bg-card: #141414;
+    --bg-tint: #1a1a1a;
+    --text: #fafafa;
+    --muted: #9ca3af;
+    --accent: #93c5fd;
+    --border: #262626;
+    --border-strong: #404040;
+    --code-bg: #0d1117;
+    color-scheme: dark;
+  }
+}
+
+/* Explicit dark pick — matches the @media fallback so the user's
+ * choice and the system preference land in the same palette. */
+html[data-theme='dark'] {
+  --bg: #0a0a0a;
+  --bg-elev: #121212;
+  --bg-card: #141414;
+  --bg-tint: #1a1a1a;
+  --text: #fafafa;
+  --muted: #9ca3af;
+  --accent: #93c5fd;
+  --border: #262626;
+  --border-strong: #404040;
+  --code-bg: #0d1117;
+  color-scheme: dark;
+}
+
+/* Neo-Kijū — retro mech-beast palette. Deep purple background
+ * with electric-violet accent. Not a light/dark variant; own
+ * coherent palette. Named internally as neo-kiju (ASCII, macron-
+ * free) so CSS selectors and localStorage keys stay plain. */
+html[data-theme='neo-kiju'] {
+  --bg: #1a0830;
+  --bg-elev: #2a1044;
+  --bg-card: #2a1044;
+  --bg-tint: #3a1a5a;
+  --text: #f6eeff;
+  --muted: #b8a4dc;
+  --accent: #b24bff;
+  --border: #3d2a5a;
+  --border-strong: #5a3d7a;
+  --code-bg: #22143a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Anchor jumps land below the sticky topbar instead of being
+   * occluded by it. Browsers respect this for both fragment
+   * navigation and CSS-driven `scroll-margin`. */
+  scroll-padding-top: var(--topbar-offset);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+/* Themed scrollbars — Firefox + Chromium honor the standard
+ * `scrollbar-color` / `scrollbar-width` properties; Safari does
+ * not yet, so the ::-webkit-scrollbar block below covers it.
+ * Both render a thin track-aware thumb that tracks the active
+ * theme via color-mix. */
+@supports (scrollbar-color: auto) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent)
+      transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text) 38%, transparent);
+  background-clip: padding-box;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Unified keyboard-focus ring — visible only for keyboard users
+ * (mouse clicks suppress it via :focus-visible UA heuristics).
+ * Component-specific overrides win on selector specificity, so
+ * existing custom rings (col-splitter, demo-dismiss, etc.) keep
+ * their bespoke treatment. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+  /* Subtle vertical fade keyed off the elevated tint so the
+   * topbar separates from the page without a hard edge. */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg-elev) 92%, transparent),
+    color-mix(in srgb, var(--bg-elev) 76%, transparent)
+  );
+  /* Glassy blur — saturate boost rescues colour through the blur
+   * (Safari otherwise washes accents to grey behind the chrome). */
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  /* Soft ambient shadow tinted from the accent rather than black,
+   * so it reads as theme-aware in dark mode without a hard halo. */
+  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--accent) 18%, transparent);
+  padding: 12px 16px;
+  /* Names the topbar so cross-part view transitions hold it stable
+   * while the body cross-fades. Browsers without view-transition
+   * support ignore the property. */
+  view-transition-name: mdr-topbar;
+}
+
+/* Reserve space for the absolutely-positioned .topbar-actions
+ * stack only on the rows where it actually overlaps — the title
+ * + objective sit at the same vertical band as the actions, so
+ * they need the right inset. The .part-nav row sits below the
+ * actions and gets the full topbar width. */
+.topbar h1,
+.topbar p {
+  padding-right: 96px;
+}
+
+.topbar-actions {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.topbar p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.part-nav {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mdr-parts-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.part-nav a {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.part-nav a.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Docs pill gets a separator + a slightly different chrome so the
+ * eye reads "Topics: A B C | Docs" as one nav block. A left
+ * border acts as the visual divider without an actual <hr>. */
+.part-nav a.mdr-topic-doc {
+  margin-left: 8px;
+  border-left: 2px solid var(--border);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns:
+    calc(var(--col-split) * 1%)
+    calc((100 - var(--col-split)) * 1%);
+  min-height: calc(100vh - 100px);
+}
+
+.pair-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    calc(var(--col-split) * 1%)
+    calc((100 - var(--col-split)) * 1%);
+  column-gap: 12px;
+  row-gap: 0;
+  align-items: start;
+  /* Paint the entire right column as one continuous dark band so
+   * stacked code sections sit inside ONE dark region instead of
+   * each carrying its own panel. No per-section gaps, no
+   * stairstep when the column reflows on splitter drag. The
+   * gradient stops at --col-split (left edge of code column)
+   * with a 12px transparent gutter for the column-gap. */
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--col-split, 50) * 1%),
+    transparent calc(var(--col-split, 50) * 1% + 12px),
+    var(--code-bg) calc(var(--col-split, 50) * 1% + 12px),
+    var(--code-bg) 100%
+  );
+}
+
+.files-stack {
+  padding: 12px;
+}
+
+.file-block {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  background: var(--bg-elev);
+}
+
+/* When the section-chip dropdown is open the file-block must
+ * stop clipping so the menu can extend over the right edge.
+ * Browsers without :has() fall back to the default overflow:
+ * hidden and the panel is visually trimmed — same as before. */
+.file-block:has(.mdr-sections-menu[open]) {
+  overflow: visible;
+}
+
+.file-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.file-head .path {
+  color: var(--text);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+}
+
+.file-head .count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.file-grid {
+  padding: 12px;
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--col-split) * 1%),
+    transparent calc(var(--col-split) * 1% + 12px),
+    var(--code-bg) calc(var(--col-split) * 1% + 12px),
+    var(--code-bg) 100%
+  );
+  align-items: stretch;
+}
+
+.file-grid .annotation-card {
+  margin-bottom: 12px;
+  align-self: start;
+}
+
+.file-grid .code-section {
+  margin-bottom: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--code-bg);
+  align-self: stretch;
+}
+
+.file-grid pre {
+  height: 100%;
+  /* Don't let <pre>'s default --code-bg leak past the section
+   * bounds during column reflow — let .code-section own the
+   * painted area instead. */
+  background: transparent;
+}
+
+.left-pane,
+.right-pane {
+  padding: 14px;
+}
+
+.left-pane {
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  overflow: auto;
+  position: sticky;
+  top: 100px;
+  max-height: calc(100vh - 100px);
+}
+
+.annotation-card {
+  border: none;
+  border-radius: 0;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: transparent;
+}
+
+.annotation-card h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.code-table {
+  border-collapse: collapse;
+  width: 100%;
+  border-spacing: 0;
+}
+
+.code-table tr {
+  line-height: 1.45;
+}
+
+.code-table .line-num {
+  position: relative;
+  width: 1px;
+  white-space: nowrap;
+  padding: 0 12px 0 18px;
+  text-align: right;
+  color: #484f58;
+  font-size: 13px;
+  user-select: none;
+  vertical-align: top;
+  cursor: pointer;
+}
+
+.code-table .line-num:hover {
+  color: #8b949e;
+}
+
+.comment-indicator {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #eab308;
+  cursor: pointer;
+}
+
+.comment-indicator:hover {
+  background: #facc15;
+  box-shadow: 0 0 4px rgba(234, 179, 8, 0.5);
+}
+
+.comment-indicator-resolved {
+  background: #22c55e;
+}
+
+.comment-indicator-resolved:hover {
+  background: #4ade80;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+}
+
+.code-table tr.selected .line-num {
+  color: #c9d1d9;
+}
+
+.code-table tr.selected .line-code {
+  background: rgba(56, 139, 253, 0.15);
+}
+
+.code-table .line-code {
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 0;
+}
+
+.code-table .line-code code {
+  font-family: inherit;
+  font-size: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+.annotation-card p {
+  margin: 10px 0 0;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.annotation-md {
+  margin-bottom: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.annotation-md p,
+.annotation-md ul,
+.annotation-md ol,
+.annotation-md pre,
+.annotation-md blockquote {
+  margin: 0 0 10px;
+}
+
+.annotation-md :last-child {
+  margin-bottom: 0;
+}
+
+.annotation-md code {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: var(--bg-elev);
+}
+
+.annotation-md pre code {
+  display: block;
+  padding: 8px;
+  white-space: pre-wrap;
+}
+
+.right-pane {
+  overflow: auto;
+}
+
+.pair-grid .annotation-card,
+.pair-grid .code-section {
+  margin-bottom: 0;
+}
+
+/* Pair-grid layout — the .pair-grid background gradient already
+ * paints the dark code area as one continuous band. The
+ * individual code-section boxes inside become invisible
+ * containers; they shouldn't paint their own bg, border, or
+ * radius (which would create visible boundaries between
+ * sections inside the otherwise-uniform dark column). */
+.pair-grid .code-section {
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+}
+
+.code-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  background: var(--code-bg);
+}
+
+pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--code-bg);
+}
+
+pre code {
+  background: transparent;
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--muted);
+  background: var(--bg-card);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Comments                                                           */
+/* ------------------------------------------------------------------ */
+
+.comment-card-cell,
+.comment-form-cell {
+  padding: 8px 0;
+}
+
+.comment-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  font-size: 13px;
+}
+
+/* Long threads (dozens of cards below the fold on a populated
+ * walkthrough) skip layout cost until they enter the viewport.
+ * Safari excluded for the same reason as .unresolved-item. */
+html:not([data-ua='safari']) .comment-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
+}
+
+.comment-card + .comment-card {
+  margin-top: 8px;
+}
+
+.comment-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.comment-body {
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.comment-card-actions {
+  margin-top: 6px;
+  text-align: right;
+}
+
+.comment-thread + .comment-card-actions {
+  margin-top: 12px;
+}
+
+.comment-resolved {
+  opacity: 0.6;
+}
+
+.comment-resolve-btn,
+.comment-reply-btn,
+.comment-delete-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.comment-resolve-btn:hover {
+  color: #22c55e;
+}
+
+.comment-reply-btn:hover {
+  color: var(--accent);
+}
+
+.comment-delete-btn:hover {
+  color: #dc2626;
+}
+
+.comment-thread {
+  margin: 8px 0 0 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.comment-reply {
+  padding: 8px 10px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg);
+  margin-left: 4px;
+}
+
+.comment-reply-form {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.comment-add-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.comment-add-btn:hover {
+  opacity: 0.9;
+}
+
+.comment-form-container {
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.comment-form-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.comment-form-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.comment-form-textarea:focus {
+  border-color: var(--accent);
+}
+
+.comment-form-textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.comment-form-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.comment-form-cancel,
+.comment-form-submit {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.comment-form-cancel {
+  background: var(--bg-elev);
+  color: var(--muted);
+}
+
+.comment-form-submit {
+  background: var(--accent);
+  color: #fff;
+}
+
+.comment-form-submit:hover {
+  opacity: 0.9;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Go-to-definition                                                   */
+/* ------------------------------------------------------------------ */
+
+.def-ref {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #484f58;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.def-ref:hover {
+  text-decoration-color: #8b949e;
+}
+
+.def-tooltip {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  pointer-events: none;
+  max-width: 400px;
+}
+
+.def-tooltip-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.def-tooltip-location {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.def-tooltip-hint {
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Unresolved Comments Button                                         */
+/* ------------------------------------------------------------------ */
+
+.unresolved-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  /* Transparent resting border matches .theme-toggle so the three
+   * topbar action buttons read as one set. Hover reveals tint;
+   * the open state borrows the border-strong outline. */
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+/* Lock the icon to a 16px footprint — same as .theme-toggle's
+ * stacked icons — so all three topbar action buttons render with
+ * the same visual weight. The badge is positioned absolutely so
+ * it doesn't push the icon. */
+.unresolved-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.unresolved-btn:hover,
+.unresolved-btn[aria-expanded='true'] {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.unresolved-btn[aria-expanded='true'] {
+  border-color: var(--border-strong);
+}
+
+/* Floating count chip on the icon — top-right corner of the
+ * 30×30 button. Absolute so it doesn't push the icon, sized for
+ * a single digit (auto-grows for two), hidden by default and
+ * toggled via inline display by JS when count > 0. */
+.unresolved-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  background: #eab308;
+  border: 1.5px solid var(--bg);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Unresolved Comments Dropdown                                       */
+/* ------------------------------------------------------------------ */
+
+.unresolved-dropdown {
+  position: fixed;
+  z-index: 100;
+  width: 340px;
+  max-height: 70vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.unresolved-dropdown-header {
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.unresolved-list {
+  overflow-y: auto;
+  max-height: calc(70vh - 50px);
+}
+
+.unresolved-group-header {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-elev);
+  position: sticky;
+  top: 0;
+}
+
+.unresolved-item {
+  display: block;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Skip layout/paint cost for offscreen list items. Safari's
+ * content-visibility implementation has find-in-page + :target
+ * glitches as of 18.x, so the rule is gated on the boot.js UA
+ * flag — non-Safari browsers get the perf win, Safari renders
+ * the list normally. The intrinsic size mirrors the rendered
+ * height so the scroll thumb doesn't jump as items realise. */
+html:not([data-ua='safari']) .unresolved-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
+}
+
+.unresolved-item:last-child {
+  border-bottom: none;
+}
+
+.unresolved-item:hover {
+  background: var(--bg-elev);
+}
+
+.unresolved-item-file {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.unresolved-item-preview {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+
+.unresolved-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.unresolved-item-author {
+  font-weight: 500;
+}
+
+.unresolved-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.unresolved-loading,
+.unresolved-error {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.unresolved-error {
+  color: #dc2626;
+}
+
+/* Skeleton placeholder rows sized to mirror real .unresolved-item
+ * geometry so the dropdown doesn't pop-resize when the fetch lands.
+ * The shimmer animation is a slow background-position sweep — a
+ * single transform-cheap repaint that respects reduced motion via
+ * the global @media block at the bottom of this file. */
+.unresolved-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.unresolved-skel-row {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.unresolved-skel-line {
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text) 6%, transparent) 0%,
+    color-mix(in srgb, var(--text) 14%, transparent) 50%,
+    color-mix(in srgb, var(--text) 6%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: mdr-skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.unresolved-skel-line.skel-1 {
+  width: 70%;
+}
+
+.unresolved-skel-line.skel-2 {
+  width: 45%;
+  height: 8px;
+  opacity: 0.7;
+}
+
+@keyframes mdr-skel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Standard accessibility helper — visually hides text from sighted
+ * users while keeping it in the accessibility tree (the skeleton's
+ * aria-live status announcement, etc.). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Export Comments Button                                             */
+/* ------------------------------------------------------------------ */
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  /* Transparent resting border matches .theme-toggle and
+   * .unresolved-btn so the topbar action set reads as one row. */
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.export-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.export-btn:hover,
+.export-btn[aria-expanded='true'] {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.export-btn[aria-expanded='true'] {
+  border-color: var(--border-strong);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Export Dropdown                                                    */
+/* ------------------------------------------------------------------ */
+
+.export-dropdown {
+  position: fixed;
+  z-index: 100;
+  width: 200px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.export-dropdown-header {
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.export-option {
+  display: block;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.export-option:last-child {
+  border-bottom: none;
+}
+
+.export-option:hover {
+  background: var(--bg-elev);
+  text-decoration: none;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pair-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .file-grid {
+    background: transparent;
+  }
+
+  .left-pane {
+    position: static;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Document page responsive styles */
+  .doc-container {
+    padding: 0 16px 32px;
+  }
+
+  .doc-tab-bar {
+    padding: 0 16px;
+  }
+
+  .doc-tab-btn {
+    flex-shrink: 0;
+  }
+
+  .doc-block {
+    padding-left: 20px;
+  }
+
+  .doc-block-gutter {
+    left: 6px;
+  }
+
+  .doc-block:hover .doc-block-gutter {
+    left: 5px;
+  }
+
+  .doc-block.block-selected .doc-block-gutter {
+    left: 5px;
+  }
+
+  .doc-block .comment-indicator {
+    left: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Page Layout                                               */
+/* ------------------------------------------------------------------ */
+
+.doc-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+}
+
+.doc-content {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.doc-content h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 32px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.doc-content h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 28px 0 12px;
+}
+
+.doc-content h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 24px 0 10px;
+}
+
+.doc-content h4,
+.doc-content h5,
+.doc-content h6 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+
+.doc-content p {
+  margin: 0 0 14px;
+}
+
+.doc-content ul,
+.doc-content ol {
+  margin: 0 0 14px;
+  padding-left: 24px;
+}
+
+.doc-content li {
+  margin-bottom: 4px;
+}
+
+.doc-content blockquote {
+  margin: 0 0 14px;
+  padding: 8px 16px;
+  border-left: 4px solid var(--accent);
+  background: var(--bg-elev);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+}
+
+.doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.doc-content th,
+.doc-content td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.doc-content th {
+  background: var(--bg-elev);
+  font-weight: 600;
+}
+
+.doc-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.doc-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+.doc-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.doc-content a:hover {
+  text-decoration: underline;
+}
+
+/* Inline code */
+.doc-content code {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: var(--bg-elev);
+}
+
+/* Code blocks override inline code styles */
+.doc-content pre {
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: 8px;
+  overflow: auto;
+  background: var(--code-bg);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.doc-content pre code {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+  color: #c9d1d9;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Tabs                                                      */
+/* ------------------------------------------------------------------ */
+
+.doc-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  background: var(--bg);
+  max-width: 900px;
+  margin: 0 auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Fade the right edge to hint that the bar is horizontally scrollable.
+     The mask is applied only on the inline-end side so the left edge stays
+     sharp; the gradient fades from fully opaque to transparent over 48px. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+  /* Hide the scrollbar track to keep the UI clean while retaining scroll. */
+  scrollbar-width: none;
+}
+
+.doc-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.doc-tab-btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.doc-tab-btn:hover {
+  color: var(--text);
+  background: var(--bg-elev);
+}
+
+.doc-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Block Gutter and Selection                                */
+/* ------------------------------------------------------------------ */
+
+.doc-block {
+  position: relative;
+  padding-left: 24px;
+}
+
+.doc-block-gutter {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  cursor: pointer;
+  border-radius: 1px;
+}
+
+.doc-block:hover {
+  background: rgba(37, 99, 235, 0.04);
+  border-radius: 4px;
+}
+
+.doc-block:hover .doc-block-gutter {
+  width: 4px;
+  left: 7px;
+  background: var(--accent);
+}
+
+.doc-block.block-selected {
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 4px;
+}
+
+.doc-block.block-selected .doc-block-gutter {
+  width: 4px;
+  left: 7px;
+  background: var(--accent);
+}
+
+.doc-block .comment-indicator {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #eab308;
+  cursor: pointer;
+}
+
+.doc-block .comment-indicator:hover {
+  background: #facc15;
+  box-shadow: 0 0 4px rgba(234, 179, 8, 0.5);
+}
+
+.doc-block .comment-indicator-resolved {
+  background: #22c55e;
+}
+
+.doc-block .comment-indicator-resolved:hover {
+  background: #4ade80;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Collapsible Sections                                      */
+/* ------------------------------------------------------------------ */
+
+.doc-content details {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.doc-content details summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  user-select: none;
+}
+
+.doc-content details[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.doc-content details > *:not(summary) {
+  padding: 0 14px;
+}
+
+/* Lists need their bullet/number gutter on top of the container
+ * inset, otherwise the marker hangs against the rounded edge.
+ * Override the padding-left set by the rule above; the inline
+ * padding from the container shorthand still applies on the
+ * right via padding-right inheritance. */
+.doc-content details > ul,
+.doc-content details > ol {
+  padding-left: 38px;
+  padding-right: 14px;
+}
+
+.doc-content details > *:not(summary):first-of-type {
+  margin-top: 10px;
+}
+
+.doc-content details > *:not(summary):last-child {
+  margin-bottom: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Comment Container                                         */
+/* ------------------------------------------------------------------ */
+
+.doc-comment-container {
+  margin: 8px 0 16px 24px;
+  padding: 8px 0;
+}
+
+.doc-comment-form {
+  margin: 8px 0 16px 24px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document self-link (same-document reference without anchor)       */
+/* ------------------------------------------------------------------ */
+
+.doc-self-link {
+  color: var(--accent, #58a6ff);
+  cursor: default;
+  text-decoration: underline dotted;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document TOC                                                       */
+/* ------------------------------------------------------------------ */
+
+.doc-toc-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.doc-toc-btn:hover,
+.doc-toc-btn[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.doc-toc-dropdown {
+  position: fixed;
+  bottom: 76px;
+  right: 24px;
+  z-index: 100;
+  width: 280px;
+  max-height: 60vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-toc-dropdown-header {
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.doc-toc-list {
+  overflow-y: auto;
+  max-height: calc(60vh - 50px);
+  padding: 4px 0;
+}
+
+.doc-toc-item {
+  display: block;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+
+.doc-toc-item:hover {
+  background: var(--bg-elev);
+  text-decoration: none;
+}
+
+.doc-toc-item.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.doc-toc-h2 {
+  padding-left: 28px;
+}
+.doc-toc-h3 {
+  padding-left: 42px;
+}
+.doc-toc-h4 {
+  padding-left: 56px;
+}
+.doc-toc-h5 {
+  padding-left: 70px;
+}
+.doc-toc-h6 {
+  padding-left: 84px;
+}
+
+/* ── Column splitter ─────────────────────────────────────────── */
+
+/* Vertical handle between prose + code columns. Positioned
+ * absolute against the .pair-grid (position: relative set above)
+ * so the rail only spans the prose+code region — never overshoots
+ * into .file-head above or below the grid.
+ *
+ * 6px hit target masks top/bottom 6% to transparent so the clipped
+ * rail ends fade instead of cutting flat. */
+.col-splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(clamp(20%, var(--col-split, 50) * 1%, 80%));
+  width: 6px;
+  margin-left: -3px;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+}
+
+/* Visible rail — 1px centered in the 6px hit zone. Faint until
+ * hover / focus, hidden while dragging (the hotspot takes over). */
+.col-splitter::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 120ms ease;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+}
+
+.col-splitter:hover::before,
+.col-splitter:focus-visible::before {
+  background: var(--border-strong);
+}
+
+.col-splitter.dragging::before {
+  background: transparent;
+}
+
+/* Hotspot — a tall soft glow translated by pointer Y via
+ * translate3d so motion stays on the compositor path. Only visible
+ * while .dragging so the rest state isn't affected. */
+.col-splitter .col-hotspot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 800px;
+  margin-top: -400px;
+  transform: translate3d(-50%, 0, 0);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 55%, transparent) 50%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.col-splitter.dragging .col-hotspot {
+  opacity: 1;
+  will-change: transform;
+}
+
+.col-splitter:focus-visible {
+  outline: none;
+}
+
+/* Drag-wide cursor lock — a fast pointer outside the handle still
+ * reads as col-resize while the body class is set. */
+body.col-resizing,
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* ── Jump-to-file menu ───────────────────────────────────────── */
+
+/* The file-head .path is wrapped in a <details class="mdr-files-menu">
+ * whose <summary> is the path text. Clicking opens a floating panel
+ * listing every file on the page. Dashed underline on the summary
+ * is the "clickable" affordance without the weight of a button. */
+.mdr-files-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.mdr-files-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+  transition:
+    color 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+/* Suppress the native disclosure marker in every browser. */
+.mdr-files-menu > summary::marker {
+  content: '';
+  display: none;
+}
+
+.mdr-files-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mdr-files-menu[open] > summary {
+  color: var(--text);
+  text-decoration-color: var(--text);
+}
+
+.mdr-files-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mdr-files-panel a {
+  display: block;
+  padding: 6px 10px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+/* Zebra stripe — subtle tint on alternating rows to help the eye
+ * track long lists. Dark theme gets a lighter tint so the band
+ * still reads without dominating. */
+.mdr-files-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme='dark'] .mdr-files-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.mdr-files-panel a:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.mdr-files-panel a.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mdr-files-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mdr-files-panel::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg-card);
+}
+
+/* ── Sections menu ───────────────────────────────────────────── */
+
+/* Mirrors .mdr-files-menu but right-aligned (sits on the .count
+ * side of .file-head). Each row shows "Section N" + line range. */
+.mdr-sections-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.mdr-sections-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+  transition:
+    color 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+.mdr-sections-menu > summary::marker {
+  content: '';
+  display: none;
+}
+
+.mdr-sections-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mdr-sections-menu[open] > summary {
+  color: var(--text);
+  text-decoration-color: var(--text);
+}
+
+.mdr-sections-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mdr-sections-panel a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.mdr-section-label {
+  font-weight: 500;
+}
+
+.mdr-section-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mdr-sections-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.mdr-sections-panel a:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.mdr-sections-panel a.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mdr-sections-panel a.active .mdr-section-meta {
+  color: var(--text);
+}
+
+/* Per-code-section chip — floats at top-right of each
+ * .code-section, giving every chunk its own jump affordance. */
+.code-section {
+  position: relative;
+}
+
+/* Same overflow-trick as .file-block above: when the chip's
+ * dropdown is open, allow the panel to extend past the
+ * .code-section's rounded edges. Browsers without :has() fall
+ * back to overflow: hidden — the dropdown clips on top, same as
+ * before this rule. */
+.code-section:has(.mdr-sections-menu[open]) {
+  overflow: visible;
+}
+
+.mdr-section-chip {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 3;
+}
+
+.mdr-section-chip > summary {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  color: #8b949e;
+  text-decoration-color: color-mix(in srgb, #8b949e 50%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
+  /* Opaque fill matched to the code panel's bg so wrapped lines
+   * sliding under the chip don't read through it. The 1px ring
+   * via box-shadow nudges contrast against the dark code panel
+   * without adding a hard border. */
+  background: var(--code-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #8b949e 30%, transparent);
+}
+
+.mdr-section-chip[open] > summary {
+  color: #e6edf3;
+  text-decoration-color: #e6edf3;
+}
+
+/* ── Theme toggle ────────────────────────────────────────────── */
+
+.theme-toggle-wrapper {
+  position: relative;
+}
+
+/* Button is position: relative so its four stacked icons (all
+ * absolute, inset: 0, margin: auto) center themselves identically
+ * — switching pref only flips opacity, no layout shift. */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.theme-toggle[aria-expanded='true'] {
+  background: var(--bg-tint);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Stacked icons — all three rendered on top of each other; only
+ * the one matching the current pref is visible. opacity (not
+ * display: none) keeps every icon in the layout tree so CSS
+ * transitions fire on pref change. */
+.theme-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.theme-toggle-wrapper[data-pref='system'] .theme-icon-system,
+.theme-toggle-wrapper[data-pref='light'] .theme-icon-light,
+.theme-toggle-wrapper[data-pref='dark'] .theme-icon-dark,
+.theme-toggle-wrapper[data-pref='neo-kiju'] .theme-icon-neo-kiju {
+  opacity: 1;
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-menu[hidden] {
+  display: none;
+}
+
+.theme-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.theme-menu-item:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.theme-menu-item[aria-checked='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+
+.theme-menu-item[aria-checked='true'] .theme-menu-check {
+  opacity: 1;
+}
+
+.theme-menu-check {
+  opacity: 0;
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  transition: opacity 120ms ease;
+}
+
+.theme-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.theme-menu-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.theme-menu-item[aria-checked='true'] .theme-menu-icon,
+.theme-menu-item:hover .theme-menu-icon {
+  color: var(--text);
+}
+
+/* Mobile — fixed-column layout below 1100px, splitter hidden
+ * (single column = nothing to split). */
+@media (max-width: 1100px) {
+  .col-splitter {
+    display: none;
+  }
+}
+
+/* ── Prose polishers ─────────────────────────────────────────── */
+
+/* highlightProseNumbers — accent-color digits + version strings
+ * wrapped in <span class="mdr-num"> by the server-side polisher. */
+.mdr-num {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* anchorifyHeadings — GitHub-style `#` permalink that appears
+ * on heading hover. Hidden at rest to keep the heading clean,
+ * fades in when the reader is visibly close. */
+.mdr-heading-anchor {
+  opacity: 0;
+  margin-left: 0.35em;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: none;
+  transition: opacity 120ms ease;
+}
+
+h2:hover .mdr-heading-anchor,
+h3:hover .mdr-heading-anchor,
+h4:hover .mdr-heading-anchor,
+.mdr-heading-anchor:focus {
+  opacity: 1;
+}
+
+.mdr-heading-anchor:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* hotlinks.js — Cmd/Ctrl-click URLs/paths inside code cells.
+ * Invisible at rest (inherit color, no underline, no pointer)
+ * so the code cell reads as plain text. body.mdr-mod-pressed
+ * is flipped on when the user holds the modifier key and
+ * flips back off on keyup/blur — that's the visible state. */
+.mdr-src-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: text;
+}
+
+body.mdr-mod-pressed .mdr-src-link {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+
+body.mdr-mod-pressed .mdr-src-link:hover {
+  text-decoration-color: var(--accent);
+  color: var(--accent);
+}
+
+/* enhanceRepoTrees — ASCII directory trees (├── └── │).
+ * Dim the drawing glyphs so the filename + annotation columns
+ * read as the signal. `nohighlight` on the inner <code> tells
+ * hljs to skip, so drawing chars never get random token
+ * colors. */
+pre.mdr-repo-tree {
+  /* Re-assert mono so we don't inherit a proportional font from
+   * any surrounding prose container. */
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+pre.mdr-repo-tree code {
+  color: var(--text);
+}
+
+/* ── JSDoc annotation pills ─────────────────────────────────── */
+
+/* .annotation-md ships at opacity:0 to avoid a flash of
+ * unstyled JSDoc markers (@example / @param / etc. rendered as
+ * plain text for one frame before the pill-wrap runs). The
+ * annotation-ready orchestrator adds .mdr-annotation-md-ready
+ * at the start of its pass so the cleaned DOM composites in
+ * the same paint. */
+.annotation-md {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.annotation-md.mdr-annotation-md-ready {
+  opacity: 1;
+}
+
+/* Resilience fallback: if annotation-ready.js never runs (SRI
+ * failure, CDN outage, thrown exception), reveal the raw
+ * content after 600ms so the page isn't stuck on the opacity:0
+ * placeholder forever. Reader sees one frame of raw @markers
+ * but at least sees the content. */
+@keyframes mdr-annotation-md-fallback {
+  to {
+    visibility: visible;
+  }
+}
+
+.annotation-md:not(.mdr-annotation-md-ready):not(:empty) > * {
+  animation: mdr-annotation-md-fallback 0ms linear 600ms forwards;
+}
+
+/* Neutralize motion when the user opts into reduced-motion.
+ * Covers the neo-kiju bolt-strike + spark sequence and the
+ * annotation-md fade — those are one-shot entrance effects,
+ * so stripping them leaves the final rest state intact. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju,
+  html[data-theme='neo-kiju'].mdr-theme-toggle-fired
+    .theme-toggle
+    .theme-icon-neo-kiju
+    .mdr-spark {
+    animation: none;
+  }
+  .annotation-md {
+    transition: none;
+  }
+  .unresolved-skel-line {
+    animation: none;
+  }
+}
+
+/* Tag pill — "[@throws]" etc. Muted chip that reads as a label
+ * above its body, not competing with prose. */
+.mdr-jsdoc-tag {
+  display: inline-block;
+  margin: 4px 6px 4px 0;
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--bg-tint);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Type annotation next to the pill — "@THROWS `{Error}`". */
+.mdr-jsdoc-type-inline {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 4px;
+  border-radius: 4px;
+  background: var(--bg-tint);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+}
+
+.mdr-jsdoc-type {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-tint));
+}
+
+.mdr-jsdoc-param-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Block wrapper — tag + body as one outlined card so multiple
+ * @param / @throws stack cleanly without running together. */
+.mdr-jsdoc-block {
+  display: block;
+  margin: 6px 0;
+  padding-left: 2px;
+}
+
+.mdr-jsdoc-body {
+  display: block;
+  padding-left: 4px;
+  color: var(--text);
+}
+
+/* Description card leads the stack and gets no pill border;
+ * it reads as lead prose. */
+.mdr-jsdoc-block-desc .mdr-jsdoc-tag {
+  display: none;
+}
+
+.mdr-jsdoc-block-desc .mdr-jsdoc-body {
+  padding-left: 0;
+}
+
+/* ── Size-tier badges ────────────────────────────────────────── */
+
+.mdr-size-tier {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg-tint);
+  border: 1px solid var(--border);
+}
+
+.mdr-size-tier-x-small {
+  color: #059669;
+  background: color-mix(in srgb, #059669 10%, transparent);
+  border-color: color-mix(in srgb, #059669 30%, transparent);
+}
+
+.mdr-size-tier-small {
+  color: #0891b2;
+  background: color-mix(in srgb, #0891b2 10%, transparent);
+  border-color: color-mix(in srgb, #0891b2 30%, transparent);
+}
+
+.mdr-size-tier-medium {
+  color: #2563eb;
+  background: color-mix(in srgb, #2563eb 10%, transparent);
+  border-color: color-mix(in srgb, #2563eb 30%, transparent);
+}
+
+.mdr-size-tier-large {
+  color: #c2410c;
+  background: color-mix(in srgb, #c2410c 10%, transparent);
+  border-color: color-mix(in srgb, #c2410c 30%, transparent);
+}
+
+.mdr-size-tier-x-large {
+  color: #b91c1c;
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+  border-color: color-mix(in srgb, #b91c1c 30%, transparent);
+}
+
+/* ── Index page — hero + TOC grid ───────────────────────────── */
+
+.mdr-index {
+  padding: 32px 16px 64px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.mdr-hero {
+  padding: 24px 0 12px;
+  max-width: 720px;
+}
+
+.mdr-hero-subtitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.mdr-hero-desc {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.mdr-hero-desc code {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 14px;
+  padding: 1px 6px;
+  background: var(--bg-tint);
+  border-radius: 4px;
+}
+
+.mdr-toc {
+  margin-top: 32px;
+}
+
+.mdr-toc h2 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mdr-toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.mdr-toc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.mdr-toc-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-tint);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.mdr-toc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.mdr-toc-card-num {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mdr-toc-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mdr-toc-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.mdr-toc-card-meta {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.mdr-toc-card-docs {
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-card));
+}
+
+/* ── Trail (row) layout ──────────────────────────────────────── */
+
+/* OKLCH-based size-tier ramp for the row layout. Cool→amber→clay
+ * across five steps, all at constant perceived lightness so the
+ * progression reads as one signal type. Pulled back from the
+ * card-grid ramp's saturated red on x-large — clay (oklch hue 30)
+ * is warm without screaming "danger". */
+:root {
+  --mdr-trail-tier-1: oklch(72% 0.06 240);
+  --mdr-trail-tier-2: oklch(72% 0.06 195);
+  --mdr-trail-tier-3: oklch(72% 0.07 90);
+  --mdr-trail-tier-4: oklch(70% 0.09 60);
+  --mdr-trail-tier-5: oklch(66% 0.1 30);
+}
+
+.mdr-trail {
+  margin-top: var(--space-5);
+}
+
+.mdr-trail h2 {
+  margin: 0 0 var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Filter toolbar — only emitted when the trail has 24+ rows.
+ * Sticky once the user scrolls past the hero so the search stays
+ * reachable while the eye walks the list. */
+.mdr-trail-toolbar {
+  position: sticky;
+  top: var(--topbar-offset);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-2);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.mdr-trail-filter {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 120ms ease;
+}
+
+.mdr-trail-filter:focus {
+  border-color: var(--accent);
+}
+
+.mdr-trail-filter:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.mdr-trail-count {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--bg-tint);
+  border-radius: 999px;
+}
+
+/* The list itself — semantic <ol> so screen-readers announce
+ * position. Visible numbering comes from .mdr-trail-num so we
+ * disable the native marker. */
+.mdr-trail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.mdr-trail-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mdr-trail-row[hidden] {
+  display: none;
+}
+
+/* Suppress the kind glyph column when every row is the same kind
+ * — the column reads as visual noise when it's repetitive. */
+.mdr-trail-single .mdr-trail-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.mdr-trail-single .mdr-trail-kind {
+  display: none;
+}
+
+.mdr-trail-num {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  align-self: start;
+  padding-top: 2px;
+}
+
+/* Kind glyph — small, muted, decorative-but-meaningful. The aria-
+ * label on the parent carries the textual signal for assistive
+ * tech; the glyph is just the visual cue. */
+.mdr-trail-kind {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 14px;
+  color: var(--muted);
+  align-self: start;
+  padding-top: 1px;
+  user-select: none;
+}
+
+.mdr-trail-row[data-kind='code'] .mdr-trail-kind {
+  color: color-mix(in srgb, var(--mdr-trail-tier-1) 60%, var(--muted));
+}
+
+.mdr-trail-row[data-kind='article'] .mdr-trail-kind {
+  color: color-mix(in srgb, var(--mdr-trail-tier-2) 60%, var(--muted));
+}
+
+.mdr-trail-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mdr-trail-link:hover .mdr-trail-title {
+  color: var(--accent);
+}
+
+.mdr-trail-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  transition: color 120ms ease;
+}
+
+.mdr-trail-summary {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.mdr-trail-meta {
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  color: var(--muted);
+}
+
+/* Trailing size pill — the only pill on the row. Muted fill, body
+ * text color so the hue does the work without screaming. */
+.mdr-trail-size {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg-tint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.mdr-trail-size-x-small {
+  background: color-mix(in srgb, var(--mdr-trail-tier-1) 14%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-1) 32%, var(--border));
+}
+
+.mdr-trail-size-small {
+  background: color-mix(in srgb, var(--mdr-trail-tier-2) 14%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-2) 32%, var(--border));
+}
+
+.mdr-trail-size-medium {
+  background: color-mix(in srgb, var(--mdr-trail-tier-3) 16%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-3) 34%, var(--border));
+}
+
+.mdr-trail-size-large {
+  background: color-mix(in srgb, var(--mdr-trail-tier-4) 18%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-4) 36%, var(--border));
+}
+
+.mdr-trail-size-x-large {
+  background: color-mix(in srgb, var(--mdr-trail-tier-5) 20%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-5) 40%, var(--border));
+}
+
+/* Mobile — collapse the trailing size pill to a 4px leading bar
+ * on the left edge of each row. The hue is the same; the label
+ * and pill chrome go away. Numbering stays as the navigation
+ * anchor. */
+@media (max-width: 600px) {
+  .mdr-trail-row {
+    position: relative;
+    padding-left: var(--space-4);
+  }
+
+  .mdr-trail-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: var(--space-3);
+    bottom: var(--space-3);
+    width: 3px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  .mdr-trail-row:has(.mdr-trail-size-x-small)::before {
+    background: var(--mdr-trail-tier-1);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-small)::before {
+    background: var(--mdr-trail-tier-2);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-medium)::before {
+    background: var(--mdr-trail-tier-3);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-large)::before {
+    background: var(--mdr-trail-tier-4);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-x-large)::before {
+    background: var(--mdr-trail-tier-5);
+  }
+
+  .mdr-trail-size {
+    display: none;
+  }
+
+  .mdr-trail-title {
+    font-size: 16px;
+  }
+
+  .mdr-trail-summary {
+    font-size: 13px;
+  }
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+
+.mdr-footer {
+  padding: 24px 16px 32px;
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mdr-footer a {
+  color: var(--muted);
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+.mdr-footer a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+/* Tagline split — prefix span is plain text, the brand word
+ * sits in the sibling <a>. The space between them comes from
+ * the HTML whitespace between </span> and <a>. */
+.mdr-footer-tagline {
+  color: var(--muted);
+}
+
+/* ── Neo-Kijū — bolt strike + spark sequence ─────────────────── */
+
+/* Bolt strike — when neo-kiju is picked, the lightning bolt
+ * icon plays a one-shot "energize": scales up, overshoots,
+ * settles. Runs exactly once per user click (gated by
+ * .mdr-theme-toggle-fired). On page reload with neo-kiju
+ * already stored, the bolt just paints at rest — no unprompted
+ * motion on a state the user didn't actively select. */
+@keyframes mdr-bolt-strike {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju {
+  transform-origin: center;
+  animation: mdr-bolt-strike 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
+}
+
+/* Sparks — hidden by default, visible only on the toggle button
+ * when neo-kiju is active and the user just clicked. Three
+ * sparks fire in a choreographed 3-beat sequence over 1.5s,
+ * each visible for ~17% of the cycle at peak scale(1.2). */
+.mdr-spark {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes mdr-spark-middle {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes mdr-spark-top {
+  0%,
+  33% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  43% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  56% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  67%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes mdr-spark-bottom {
+  0%,
+  67% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  77% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Spark-1 is the top-right spark on the bolt SVG path. Each
+ * spark has its own keyframe set so the 3-beat sequence reads
+ * distinctly instead of all three flickering at the same offset. */
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-1 {
+  animation: mdr-spark-top 1.5s ease 0.55s 1 forwards;
+}
+
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-2 {
+  animation: mdr-spark-middle 1.5s ease 0.55s 1 forwards;
+}
+
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-3 {
+  animation: mdr-spark-bottom 1.5s ease 0.55s 1 forwards;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth widget + demo banner (email magic-code sign-in)               */
+/* ------------------------------------------------------------------ */
+
+.mdr-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
+.mdr-auth-email {
+  font-variant-numeric: tabular-nums;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdr-auth-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-default, #d1d5da);
+  border-radius: 6px;
+  background: var(--bg-card, #fff);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.mdr-auth-btn:hover {
+  background: var(--bg-card-hover, #f6f8fa);
+}
+
+.mdr-auth-btn:focus-visible {
+  outline: 2px solid var(--accent, #0969da);
+  outline-offset: 2px;
+}
+
+.mdr-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--demo-banner-bg, #fff5b1);
+  color: var(--demo-banner-fg, #4d3800);
+  border-bottom: 1px solid var(--demo-banner-border, #e3c100);
+  font-size: 13px;
+}
+
+[data-theme='dark'] .mdr-demo-banner,
+[data-theme='neo-kiju'] .mdr-demo-banner {
+  background: var(--demo-banner-bg, rgba(255, 196, 0, 0.15));
+  color: var(--demo-banner-fg, #ffd54f);
+  border-bottom-color: var(--demo-banner-border, rgba(255, 196, 0, 0.35));
+}
+
+.mdr-demo-dismiss {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.mdr-demo-dismiss:hover {
+  opacity: 1;
+}
+
+.mdr-demo-dismiss:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
