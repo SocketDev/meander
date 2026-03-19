@@ -1,0 +1,27 @@
+{
+  "name": "@divmain/meander",
+  "version": "0.1.0",
+  "description": "Walkthrough generator — annotated code walkthroughs with comments, hosted on Val Town",
+  "license": "MIT",
+  "author": "Dale Bustad <github@dale.link>",
+  "type": "module",
+  "bin": {
+    "meander": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48",
+    "@valtown/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
