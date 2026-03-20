@@ -17,6 +17,7 @@ import { Hono } from "npm:hono@4";
 import { basicAuth } from "npm:hono@4/basic-auth";
 import { blob } from "https://esm.town/v/std/blob";
 import { sqlite } from "https://esm.town/v/std/sqlite/main.ts";
+import type { BaseComment, ExportedComment, ExportedComments, ApiComment } from "./types.ts";
 
 const app = new Hono();
 
@@ -256,6 +257,86 @@ app.delete("/:slug/api/comments/:id", async (c) => {
     args: { id },
   });
   return c.json({ ok: true });
+});
+
+app.get("/:slug/api/comments/export", async (c) => {
+  await ensureDb();
+  const slug = c.req.param("slug");
+  const unresolvedOnly = c.req.query("unresolved") === "true";
+
+  // Build query based on whether we want all or just unresolved
+  let sql = "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug";
+  if (unresolvedOnly) {
+    sql += " AND resolved = 0";
+  }
+  sql += " ORDER BY part ASC, file ASC, line_from ASC, created_at ASC";
+
+  const result = await sqlite.execute({
+    sql,
+    args: { slug },
+  });
+
+  // Transform to API format
+  const comments: ApiComment[] = result.rows.map((row: any) => ({
+    id: row.id,
+    slug: row.slug,
+    part: row.part,
+    file: row.file,
+    lineFrom: row.line_from,
+    lineTo: row.line_to,
+    author: row.author,
+    body: row.body,
+    parentId: row.parent_id || null,
+    resolved: !!row.resolved,
+    createdAt: row.created_at,
+  }));
+
+  // Build parent lookup for thread reconstruction
+  const commentById = new Map<string, ApiComment>();
+  for (const comment of comments) {
+    commentById.set(comment.id, comment);
+  }
+
+  // Group root comments by file + line range
+  const rootComments = comments.filter(c => !c.parentId);
+  const repliesByParentId = new Map<string, ApiComment[]>();
+  
+  for (const comment of comments) {
+    if (comment.parentId) {
+      const siblings = repliesByParentId.get(comment.parentId) || [];
+      siblings.push(comment);
+      repliesByParentId.set(comment.parentId, siblings);
+    }
+  }
+
+  // Build exported comments with threaded structure
+  const exportedComments: ExportedComments = rootComments.map((root): ExportedComment => {
+    // Get all replies for this root comment
+    const replies = repliesByParentId.get(root.id) || [];
+    
+    // Convert replies to BaseComment format
+    const children: BaseComment[] = replies.map(reply => ({
+      author: reply.author,
+      datetime: new Date(reply.createdAt).getTime(),
+      content: reply.body,
+    }));
+
+    return {
+      author: root.author,
+      datetime: new Date(root.createdAt).getTime(),
+      content: root.body,
+      children,
+      sourceFile: root.file,
+      startLine: root.lineFrom,
+      endLine: root.lineTo,
+    };
+  });
+
+  // Set headers for JSON file download
+  c.header("Content-Type", "application/json; charset=utf-8");
+  c.header("Content-Disposition", `attachment; filename="${slug}-comments.json"`);
+  
+  return c.json(exportedComments);
 });
 
 /* ------------------------------------------------------------------ */

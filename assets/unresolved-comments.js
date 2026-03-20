@@ -258,29 +258,38 @@
     var topbar = document.querySelector(".topbar");
     if (!topbar) return;
 
-    var btn = createButton();
-    topbar.appendChild(btn);
+    var actions = topbar.querySelector(".topbar-actions");
+    if (!actions) {
+      actions = document.createElement("div");
+      actions.className = "topbar-actions";
+      topbar.appendChild(actions);
+    }
 
+    var btn = createButton();
+    actions.appendChild(btn);
+
+    // Load unresolved comments count
+    loadUnresolved();
+
+    // Hide dropdown when clicking outside
     document.addEventListener("click", function (e) {
       if (!dropdown) return;
-      if (dropdown.style.display === "none") return;
-      if (dropdown.contains(e.target)) return;
-      if (e.target.closest && e.target.closest(".unresolved-btn")) return;
-      closeDropdown();
+      var btn = document.querySelector(".unresolved-btn");
+      var isClickInside = dropdown.contains(e.target) || btn.contains(e.target);
+      if (!isClickInside) {
+        hideDropdown();
+      }
     });
 
-    window.addEventListener("scroll", function () {
-      if (dropdown && dropdown.style.display !== "none") {
-        positionDropdown();
-      }
-    }, { passive: true });
-
+    // Reposition dropdown on resize
     window.addEventListener("resize", function () {
       if (dropdown && dropdown.style.display !== "none") {
         positionDropdown();
       }
     }, { passive: true });
+  }
 
+  function loadUnresolved() {
     fetch(apiBase)
       .then(function (r) { return r.json(); })
       .then(function (comments) {

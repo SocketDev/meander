@@ -500,7 +500,8 @@ export async function generate(configPath: string): Promise<void> {
   const commentClientJs = readFileSync(join(assetsDir, "comment-client.js"), "utf-8");
   const defLinkJs = readFileSync(join(assetsDir, "def-link.js"), "utf-8");
   const unresolvedJs = readFileSync(join(assetsDir, "unresolved-comments.js"), "utf-8");
-  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs;
+  const exportJs = readFileSync(join(assetsDir, "export-comments.js"), "utf-8");
+  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs;
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 
