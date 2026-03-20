@@ -30,7 +30,8 @@ export async function publish(configPath: string): Promise<void> {
     throw new Error("walkthrough.json must have a 'slug' field");
   }
 
-  const walkthroughDir = join(resolved, "..");
+  const configDir = join(resolved, "..");
+  const walkthroughDir = join(configDir, "walkthrough");
   const parts: Array<{ id: number }> = config.parts;
 
   console.log(`Publishing walkthrough "${slug}" (${parts.length} parts)...`);

@@ -134,6 +134,7 @@
 
     if (e.shiftKey && anchor && anchor.table === table) {
       // Shift+click: extend range from anchor
+      e.preventDefault(); // suppress Safari's text selection
       selectRange(table, anchor.lineNum, lineNum);
     } else {
       // Single click: set new anchor

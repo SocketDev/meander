@@ -548,6 +548,147 @@ pre code {
   font-size: 11px;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Unresolved Comments Button                                         */
+/* ------------------------------------------------------------------ */
+
+.unresolved-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--muted);
+  gap: 4px;
+}
+
+.unresolved-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.unresolved-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #eab308;
+  border-radius: 9px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Unresolved Comments Dropdown                                       */
+/* ------------------------------------------------------------------ */
+
+.unresolved-dropdown {
+  position: fixed;
+  z-index: 100;
+  width: 340px;
+  max-height: 70vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.unresolved-dropdown-header {
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.unresolved-list {
+  overflow-y: auto;
+  max-height: calc(70vh - 50px);
+}
+
+.unresolved-group-header {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-elev);
+  position: sticky;
+  top: 0;
+}
+
+.unresolved-item {
+  display: block;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.unresolved-item:last-child {
+  border-bottom: none;
+}
+
+.unresolved-item:hover {
+  background: var(--bg-elev);
+}
+
+.unresolved-item-file {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.unresolved-item-preview {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+
+.unresolved-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.unresolved-item-author {
+  font-weight: 500;
+}
+
+.unresolved-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.unresolved-loading,
+.unresolved-error {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.unresolved-error {
+  color: #dc2626;
+}
+
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: 1fr;

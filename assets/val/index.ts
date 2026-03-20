@@ -137,6 +137,32 @@ app.get("/:slug/part/:id", async (c) => {
 /*  Comments API                                                       */
 /* ------------------------------------------------------------------ */
 
+app.get("/:slug/api/comments/unresolved", async (c) => {
+  await ensureDb();
+  const slug = c.req.param("slug");
+
+  const result = await sqlite.execute({
+    sql: "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND resolved = 0 AND parent_id IS NULL ORDER BY part ASC, created_at ASC",
+    args: { slug },
+  });
+
+  const rows = result.rows.map((row: any) => ({
+    id: row.id,
+    slug: row.slug,
+    part: row.part,
+    file: row.file,
+    lineFrom: row.line_from,
+    lineTo: row.line_to,
+    author: row.author,
+    body: row.body,
+    parentId: row.parent_id || null,
+    resolved: !!row.resolved,
+    createdAt: row.created_at,
+  }));
+
+  return c.json(rows);
+});
+
 app.get("/:slug/api/comments", async (c) => {
   await ensureDb();
   const slug = c.req.param("slug");
