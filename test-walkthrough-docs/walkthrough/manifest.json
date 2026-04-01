@@ -1,7 +1,12 @@
 {
-  "generatedAt": "2026-04-01T05:37:43.161Z",
+  "generatedAt": "2026-04-01T06:05:23.406Z",
   "slug": "test-docs",
   "title": "Test Walkthrough with Documents",
+  "hasDocuments": true,
+  "documents": [
+    "docs/README.md",
+    "docs/api.md"
+  ],
   "parts": [
     {
       "id": 1,

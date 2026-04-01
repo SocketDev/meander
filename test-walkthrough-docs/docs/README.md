@@ -48,4 +48,6 @@ console.log("Inside details");
 
 ---
 
+See the [API Documentation](docs/api.md) for endpoint details.
+
 End of document.

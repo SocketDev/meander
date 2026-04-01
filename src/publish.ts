@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const API_BASE = "https://api.val.town";
@@ -51,9 +51,19 @@ export async function publish(configPath: string): Promise<void> {
     await uploadBlob(token, `walkthrough/${slug}/${filename}`, html);
   }
 
+  // Upload documents.html if present
+  const documentsPath = join(walkthroughDir, "documents.html");
+  let hasDocuments = false;
+  if (existsSync(documentsPath)) {
+    const documentsHtml = readFileSync(documentsPath, "utf-8");
+    await uploadBlob(token, `walkthrough/${slug}/documents.html`, documentsHtml);
+    hasDocuments = true;
+  }
+
   // Upload manifest
   const manifest = readFileSync(join(walkthroughDir, "manifest.json"), "utf-8");
   await uploadBlob(token, `walkthrough/${slug}/manifest.json`, manifest);
 
-  console.log(`\nDone! Published ${parts.length + 2} files for "${slug}".`);
+  const fileCount = parts.length + 2 + (hasDocuments ? 1 : 0);
+  console.log(`\nDone! Published ${fileCount} files for "${slug}".`);
 }

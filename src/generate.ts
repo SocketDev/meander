@@ -844,8 +844,9 @@ export async function generate(configPath: string): Promise<void> {
   const exportJs = readFileSync(join(assetsDir, "export-comments.js"), "utf-8");
   const docTabsJs = readFileSync(join(assetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(join(assetsDir, "block-select.js"), "utf-8");
+  const docTocJs = readFileSync(join(assetsDir, "doc-toc.js"), "utf-8");
   const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs;
-  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + exportJs + "\n" + docTabsJs;
+  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + exportJs + "\n" + docTabsJs + "\n" + docTocJs;
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 
@@ -894,6 +895,8 @@ export async function generate(configPath: string): Promise<void> {
     generatedAt: new Date().toISOString(),
     slug,
     title,
+    hasDocuments: hasDocuments,
+    documents: documents ?? [],
     parts: parts.map((part) => ({
       id: part.id,
       title: part.title,

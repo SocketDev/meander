@@ -285,7 +285,7 @@
       var btn = document.querySelector(".unresolved-btn");
       var isClickInside = dropdown.contains(e.target) || btn.contains(e.target);
       if (!isClickInside) {
-        hideDropdown();
+        closeDropdown();
       }
     });
 

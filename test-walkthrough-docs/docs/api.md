@@ -32,4 +32,8 @@ Authorization: Bearer YOUR_API_KEY
 
 ## Another Section
 
-More content here.
+More content here. See [README](docs/README.md#features) for the feature list.
+
+## Cross-Reference Test
+
+This section references back to the [README overview](docs/README.md).
