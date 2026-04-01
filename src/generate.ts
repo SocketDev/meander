@@ -843,7 +843,9 @@ export async function generate(configPath: string): Promise<void> {
   const unresolvedJs = readFileSync(join(assetsDir, "unresolved-comments.js"), "utf-8");
   const exportJs = readFileSync(join(assetsDir, "export-comments.js"), "utf-8");
   const docTabsJs = readFileSync(join(assetsDir, "doc-tabs.js"), "utf-8");
+  const blockSelectJs = readFileSync(join(assetsDir, "block-select.js"), "utf-8");
   const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs;
+  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + exportJs + "\n" + docTabsJs;
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 
@@ -879,7 +881,7 @@ export async function generate(configPath: string): Promise<void> {
       };
     });
 
-    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, inlineJs);
+    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs);
     writeFileSync(join(outDir, "documents.html"), documentsHtml);
     console.log(`Generated documents.html with ${documents.length} documents`);
   }

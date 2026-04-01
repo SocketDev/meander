@@ -166,68 +166,55 @@
   <script>(function () {
   "use strict";
 
-  var anchor = null; // { table, row, lineNum }
-  var currentSelection = []; // array of <tr> elements
+  // Only activate on the documents page
+  if (document.body.getAttribute("data-page-type") !== "documents") return;
+
+  var anchor = null; // { pane, blockId }
+  var currentSelection = []; // array of .doc-block elements
 
   // Expose selection state and API for comment-client.js
   window.walkthroughSelection = null;
-  window.walkthroughSelectRange = function (table, fromLine, toLine) {
-    selectRange(table, fromLine, toLine);
+  window.walkthroughSelectRange = function (pane, fromBlock, toBlock) {
+    selectBlockRange(pane, pane.getAttribute("data-doc-file"), fromBlock, toBlock);
   };
-
-  function getLineNum(td) {
-    return parseInt(td.textContent, 10) || 0;
-  }
-
-  function getFilePath(table) {
-    return table.getAttribute("data-file") || "";
-  }
-
-  function getTableRows(table) {
-    return Array.from(table.querySelectorAll("tbody tr, tr"));
-  }
 
   function clearSelection() {
     for (var i = 0; i < currentSelection.length; i++) {
-      currentSelection[i].classList.remove("selected");
+      currentSelection[i].classList.remove("block-selected");
     }
     currentSelection = [];
     window.walkthroughSelection = null;
     document.dispatchEvent(new CustomEvent("walkthroughselectionchange"));
   }
 
-  function selectRange(table, fromLine, toLine) {
-    var lo = Math.min(fromLine, toLine);
-    var hi = Math.max(fromLine, toLine);
-    var rows = getTableRows(table);
-
+  function selectBlockRange(pane, file, fromId, toId) {
+    var lo = Math.min(fromId, toId);
+    var hi = Math.max(fromId, toId);
     clearSelection();
 
-    for (var i = 0; i < rows.length; i++) {
-      var numCell = rows[i].querySelector(".line-num");
-      if (!numCell) continue;
-      var num = getLineNum(numCell);
-      if (num >= lo && num <= hi) {
-        rows[i].classList.add("selected");
-        currentSelection.push(rows[i]);
+    var blocks = pane.querySelectorAll(".doc-block");
+    for (var i = 0; i < blocks.length; i++) {
+      var id = parseInt(blocks[i].getAttribute("data-block-id"), 10);
+      if (id >= lo && id <= hi) {
+        blocks[i].classList.add("block-selected");
+        currentSelection.push(blocks[i]);
       }
     }
 
-    window.walkthroughSelection = { file: getFilePath(table), from: lo, to: hi, table: table };
+    window.walkthroughSelection = { file: file, from: lo, to: hi, type: "block" };
     document.dispatchEvent(new CustomEvent("walkthroughselectionchange"));
-    updateHash(table, lo, hi);
+    updateHash(file, lo, hi);
   }
 
-  function updateHash(table, lo, hi) {
-    var file = encodeURIComponent(getFilePath(table));
-    var lines = lo === hi ? "L" + lo : "L" + lo + "-L" + hi;
-    var hash = "#" + file + ":" + lines;
+  function updateHash(file, lo, hi) {
+    var hash = "#" + encodeURIComponent(file) + ":B" + lo;
+    if (lo !== hi) hash += "-B" + hi;
     if (history.replaceState) {
       history.replaceState(null, "", hash);
     }
   }
 
-  // Match #<encoded-filepath>:L28 or #<encoded-filepath>:L28-L35
+  // Match #<encoded-filepath>:B28 or #<encoded-filepath>:B28-B35
   function parseHash() {
     var hash = window.location.hash;
     if (!hash) return null;
@@ -236,9 +223,9 @@
     if (colonIdx < 1) return null;
 
     var filePart = decodeURIComponent(hash.substring(1, colonIdx));
-    var linesPart = hash.substring(colonIdx + 1);
+    var blocksPart = hash.substring(colonIdx + 1);
 
-    var match = linesPart.match(/^L(\d+)(?:-L(\d+))?$/);
+    var match = blocksPart.match(/^B(\d+)(?:-B(\d+))?$/);
     if (!match) return null;
 
     var from = parseInt(match[1], 10);
@@ -246,41 +233,25 @@
     return { file: filePart, from: from, to: to };
   }
 
-  function findTableForFile(filePath) {
-    var tables = document.querySelectorAll('.code-table[data-file="' + CSS.escape(filePath) + '"]');
-    // May have multiple tables for the same file (multiple sections); find the one containing the line
-    return tables;
-  }
-
-  function findTableForFileAndLine(filePath, lineNum) {
-    var tables = findTableForFile(filePath);
-    for (var i = 0; i < tables.length; i++) {
-      var rows = getTableRows(tables[i]);
-      for (var j = 0; j < rows.length; j++) {
-        var numCell = rows[j].querySelector(".line-num");
-        if (numCell && getLineNum(numCell) === lineNum) {
-          return tables[i];
-        }
-      }
-    }
-    return null;
+  function findPaneForFile(filePath) {
+    var panes = document.querySelectorAll('.doc-tab-pane[data-doc-file="' + CSS.escape(filePath) + '"]');
+    return panes.length > 0 ? panes[0] : null;
   }
 
   document.addEventListener("click", function (e) {
-    // Ignore clicks on comment indicators
-    if (e.target.closest(".comment-indicator")) return;
+    // Ignore clicks on comment UI elements
+    if (e.target.closest(".comment-add-btn") ||
+        e.target.closest(".comment-form-container") ||
+        e.target.closest(".comment-card") ||
+        e.target.closest(".doc-comment-container") ||
+        e.target.closest(".comment-indicator")) return;
 
-    var td = e.target.closest(".line-num");
+    var block = e.target.closest(".doc-block");
+    var gutter = e.target.closest(".doc-block-gutter");
 
-    if (!td) {
-      // Click outside line numbers — clear selection (but not if clicking comment UI)
-      if (currentSelection.length > 0
-          && !e.target.closest(".code-table")
-          && !e.target.closest(".comment-add-btn")
-          && !e.target.closest(".comment-form-container")
-          && !e.target.closest(".comment-form-row")
-          && !e.target.closest(".comment-row")
-          && !e.target.closest(".comment-card")) {
+    if (!block && !gutter) {
+      // Click outside blocks — clear selection
+      if (currentSelection.length > 0) {
         clearSelection();
         anchor = null;
         if (history.replaceState) {
@@ -290,26 +261,30 @@
       return;
     }
 
-    var tr = td.closest("tr");
-    var table = td.closest(".code-table");
-    if (!tr || !table) return;
+    if (gutter) {
+      block = gutter.closest(".doc-block");
+    }
+    if (!block) return;
 
-    var lineNum = getLineNum(td);
-    if (!lineNum) return;
+    var pane = block.closest(".doc-tab-pane");
+    if (!pane) return;
 
-    if (e.shiftKey && anchor && anchor.table === table) {
-      // Shift+click: extend range from anchor
-      e.preventDefault(); // suppress Safari's text selection
-      selectRange(table, anchor.lineNum, lineNum);
+    var blockId = parseInt(block.getAttribute("data-block-id"), 10);
+    var file = pane.getAttribute("data-doc-file");
+
+    if (e.shiftKey && anchor && anchor.pane === pane) {
+      // Shift+click: select range from anchor to clicked block
+      e.preventDefault();
+      selectBlockRange(pane, file, anchor.blockId, blockId);
     } else {
-      // Single click: set new anchor
+      // Single click: set new anchor, select single block
       clearSelection();
-      tr.classList.add("selected");
-      currentSelection.push(tr);
-      anchor = { table: table, row: tr, lineNum: lineNum };
-      window.walkthroughSelection = { file: getFilePath(table), from: lineNum, to: lineNum, table: table };
+      block.classList.add("block-selected");
+      currentSelection = [block];
+      anchor = { pane: pane, blockId: blockId };
+      window.walkthroughSelection = { file: file, from: blockId, to: blockId, type: "block" };
       document.dispatchEvent(new CustomEvent("walkthroughselectionchange"));
-      updateHash(table, lineNum, lineNum);
+      updateHash(file, blockId, blockId);
     }
   });
 
@@ -318,12 +293,21 @@
     var range = parseHash();
     if (!range) return;
 
-    var table = findTableForFileAndLine(range.file, range.from);
-    if (!table) return;
+    var pane = findPaneForFile(range.file);
+    if (!pane) return;
 
-    selectRange(table, range.from, range.to);
+    // Ensure the pane is visible (switch tabs if necessary)
+    var docIndex = pane.getAttribute("data-doc-index");
+    if (docIndex !== null) {
+      var tabBtn = document.querySelector('.doc-tab-btn[data-doc-index="' + CSS.escape(docIndex) + '"]');
+      if (tabBtn && !tabBtn.classList.contains("active")) {
+        tabBtn.click();
+      }
+    }
 
-    // Scroll the first selected row into view
+    selectBlockRange(pane, range.file, range.from, range.to);
+
+    // Scroll the first selected block into view
     if (currentSelection.length > 0) {
       currentSelection[0].scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -874,499 +858,6 @@
   }
 })();
 
-(function () {
-  "use strict";
-
-  var defIndex = window.__defIndex;
-  if (!defIndex || typeof defIndex !== "object") return;
-
-  var slug = document.body.getAttribute("data-slug");
-  if (!slug) return;
-
-  var names = Object.keys(defIndex).sort(function (a, b) {
-    return b.length - a.length; // longest first to avoid partial matches
-  });
-  if (names.length === 0) return;
-
-  // Build a regex that matches any definition name as a whole word
-  var escaped = names.map(function (n) {
-    return n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  });
-  var pattern = new RegExp("\\b(" + escaped.join("|") + ")\\b", "g");
-
-  // Process all highlighted code elements — runs after highlight.js
-  function processCodeElements() {
-    var codeEls = document.querySelectorAll(".line-code code");
-
-    for (var i = 0; i < codeEls.length; i++) {
-      processNode(codeEls[i]);
-    }
-  }
-
-  function processNode(node) {
-    // Walk text nodes within the already-highlighted code
-    var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
-    var textNodes = [];
-    var current;
-    while ((current = walker.nextNode())) {
-      textNodes.push(current);
-    }
-
-    for (var i = 0; i < textNodes.length; i++) {
-      var textNode = textNodes[i];
-      var text = textNode.textContent;
-      if (!text) continue;
-
-      // Skip text inside existing def-ref spans
-      if (textNode.parentElement && textNode.parentElement.classList.contains("def-ref")) continue;
-
-      var parts = [];
-      var lastIndex = 0;
-      var match;
-      pattern.lastIndex = 0;
-
-      while ((match = pattern.exec(text)) !== null) {
-        var name = match[1];
-        var def = defIndex[name];
-        if (!def) continue;
-
-        // Don't link a name to itself (same file, same line)
-        var table = textNode.closest ? textNode.closest(".code-table") : null;
-        if (!table) {
-          var el = textNode.parentElement;
-          while (el && !el.classList.contains("code-table")) el = el.parentElement;
-          table = el;
-        }
-        if (table) {
-          var currentFile = table.getAttribute("data-file");
-          var row = textNode.parentElement;
-          while (row && row.tagName !== "TR") row = row.parentElement;
-          if (row && currentFile === def.file) {
-            var lineCell = row.querySelector(".line-num");
-            if (lineCell && parseInt(lineCell.textContent, 10) === def.line) continue;
-          }
-        }
-
-        // Add text before match
-        if (match.index > lastIndex) {
-          parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
-        }
-
-        // Create the def-ref span
-        var span = document.createElement("span");
-        span.className = "def-ref";
-        span.setAttribute("data-def-name", name);
-        span.setAttribute("data-def-file", def.file);
-        span.setAttribute("data-def-line", def.line);
-        span.setAttribute("data-def-part", def.part);
-        span.textContent = name;
-        parts.push(span);
-
-        lastIndex = match.index + match[0].length;
-      }
-
-      if (parts.length === 0) continue;
-
-      // Add remaining text
-      if (lastIndex < text.length) {
-        parts.push(document.createTextNode(text.slice(lastIndex)));
-      }
-
-      // Replace the text node with the parts
-      var parent = textNode.parentNode;
-      for (var j = 0; j < parts.length; j++) {
-        parent.insertBefore(parts[j], textNode);
-      }
-      parent.removeChild(textNode);
-    }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Tooltip                                                            */
-  /* ------------------------------------------------------------------ */
-
-  var tooltip = null;
-
-  function createTooltip() {
-    var el = document.createElement("div");
-    el.className = "def-tooltip";
-    el.style.display = "none";
-    document.body.appendChild(el);
-    return el;
-  }
-
-  function showTooltip(span) {
-    if (!tooltip) tooltip = createTooltip();
-    var name = span.getAttribute("data-def-name");
-    var file = span.getAttribute("data-def-file");
-    var line = span.getAttribute("data-def-line");
-    var part = span.getAttribute("data-def-part");
-
-    tooltip.innerHTML =
-      '<div class="def-tooltip-name">' + name + '</div>' +
-      '<div class="def-tooltip-location">' + file + ':' + line + ' (Part ' + part + ')</div>' +
-      '<div class="def-tooltip-hint">Click symbol to go to definition</div>';
-
-    var rect = span.getBoundingClientRect();
-    tooltip.style.display = "block";
-    tooltip.style.left = rect.left + "px";
-    tooltip.style.top = (rect.bottom + 4) + "px";
-  }
-
-  function hideTooltip() {
-    if (tooltip) tooltip.style.display = "none";
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Event listeners                                                    */
-  /* ------------------------------------------------------------------ */
-
-  document.addEventListener("mouseover", function (e) {
-    var span = e.target.closest ? e.target.closest(".def-ref") : null;
-    if (span) {
-      showTooltip(span);
-    } else {
-      hideTooltip();
-    }
-  });
-
-  document.addEventListener("click", function (e) {
-    var span = e.target.closest ? e.target.closest(".def-ref") : null;
-    if (!span) return;
-
-    var part = span.getAttribute("data-def-part");
-    var file = span.getAttribute("data-def-file");
-    var line = span.getAttribute("data-def-line");
-    var currentPart = document.body.getAttribute("data-part");
-
-    var hash = "#" + encodeURIComponent(file) + ":L" + line;
-
-    if (part === currentPart) {
-      // Same page — scroll to the line
-      window.location.hash = hash;
-    } else {
-      // Different part — navigate
-      window.location.href = "/" + slug + "/part/" + part + hash;
-    }
-  });
-
-  // Run after highlight.js has processed the code
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      // Small delay to ensure highlight.js has run
-      setTimeout(processCodeElements, 100);
-    });
-  } else {
-    setTimeout(processCodeElements, 100);
-  }
-})();
-
-(function () {
-  "use strict";
-
-  var slug = document.body.getAttribute("data-slug");
-  if (!slug) return;
-
-  var apiBase = "/" + slug + "/api/comments/unresolved";
-  var dropdown = null;
-  var unresolvedCount = 0;
-
-  /* ------------------------------------------------------------------ */
-  /*  SVG Icon                                                           */
-  /* ------------------------------------------------------------------ */
-
-  function createIcon() {
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "18");
-    svg.setAttribute("height", "18");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "2");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-
-    var path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path1.setAttribute("d", "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z");
-    svg.appendChild(path1);
-
-    return svg;
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Button                                                             */
-  /* ------------------------------------------------------------------ */
-
-  function createButton() {
-    var btn = document.createElement("button");
-    btn.className = "unresolved-btn";
-    btn.title = "View unresolved comments";
-
-    btn.appendChild(createIcon());
-
-    var badge = document.createElement("span");
-    badge.className = "unresolved-badge";
-    badge.style.display = "none";
-    btn.appendChild(badge);
-
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      toggleDropdown();
-    });
-
-    return btn;
-  }
-
-  function updateBadge(count) {
-    unresolvedCount = count;
-    var badge = document.querySelector(".unresolved-badge");
-    if (!badge) return;
-    if (count > 0) {
-      badge.textContent = count;
-      badge.style.display = "inline-flex";
-    } else {
-      badge.style.display = "none";
-    }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Dropdown                                                           */
-  /* ------------------------------------------------------------------ */
-
-  function createDropdown() {
-    var el = document.createElement("div");
-    el.className = "unresolved-dropdown";
-    el.style.display = "none";
-
-    var header = document.createElement("div");
-    header.className = "unresolved-dropdown-header";
-    header.textContent = "Unresolved Comments";
-    el.appendChild(header);
-
-    var list = document.createElement("div");
-    list.className = "unresolved-list";
-    el.appendChild(list);
-
-    var empty = document.createElement("div");
-    empty.className = "unresolved-empty";
-    empty.textContent = "No unresolved comments";
-    empty.style.display = "none";
-    el.appendChild(empty);
-
-    document.body.appendChild(el);
-    return el;
-  }
-
-  function positionDropdown() {
-    if (!dropdown) return;
-    var btn = document.querySelector(".unresolved-btn");
-    if (!btn) return;
-    var rect = btn.getBoundingClientRect();
-    dropdown.style.position = "fixed";
-    dropdown.style.top = (rect.bottom + 8) + "px";
-    dropdown.style.right = (window.innerWidth - rect.right) + "px";
-  }
-
-  function toggleDropdown() {
-    if (!dropdown) {
-      dropdown = createDropdown();
-    }
-
-    var visible = dropdown.style.display !== "none";
-    if (visible) {
-      dropdown.style.display = "none";
-      return;
-    }
-
-    positionDropdown();
-    dropdown.style.display = "block";
-    fetchAndRenderComments();
-  }
-
-  function closeDropdown() {
-    if (dropdown) {
-      dropdown.style.display = "none";
-    }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  API                                                                */
-  /* ------------------------------------------------------------------ */
-
-  function fetchAndRenderComments() {
-    var list = dropdown.querySelector(".unresolved-list");
-    var empty = dropdown.querySelector(".unresolved-empty");
-    list.innerHTML = '<div class="unresolved-loading">Loading...</div>';
-    empty.style.display = "none";
-
-    fetch(apiBase)
-      .then(function (r) { return r.json(); })
-      .then(function (comments) {
-        updateBadge(comments.length);
-        renderComments(comments);
-      })
-      .catch(function (err) {
-        console.error("Failed to fetch unresolved comments:", err);
-        list.innerHTML = '<div class="unresolved-error">Failed to load</div>';
-      });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Rendering                                                          */
-  /* ------------------------------------------------------------------ */
-
-  function renderComments(comments) {
-    var list = dropdown.querySelector(".unresolved-list");
-    var empty = dropdown.querySelector(".unresolved-empty");
-    list.innerHTML = "";
-
-    if (comments.length === 0) {
-      empty.style.display = "block";
-      return;
-    }
-
-    var grouped = {};
-    for (var i = 0; i < comments.length; i++) {
-      var c = comments[i];
-      var key = "Part " + c.part;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(c);
-    }
-
-    var parts = Object.keys(grouped);
-    for (var p = 0; p < parts.length; p++) {
-      var partLabel = parts[p];
-      var partComments = grouped[partLabel];
-
-      var groupHeader = document.createElement("div");
-      groupHeader.className = "unresolved-group-header";
-      groupHeader.textContent = partLabel + " (" + partComments.length + ")";
-      list.appendChild(groupHeader);
-
-      for (var j = 0; j < partComments.length; j++) {
-        var comment = partComments[j];
-        var item = createCommentItem(comment);
-        list.appendChild(item);
-      }
-    }
-  }
-
-  function createCommentItem(comment) {
-    var item = document.createElement("a");
-    item.className = "unresolved-item";
-    var range = comment.lineFrom === comment.lineTo
-      ? "L" + comment.lineFrom
-      : "L" + comment.lineFrom + "-L" + comment.lineTo;
-    item.href = "/" + slug + "/part/" + comment.part + "#" + encodeURIComponent(comment.file) + ":" + range;
-
-    var fileLine = document.createElement("div");
-    fileLine.className = "unresolved-item-file";
-    fileLine.textContent = comment.file + " " + range;
-
-    var author = document.createElement("span");
-    author.className = "unresolved-item-author";
-    author.textContent = comment.author;
-
-    var preview = document.createElement("div");
-    preview.className = "unresolved-item-preview";
-    preview.textContent = truncate(comment.body, 80);
-
-    var meta = document.createElement("div");
-    meta.className = "unresolved-item-meta";
-    meta.appendChild(author);
-    meta.appendChild(document.createTextNode(" \u00b7 "));
-    meta.appendChild(document.createTextNode(formatTime(comment.createdAt)));
-
-    item.appendChild(fileLine);
-    item.appendChild(preview);
-    item.appendChild(meta);
-
-    item.addEventListener("click", function (e) {
-      e.preventDefault();
-      window.location.href = item.href;
-    });
-
-    return item;
-  }
-
-  function truncate(str, max) {
-    if (str.length <= max) return str;
-    return str.substring(0, max - 3) + "...";
-  }
-
-  function formatTime(iso) {
-    try {
-      var d = new Date(iso);
-      var now = new Date();
-      var diffMs = now - d;
-      var diffMins = Math.floor(diffMs / 60000);
-      var diffHours = Math.floor(diffMs / 3600000);
-      var diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return "just now";
-      if (diffMins < 60) return diffMins + "m ago";
-      if (diffHours < 24) return diffHours + "h ago";
-      if (diffDays < 7) return diffDays + "d ago";
-      return d.toLocaleDateString();
-    } catch (_) {
-      return iso;
-    }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Initialization                                                     */
-  /* ------------------------------------------------------------------ */
-
-  function init() {
-    var topbar = document.querySelector(".topbar");
-    if (!topbar) return;
-
-    var actions = topbar.querySelector(".topbar-actions");
-    if (!actions) {
-      actions = document.createElement("div");
-      actions.className = "topbar-actions";
-      topbar.appendChild(actions);
-    }
-
-    var btn = createButton();
-    actions.appendChild(btn);
-
-    // Load unresolved comments count
-    loadUnresolved();
-
-    // Hide dropdown when clicking outside
-    document.addEventListener("click", function (e) {
-      if (!dropdown) return;
-      var btn = document.querySelector(".unresolved-btn");
-      var isClickInside = dropdown.contains(e.target) || btn.contains(e.target);
-      if (!isClickInside) {
-        hideDropdown();
-      }
-    });
-
-    // Reposition dropdown on resize
-    window.addEventListener("resize", function () {
-      if (dropdown && dropdown.style.display !== "none") {
-        positionDropdown();
-      }
-    }, { passive: true });
-  }
-
-  function loadUnresolved() {
-    fetch(apiBase)
-      .then(function (r) { return r.json(); })
-      .then(function (comments) {
-        updateBadge(comments.length);
-      })
-      .catch(function () { /* silently fail */ });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-})();
 (function () {
   "use strict";
 
