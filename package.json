@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.48",
-    "@valtown/sdk": "^1.0.0"
+    "@valtown/sdk": "^1.0.0",
+    "marked": "^17.0.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

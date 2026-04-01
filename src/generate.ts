@@ -3,6 +3,7 @@ import { Value } from "@sinclair/typebox/value";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { marked, Renderer } from "marked";
 
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
@@ -19,6 +20,9 @@ const WalkthroughPartSchema = Type.Object({
 const WalkthroughConfigSchema = Type.Object({
   slug: Type.String({ minLength: 1, pattern: "^[a-z0-9][a-z0-9-]*$" }),
   title: Type.String({ minLength: 1 }),
+  documents: Type.Optional(
+    Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })
+  ),
   parts: Type.Array(WalkthroughPartSchema, { minItems: 1 }),
 });
 
@@ -462,6 +466,226 @@ function renderIndexHtml(slug: string, title: string, parts: readonly Walkthroug
 }
 
 /* ------------------------------------------------------------------ */
+/*  Markdown document rendering                                        */
+/* ------------------------------------------------------------------ */
+
+type RenderedDocument = {
+  html: string;
+  headings: Array<{ id: string; text: string; level: number }>;
+  blockCount: number;
+};
+
+type ResolvedDocRef = {
+  docIndex: number;
+  anchor: string;
+};
+
+/**
+ * Resolves a link href to another document in the walkthrough.
+ * Returns null if the link is not a cross-document reference.
+ */
+function resolveDocRef(
+  href: string,
+  currentDocPath: string,
+  allDocPaths: readonly string[]
+): ResolvedDocRef | null {
+  if (!href) return null;
+
+  // Check if this is a link to another markdown file
+  // Supports formats like: ./other.md, other.md, other.md#anchor
+  let targetPath = href;
+  let anchor = "";
+
+  // Extract anchor if present
+  const hashIndex = href.indexOf("#");
+  if (hashIndex !== -1) {
+    targetPath = href.slice(0, hashIndex);
+    anchor = href.slice(hashIndex + 1);
+  }
+
+  // Normalize the target path
+  // Handle relative paths starting with ./
+  if (targetPath.startsWith("./")) {
+    targetPath = targetPath.slice(2);
+  }
+
+  // Find the target document in allDocPaths
+  for (let i = 0; i < allDocPaths.length; i++) {
+    const docPath = allDocPaths[i]!;
+    // Check for exact match or relative path match
+    if (docPath === targetPath || docPath.endsWith("/" + targetPath) || docPath === "./" + targetPath) {
+      // Don't resolve links to the current document
+      if (docPath === currentDocPath) continue;
+      return { docIndex: i, anchor };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Wraps block-level elements in .doc-block containers with sequential data-block-id attributes.
+ */
+function wrapBlocks(html: string, docIndex: number): { wrapped: string; blockCount: number } {
+  const BLOCK_TAGS = /^<(h[1-6]|p|ul|ol|blockquote|pre|table|hr|details)[\s>]/i;
+
+  const lines = html.split("\n");
+  const result: string[] = [];
+  let blockId = 0;
+  let inBlock = false;
+  let depth = 0;
+  let currentTag = "";
+  let blockLines: string[] = [];
+
+  for (const line of lines) {
+    if (!inBlock) {
+      // Check if this line starts a block element
+      const match = line.match(BLOCK_TAGS);
+      if (match) {
+        inBlock = true;
+        currentTag = match[1]!.toLowerCase();
+        depth = 1;
+        blockLines = [line];
+
+        // Check if this is a self-contained block on one line
+        // For hr, or elements that close on the same line
+        if (currentTag === "hr" || line.includes(`</${currentTag}>`)) {
+          // Wrap the block
+          result.push(
+            `<div class="doc-block" data-block-id="${blockId}">`,
+            `<div class="doc-block-gutter"></div>`,
+            ...blockLines,
+            `</div>`
+          );
+          blockId += 1;
+          inBlock = false;
+          blockLines = [];
+          continue;
+        }
+      } else {
+        // Not a block element, pass through
+        result.push(line);
+      }
+    } else {
+      // We're inside a block, track depth
+      blockLines.push(line);
+
+      // Count opening and closing tags for the current element
+      // Use regex to find all occurrences of the current tag
+      const openPattern = new RegExp(`<${currentTag}[\\s>]`, "gi");
+      const closePattern = new RegExp(`</${currentTag}>`, "gi");
+
+      const opens = (line.match(openPattern) || []).length;
+      const closes = (line.match(closePattern) || []).length;
+
+      // Adjust depth: add any additional opens, subtract closes
+      // Initial depth=1 already counts the opening tag that started this block
+      depth += opens;
+      depth -= closes;
+
+      if (depth <= 0) {
+        // Block is complete, wrap it
+        result.push(
+          `<div class="doc-block" data-block-id="${blockId}">`,
+          `<div class="doc-block-gutter"></div>`,
+          ...blockLines,
+          `</div>`
+        );
+        blockId += 1;
+        inBlock = false;
+        blockLines = [];
+      }
+    }
+  }
+
+  // Handle any remaining unclosed block (shouldn't happen with valid HTML)
+  if (inBlock && blockLines.length > 0) {
+    result.push(
+      `<div class="doc-block" data-block-id="${blockId}">`,
+      `<div class="doc-block-gutter"></div>`,
+      ...blockLines,
+      `</div>`
+    );
+    blockId += 1;
+  }
+
+  return { wrapped: result.join("\n"), blockCount: blockId };
+}
+
+/**
+ * Renders a markdown document to HTML with block wrappers and cross-reference support.
+ *
+ * @param filePath - Absolute path to the markdown file
+ * @param docIndex - Index of this document in the allDocPaths array
+ * @param allDocPaths - Array of all document paths in the walkthrough
+ * @returns Rendered document with HTML, headings, and block count
+ */
+function renderMarkdownDocument(
+  filePath: string,
+  docIndex: number,
+  allDocPaths: readonly string[]
+): RenderedDocument {
+  const markdown = readFileSync(filePath, "utf-8");
+  const headings: Array<{ id: string; text: string; level: number }> = [];
+
+  // Get the relative path for this document (for cross-reference resolution)
+  const relativePath = allDocPaths[docIndex] ?? filePath;
+
+  // Create custom renderer
+  const renderer = new Renderer();
+
+  // Override heading to add IDs and collect headings for TOC
+  renderer.heading = function (data: { text: string; depth: number }): string {
+    const { text, depth } = data;
+    // Generate slug from text
+    const slug = text
+      .toLowerCase()
+      .replace(/[^\w]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    // Collect heading for TOC
+    headings.push({ id: slug, text, level: depth });
+
+    return `<h${depth} id="${slug}">${text}</h${depth}>`;
+  };
+
+  // Override code to add language class for highlight.js
+  renderer.code = function (data: { text: string; lang?: string }): string {
+    const { text, lang } = data;
+    const langClass = lang ? ` class="language-${lang}"` : "";
+    return `<pre><code${langClass}>${escapeHtml(text)}</code></pre>`;
+  };
+
+  // Override link to resolve cross-document references
+  renderer.link = function (data: { href: string; text: string }): string {
+    const { href, text } = data;
+
+    // Try to resolve as a cross-document reference
+    const resolved = resolveDocRef(href, relativePath, allDocPaths);
+
+    if (resolved) {
+      // Cross-document link — use data attributes for client-side handling
+      return `<a href="#" data-doc-ref="${resolved.docIndex}" data-doc-anchor="${resolved.anchor}">${text}</a>`;
+    }
+
+    // External link — open in new tab
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${text}</a>`;
+  };
+
+  // Parse markdown with custom renderer
+  const rawHtml = marked.parse(markdown, { renderer }) as string;
+
+  // Wrap blocks
+  const { wrapped, blockCount } = wrapBlocks(rawHtml, docIndex);
+
+  return {
+    html: wrapped,
+    headings,
+    blockCount,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Config validation                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -484,9 +708,34 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
 
 export async function generate(configPath: string): Promise<void> {
   const config = loadAndValidateConfig(configPath);
-  const { slug, title, parts } = config;
+  const { slug, title, parts, documents } = config;
 
   const rootDir = process.cwd();
+
+  // Validate documents if present
+  if (documents && documents.length > 0) {
+    // Check for duplicates
+    const seen = new Set<string>();
+    for (const docPath of documents) {
+      if (seen.has(docPath)) {
+        throw new Error(`Duplicate document path: ${docPath}`);
+      }
+      seen.add(docPath);
+    }
+
+    // Validate each path ends with .md and exists
+    for (const docPath of documents) {
+      if (!docPath.endsWith(".md")) {
+        throw new Error(`Document path must end with .md: ${docPath}`);
+      }
+      const fullPath = join(rootDir, docPath);
+      if (!existsSync(fullPath)) {
+        throw new Error(`Document file not found: ${docPath}`);
+      }
+    }
+
+    console.log(`Documents: ${documents.length} files`);
+  }
   const outDir = join(rootDir, "walkthrough");
   mkdirSync(outDir, { recursive: true });
 
