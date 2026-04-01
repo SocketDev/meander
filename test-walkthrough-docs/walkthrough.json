@@ -1,0 +1,17 @@
+{
+  "slug": "test-docs",
+  "title": "Test Walkthrough with Documents",
+  "documents": [
+    "docs/README.md",
+    "docs/api.md"
+  ],
+  "parts": [
+    {
+      "id": 1,
+      "title": "Getting Started",
+      "objective": "Learn the basics of the system.",
+      "keywords": ["setup", "config"],
+      "files": ["src/config.ts"]
+    }
+  ]
+}

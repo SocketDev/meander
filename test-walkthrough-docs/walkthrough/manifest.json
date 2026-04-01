@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-04-01T05:15:43.673Z",
+  "slug": "test-docs",
+  "title": "Test Walkthrough with Documents",
+  "parts": [
+    {
+      "id": 1,
+      "title": "Getting Started",
+      "files": 1,
+      "sections": 2,
+      "output": "walkthrough-part-1.html"
+    }
+  ]
+}
