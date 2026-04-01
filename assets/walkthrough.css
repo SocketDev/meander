@@ -1100,3 +1100,16 @@ pre code {
 .doc-content details > *:not(summary):last-child {
   margin-bottom: 10px;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Document Comment Container                                         */
+/* ------------------------------------------------------------------ */
+
+.doc-comment-container {
+  margin: 8px 0 16px 24px;
+  padding: 8px 0;
+}
+
+.doc-comment-form {
+  margin: 8px 0 16px 24px;
+}

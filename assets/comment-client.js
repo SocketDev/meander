@@ -3,7 +3,9 @@
 
   var slug = document.body.getAttribute("data-slug");
   var partId = parseInt(document.body.getAttribute("data-part"), 10);
-  if (!slug || !partId) return;
+  var pageType = document.body.getAttribute("data-page-type");
+  var isDocumentsPage = pageType === "documents";
+  if (!slug || isNaN(partId)) return;
 
   var apiBase = "/" + slug + "/api/comments";
   var comments = [];
@@ -105,9 +107,15 @@
   /*  Rendering                                                          */
   /* ------------------------------------------------------------------ */
 
+  function getActiveDocFile() {
+    if (!isDocumentsPage) return null;
+    var activePane = document.querySelector('.doc-tab-pane.active, .doc-tab-pane:not([style*="display: none"])');
+    return activePane ? activePane.getAttribute("data-doc-file") : null;
+  }
+
   function renderAllComments() {
     // Remove existing comment rows and indicators
-    var existingRows = document.querySelectorAll(".comment-row");
+    var existingRows = document.querySelectorAll(".comment-row, .doc-comment-container");
     for (var i = 0; i < existingRows.length; i++) {
       existingRows[i].remove();
     }
@@ -116,12 +124,19 @@
       existingDots[i].remove();
     }
 
+    // Filter comments by active tab when on documents page
+    var activeDocFile = getActiveDocFile();
+    var commentsToRender = comments;
+    if (activeDocFile) {
+      commentsToRender = comments.filter(function (c) { return c.file === activeDocFile; });
+    }
+
     // Group root comments by file + lineFrom (indicator anchor point).
     // Replies are grouped with their parent regardless of line range.
     var groups = {};
     var parentGroupKey = {};
-    for (var j = 0; j < comments.length; j++) {
-      var c = comments[j];
+    for (var j = 0; j < commentsToRender.length; j++) {
+      var c = commentsToRender[j];
       if (c.parentId) continue; // handle replies in second pass
       var key = c.file + ":" + c.lineFrom;
       if (!groups[key]) {
@@ -133,8 +148,8 @@
       parentGroupKey[c.id] = key;
     }
     // Second pass: attach replies to their parent's group
-    for (var j = 0; j < comments.length; j++) {
-      var c = comments[j];
+    for (var j = 0; j < commentsToRender.length; j++) {
+      var c = commentsToRender[j];
       if (!c.parentId) continue;
       var gKey = parentGroupKey[c.parentId];
       if (gKey && groups[gKey]) {
@@ -162,6 +177,12 @@
     return null;
   }
 
+  function findBlockElement(file, blockId) {
+    var pane = document.querySelector('.doc-tab-pane[data-doc-file="' + CSS.escape(file) + '"]');
+    if (!pane) return null;
+    return pane.querySelector('.doc-block[data-block-id="' + blockId + '"]');
+  }
+
   function buildCommentCard(comment, isReply) {
     var isResolved = !isReply && comment.resolved;
     var card = document.createElement("div");
@@ -170,9 +191,10 @@
 
     var meta = document.createElement("div");
     meta.className = "comment-meta";
+    var prefix = isDocumentsPage ? "B" : "L";
     var range = comment.lineFrom === comment.lineTo
-      ? "L" + comment.lineFrom
-      : "L" + comment.lineFrom + "-L" + comment.lineTo;
+      ? prefix + comment.lineFrom
+      : prefix + comment.lineFrom + "-" + prefix + comment.lineTo;
     var resolvedLabel = isResolved ? " (resolved)" : "";
     meta.textContent = comment.author + (isReply ? "" : " on " + range) + " \u00b7 " + formatTime(comment.createdAt) + resolvedLabel;
 
@@ -275,12 +297,8 @@
   }
 
   function renderCommentGroup(group) {
-    var targetRow = findRowForLine(group.file, group.lineTo);
-    if (!targetRow) return;
-
-    // Find the lineFrom row to place the indicator
-    var indicatorRow = findRowForLine(group.file, group.lineFrom);
-    if (!indicatorRow) indicatorRow = targetRow;
+    var groupKey = group.file + ":" + group.lineFrom;
+    var startExpanded = !!expandedGroups[groupKey];
 
     // Separate root comments from replies
     var roots = [];
@@ -299,71 +317,151 @@
     var totalCount = group.comments.length;
     var allResolved = roots.length > 0 && roots.every(function (r) { return r.resolved; });
 
-    // Create the indicator dot on the lineFrom row (yellow = unresolved, green = all resolved)
-    var numCell = indicatorRow.querySelector(".line-num");
-    if (numCell) {
-      var dot = document.createElement("span");
-      dot.className = "comment-indicator" + (allResolved ? " comment-indicator-resolved" : "");
-      dot.title = totalCount + " comment" + (totalCount === 1 ? "" : "s") + (allResolved ? " (resolved)" : "");
-      numCell.insertBefore(dot, numCell.firstChild);
-    }
+    // Render based on page type
+    if (isDocumentsPage) {
+      // Document page: find the block elements
+      var targetBlock = findBlockElement(group.file, group.lineTo);
+      if (!targetBlock) return;
 
-    // Build the comment row — expanded if group is in expandedGroups, hidden otherwise
-    var groupKey = group.file + ":" + group.lineFrom;
-    var startExpanded = !!expandedGroups[groupKey];
-    var commentRow = document.createElement("tr");
-    commentRow.className = "comment-row";
-    if (!startExpanded) {
-      commentRow.style.display = "none";
-    }
-    var commentCell = document.createElement("td");
-    commentCell.colSpan = 2;
-    commentCell.className = "comment-card-cell";
+      // Find the lineFrom block to place the indicator
+      var indicatorBlock = findBlockElement(group.file, group.lineFrom);
+      if (!indicatorBlock) indicatorBlock = targetBlock;
 
-    for (var i = 0; i < roots.length; i++) {
-      var rootCard = buildCommentCard(roots[i], false);
+      // Create the indicator dot on the lineFrom block's gutter
+      var gutter = indicatorBlock.querySelector(".doc-block-gutter");
+      if (gutter) {
+        var dot = document.createElement("span");
+        dot.className = "comment-indicator" + (allResolved ? " comment-indicator-resolved" : "");
+        dot.title = totalCount + " comment" + (totalCount === 1 ? "" : "s") + (allResolved ? " (resolved)" : "");
+        gutter.appendChild(dot);
+      }
 
-      // Render replies for this root
-      var childReplies = repliesByParent[roots[i].id] || [];
-      if (childReplies.length > 0) {
-        var thread = document.createElement("div");
-        thread.className = "comment-thread";
-        for (var j = 0; j < childReplies.length; j++) {
-          thread.appendChild(buildCommentCard(childReplies[j], true));
+      // Build the comment container — expanded if group is in expandedGroups, hidden otherwise
+      var commentContainer = document.createElement("div");
+      commentContainer.className = "doc-comment-container";
+      if (!startExpanded) {
+        commentContainer.style.display = "none";
+      }
+
+      for (var i = 0; i < roots.length; i++) {
+        var rootCard = buildCommentCard(roots[i], false);
+
+        // Render replies for this root
+        var childReplies = repliesByParent[roots[i].id] || [];
+        if (childReplies.length > 0) {
+          var thread = document.createElement("div");
+          thread.className = "comment-thread";
+          for (var j = 0; j < childReplies.length; j++) {
+            thread.appendChild(buildCommentCard(childReplies[j], true));
+          }
+          rootCard.appendChild(thread);
         }
-        rootCard.appendChild(thread);
+
+        // Append actions (Reply/Delete) after the thread
+        if (rootCard._actions) {
+          rootCard.appendChild(rootCard._actions);
+        }
+
+        commentContainer.appendChild(rootCard);
       }
 
-      // Append actions (Reply/Delete) after the thread
-      if (rootCard._actions) {
-        rootCard.appendChild(rootCard._actions);
-      }
+      // Insert after the target block
+      targetBlock.parentNode.insertBefore(commentContainer, targetBlock.nextSibling);
 
-      commentCell.appendChild(rootCard);
-    }
-
-    commentRow.appendChild(commentCell);
-    targetRow.parentNode.insertBefore(commentRow, targetRow.nextSibling);
-
-    // Click the indicator to toggle comment visibility and highlight lines
-    if (numCell) {
-      var indicator = numCell.querySelector(".comment-indicator");
-      if (indicator) {
-        (function (row, gFile, gFrom, gTo) {
-          indicator.addEventListener("click", function (e) {
-            e.stopPropagation();
-            var visible = row.style.display !== "none";
-            if (visible) {
-              row.style.display = "none";
-            } else {
-              row.style.display = "";
-              var table = numCell.closest(".code-table");
-              if (table && window.walkthroughSelectRange) {
-                window.walkthroughSelectRange(table, gFrom, gTo);
+      // Click the indicator to toggle comment visibility and highlight blocks
+      if (gutter) {
+        var indicator = gutter.querySelector(".comment-indicator");
+        if (indicator) {
+          (function (container, gFile, gFrom, gTo) {
+            indicator.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var visible = container.style.display !== "none";
+              if (visible) {
+                container.style.display = "none";
+              } else {
+                container.style.display = "";
+                var pane = document.querySelector('.doc-tab-pane[data-doc-file="' + CSS.escape(gFile) + '"]');
+                if (pane && window.walkthroughSelectRange) {
+                  window.walkthroughSelectRange(pane, gFrom, gTo);
+                }
               }
-            }
-          });
-        })(commentRow, group.file, group.lineFrom, group.lineTo);
+            });
+          })(commentContainer, group.file, group.lineFrom, group.lineTo);
+        }
+      }
+    } else {
+      // Code page: use table rows
+      var targetRow = findRowForLine(group.file, group.lineTo);
+      if (!targetRow) return;
+
+      // Find the lineFrom row to place the indicator
+      var indicatorRow = findRowForLine(group.file, group.lineFrom);
+      if (!indicatorRow) indicatorRow = targetRow;
+
+      // Create the indicator dot on the lineFrom row (yellow = unresolved, green = all resolved)
+      var numCell = indicatorRow.querySelector(".line-num");
+      if (numCell) {
+        var dot = document.createElement("span");
+        dot.className = "comment-indicator" + (allResolved ? " comment-indicator-resolved" : "");
+        dot.title = totalCount + " comment" + (totalCount === 1 ? "" : "s") + (allResolved ? " (resolved)" : "");
+        numCell.insertBefore(dot, numCell.firstChild);
+      }
+
+      // Build the comment row — expanded if group is in expandedGroups, hidden otherwise
+      var commentRow = document.createElement("tr");
+      commentRow.className = "comment-row";
+      if (!startExpanded) {
+        commentRow.style.display = "none";
+      }
+      var commentCell = document.createElement("td");
+      commentCell.colSpan = 2;
+      commentCell.className = "comment-card-cell";
+
+      for (var i = 0; i < roots.length; i++) {
+        var rootCard = buildCommentCard(roots[i], false);
+
+        // Render replies for this root
+        var childReplies = repliesByParent[roots[i].id] || [];
+        if (childReplies.length > 0) {
+          var thread = document.createElement("div");
+          thread.className = "comment-thread";
+          for (var j = 0; j < childReplies.length; j++) {
+            thread.appendChild(buildCommentCard(childReplies[j], true));
+          }
+          rootCard.appendChild(thread);
+        }
+
+        // Append actions (Reply/Delete) after the thread
+        if (rootCard._actions) {
+          rootCard.appendChild(rootCard._actions);
+        }
+
+        commentCell.appendChild(rootCard);
+      }
+
+      commentRow.appendChild(commentCell);
+      targetRow.parentNode.insertBefore(commentRow, targetRow.nextSibling);
+
+      // Click the indicator to toggle comment visibility and highlight lines
+      if (numCell) {
+        var indicator = numCell.querySelector(".comment-indicator");
+        if (indicator) {
+          (function (row, gFile, gFrom, gTo) {
+            indicator.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var visible = row.style.display !== "none";
+              if (visible) {
+                row.style.display = "none";
+              } else {
+                row.style.display = "";
+                var table = numCell.closest(".code-table");
+                if (table && window.walkthroughSelectRange) {
+                  window.walkthroughSelectRange(table, gFrom, gTo);
+                }
+              }
+            });
+          })(commentRow, group.file, group.lineFrom, group.lineTo);
+        }
       }
     }
   }
@@ -394,14 +492,16 @@
     if (!addBtn) addBtn = createAddButton();
 
     // Position near the last selected row in the code column
-    var selectedRows = document.querySelectorAll(".code-table tr.selected");
-    if (selectedRows.length === 0) {
+    var selectedElements = isDocumentsPage
+      ? document.querySelectorAll(".doc-block.block-selected")
+      : document.querySelectorAll(".code-table tr.selected");
+    if (selectedElements.length === 0) {
       addBtn.style.display = "none";
       return;
     }
 
-    var lastRow = selectedRows[selectedRows.length - 1];
-    var rect = lastRow.getBoundingClientRect();
+    var lastEl = selectedElements[selectedElements.length - 1];
+    var rect = lastEl.getBoundingClientRect();
     var btnLeft = Math.min(rect.right - 100, window.innerWidth - 120);
     addBtn.style.display = "block";
     addBtn.style.position = "fixed";
@@ -414,8 +514,9 @@
     if (addBtn) addBtn.style.display = "none";
   }
 
-  function findLastSelectedRow() {
-    var selected = document.querySelectorAll(".code-table tr.selected");
+  function findLastSelectedElement() {
+    var selector = isDocumentsPage ? ".doc-block.block-selected" : ".code-table tr.selected";
+    var selected = document.querySelectorAll(selector);
     return selected.length > 0 ? selected[selected.length - 1] : null;
   }
 
@@ -427,23 +528,20 @@
     hideAddButton();
 
     // Remove existing form
-    var existingForm = document.querySelector(".comment-form-row");
+    var existingForm = document.querySelector(".comment-form-row, .doc-comment-form");
     if (existingForm) existingForm.remove();
 
-    var lastRow = findLastSelectedRow();
-    if (!lastRow) return;
-
-    // Build the form inside a table row with colspan=2
-    var formRow = document.createElement("tr");
-    formRow.className = "comment-form-row";
-    var formCell = document.createElement("td");
-    formCell.colSpan = 2;
-    formCell.className = "comment-form-cell";
+    var lastEl = findLastSelectedElement();
+    if (!lastEl) return;
 
     var container = document.createElement("div");
     container.className = "comment-form-container";
 
-    var range = sel.from === sel.to ? "L" + sel.from : "L" + sel.from + "-L" + sel.to;
+    // Build label based on page type (block IDs use "B" prefix on documents page)
+    var prefix = isDocumentsPage ? "B" : "L";
+    var range = sel.from === sel.to
+      ? prefix + sel.from
+      : prefix + sel.from + "-" + prefix + sel.to;
     var label = document.createElement("div");
     label.className = "comment-form-label";
     label.textContent = "Comment on " + sel.file + " " + range;
@@ -459,7 +557,15 @@
     var cancelBtn = document.createElement("button");
     cancelBtn.className = "comment-form-cancel";
     cancelBtn.textContent = "Cancel";
-    cancelBtn.addEventListener("click", function () { formRow.remove(); });
+    cancelBtn.addEventListener("click", function () {
+      if (isDocumentsPage) {
+        var formEl = document.querySelector(".doc-comment-form");
+        if (formEl) formEl.remove();
+      } else {
+        var formRow = document.querySelector(".comment-form-row");
+        if (formRow) formRow.remove();
+      }
+    });
 
     var submitBtn = document.createElement("button");
     submitBtn.className = "comment-form-submit";
@@ -468,7 +574,13 @@
       var text = textarea.value.trim();
       if (!text) return;
       postComment(sel.file, sel.from, sel.to, text, null, function () {
-        formRow.remove();
+        if (isDocumentsPage) {
+          var formEl = document.querySelector(".doc-comment-form");
+          if (formEl) formEl.remove();
+        } else {
+          var formRow = document.querySelector(".comment-form-row");
+          if (formRow) formRow.remove();
+        }
       });
     });
 
@@ -477,15 +589,30 @@
     container.appendChild(label);
     container.appendChild(textarea);
     container.appendChild(btnRow);
-    formCell.appendChild(container);
-    formRow.appendChild(formCell);
 
-    // Insert the form row directly after the last selected row in the table
-    lastRow.parentNode.insertBefore(formRow, lastRow.nextSibling);
+    if (isDocumentsPage) {
+      // On documents page: insert form as a div after the last selected block
+      var formDiv = document.createElement("div");
+      formDiv.className = "doc-comment-form";
+      formDiv.appendChild(container);
+      lastEl.parentNode.insertBefore(formDiv, lastEl.nextSibling);
+    } else {
+      // On code pages: insert form as a table row
+      var formRow = document.createElement("tr");
+      formRow.className = "comment-form-row";
+      var formCell = document.createElement("td");
+      formCell.colSpan = 2;
+      formCell.className = "comment-form-cell";
+      formCell.appendChild(container);
+      formRow.appendChild(formCell);
+      lastEl.parentNode.insertBefore(formRow, lastEl.nextSibling);
+    }
+
     textarea.focus({ preventScroll: true });
 
-    // Scroll the first selected line to the top, accounting for the sticky header
-    var firstSelected = document.querySelector(".code-table tr.selected");
+    // Scroll the first selected element to the top, accounting for the sticky header
+    var firstSelectedSelector = isDocumentsPage ? ".doc-block.block-selected" : ".code-table tr.selected";
+    var firstSelected = document.querySelector(firstSelectedSelector);
     if (firstSelected) {
       var topbar = document.querySelector(".topbar");
       var headerHeight = topbar ? topbar.getBoundingClientRect().height : 0;
@@ -521,6 +648,11 @@
   window.addEventListener("scroll", function () {
     hideAddButton();
   }, { passive: true });
+
+  // Re-render comments when tabs change on documents page
+  document.addEventListener("doctabchange", function () {
+    renderAllComments();
+  });
 
   // Load comments on page ready
   if (document.readyState === "loading") {

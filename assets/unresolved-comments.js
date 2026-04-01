@@ -165,7 +165,7 @@
     var grouped = {};
     for (var i = 0; i < comments.length; i++) {
       var c = comments[i];
-      var key = "Part " + c.part;
+      var key = c.part === 0 ? "Documents" : "Part " + c.part;
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(c);
     }
@@ -191,10 +191,18 @@
   function createCommentItem(comment) {
     var item = document.createElement("a");
     item.className = "unresolved-item";
-    var range = comment.lineFrom === comment.lineTo
-      ? "L" + comment.lineFrom
-      : "L" + comment.lineFrom + "-L" + comment.lineTo;
-    item.href = "/" + slug + "/part/" + comment.part + "#" + encodeURIComponent(comment.file) + ":" + range;
+    var range;
+    if (comment.part === 0) {
+      range = comment.lineFrom === comment.lineTo
+        ? "B" + comment.lineFrom
+        : "B" + comment.lineFrom + "-B" + comment.lineTo;
+      item.href = "/" + slug + "/documents#" + encodeURIComponent(comment.file) + ":" + range;
+    } else {
+      range = comment.lineFrom === comment.lineTo
+        ? "L" + comment.lineFrom
+        : "L" + comment.lineFrom + "-L" + comment.lineTo;
+      item.href = "/" + slug + "/part/" + comment.part + "#" + encodeURIComponent(comment.file) + ":" + range;
+    }
 
     var fileLine = document.createElement("div");
     fileLine.className = "unresolved-item-file";
