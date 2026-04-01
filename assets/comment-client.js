@@ -109,7 +109,7 @@
 
   function getActiveDocFile() {
     if (!isDocumentsPage) return null;
-    var activePane = document.querySelector('.doc-tab-pane.active, .doc-tab-pane:not([style*="display: none"])');
+    var activePane = document.querySelector(".doc-tab-pane.active");
     return activePane ? activePane.getAttribute("data-doc-file") : null;
   }
 

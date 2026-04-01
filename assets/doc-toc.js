@@ -118,8 +118,7 @@
   /* ------------------------------------------------------------------ */
 
   function populateToc() {
-    var activePane = document.querySelector(".doc-tab-pane.active") ||
-                     document.querySelector('.doc-tab-pane:not([style*="display: none"])');
+    var activePane = document.querySelector(".doc-tab-pane.active");
     if (!activePane) return;
 
     var docFile = activePane.getAttribute("data-doc-file");
@@ -167,8 +166,7 @@
   function updateScrollSpy() {
     if (!dropdown || dropdown.style.display === "none") return;
 
-    var activePane = document.querySelector(".doc-tab-pane.active") ||
-                     document.querySelector('.doc-tab-pane:not([style*="display: none"])');
+    var activePane = document.querySelector(".doc-tab-pane.active");
     if (!activePane) return;
 
     // Get all headings with IDs within the active pane
@@ -201,12 +199,30 @@
   /*  Initialization                                                     */
   /* ------------------------------------------------------------------ */
 
+  function activeDocHasHeadings() {
+    var activePane = document.querySelector(".doc-tab-pane.active");
+    if (!activePane || !window.__docHeadings) return false;
+    var docFile = activePane.getAttribute("data-doc-file");
+    var docData = window.__docHeadings.find(function (d) { return d.file === docFile; });
+    return !!(docData && docData.headings.length > 0);
+  }
+
+  function updateButtonVisibility() {
+    if (!btn) return;
+    btn.style.display = activeDocHasHeadings() ? "" : "none";
+  }
+
   function init() {
     btn = createTocButton();
+    updateButtonVisibility();
 
-    // Listen for tab changes to repopulate TOC
+    // Listen for tab changes to repopulate TOC and update button visibility
     document.addEventListener("doctabchange", function () {
-      if (dropdown && dropdown.style.display !== "none") {
+      updateButtonVisibility();
+      // Close the dropdown if the new tab has no headings
+      if (!activeDocHasHeadings()) {
+        closeTocDropdown();
+      } else if (dropdown && dropdown.style.display !== "none") {
         populateToc();
       }
     });
@@ -222,11 +238,6 @@
 
     // Scroll spy
     window.addEventListener("scroll", updateScrollSpy, { passive: true });
-
-    // Reposition on window resize
-    window.addEventListener("resize", function () {
-      // Fixed positioning handles this automatically
-    }, { passive: true });
   }
 
   if (document.readyState === "loading") {

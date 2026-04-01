@@ -501,18 +501,20 @@ function renderDocumentsHtml(
     })
     .join("\n    ");
 
-  // Build tab panes
+  // Build tab panes — first pane gets the "active" class so CSS display:none
+  // doesn't hide it before doc-tabs.js initialises.
   const tabPanes = renderedDocs
     .map((doc, index) => {
+      const activeClass = index === 0 ? " active" : "";
       const display = index === 0 ? "" : ' style="display:none"';
-      return `<div class="doc-tab-pane" data-doc-index="${index}" data-doc-file="${escapeHtml(doc.filePath)}"${display}>
+      return `<div class="doc-tab-pane${activeClass}" data-doc-index="${index}" data-doc-file="${escapeHtml(doc.filePath)}"${display}>
     <article class="doc-content">${doc.html}</article>
   </div>`;
     })
     .join("\n  ");
 
-  // Build objective text from first part or default
-  const objective = parts.length > 0 ? parts[0]!.objective : "Documentation for this walkthrough.";
+  // Generic description for the documents section header
+  const objective = "Reference documents for this walkthrough.";
 
   return `<!doctype html>
 <html lang="en">
@@ -540,7 +542,6 @@ function renderDocumentsHtml(
     ${tabPanes}
   </main>
 
-  <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
   <script src="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/highlight.min.js"></script>
   <script>
     for (const block of document.querySelectorAll('.doc-content pre code')) {
@@ -561,6 +562,18 @@ function renderDocumentsHtml(
 /*  Markdown document rendering                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Converts arbitrary text to a heading ID slug — the same transformation
+ * used by the heading renderer and by link anchor normalisation, so
+ * cross-reference anchors always match the generated heading IDs.
+ */
+function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 type RenderedDocument = {
   html: string;
   headings: Array<{ id: string; text: string; level: number }>;
@@ -570,6 +583,8 @@ type RenderedDocument = {
 type ResolvedDocRef = {
   docIndex: number;
   anchor: string;
+  /** True when the link targets the same document it appears in. */
+  sameDoc?: boolean;
 };
 
 /**
@@ -584,30 +599,47 @@ function resolveDocRef(
   if (!href) return null;
 
   // Check if this is a link to another markdown file
-  // Supports formats like: ./other.md, other.md, other.md#anchor
+  // Supports formats like: ./other.md, other.md, ../other.md, other.md#anchor
   let targetPath = href;
   let anchor = "";
 
-  // Extract anchor if present
+  // Extract anchor if present and slugify it so it matches the generated
+  // heading ID (e.g. "C++ Design" → "c-design", same as the heading renderer).
   const hashIndex = href.indexOf("#");
   if (hashIndex !== -1) {
     targetPath = href.slice(0, hashIndex);
-    anchor = href.slice(hashIndex + 1);
+    const rawAnchor = href.slice(hashIndex + 1);
+    // Only slugify if the anchor looks like a heading text; if it's already a
+    // valid slug (all lowercase word chars and hyphens) leave it as-is.
+    anchor = /^[a-z0-9-]+$/.test(rawAnchor) ? rawAnchor : slugifyHeading(rawAnchor);
   }
 
-  // Normalize the target path
-  // Handle relative paths starting with ./
-  if (targetPath.startsWith("./")) {
-    targetPath = targetPath.slice(2);
-  }
+  // Must reference a markdown file
+  if (!targetPath.endsWith(".md")) return null;
+
+  // Resolve the target path relative to the current document's directory.
+  // This handles ./, ../, and plain filenames uniformly.
+  // All doc paths use forward slashes (they come from the config JSON).
+  const currentDir = dirname(currentDocPath).replace(/\\/g, "/");
+  const base = currentDir === "." ? targetPath : `${currentDir}/${targetPath}`;
+  // Normalize away any ../ or ./ segments, keeping forward slashes
+  const resolvedTarget = base
+    .split("/")
+    .reduce((acc: string[], seg) => {
+      if (seg === "..") acc.pop();
+      else if (seg !== ".") acc.push(seg);
+      return acc;
+    }, [])
+    .join("/");
 
   // Find the target document in allDocPaths
   for (let i = 0; i < allDocPaths.length; i++) {
     const docPath = allDocPaths[i]!;
-    // Check for exact match or relative path match
-    if (docPath === targetPath || docPath.endsWith("/" + targetPath) || docPath === "./" + targetPath) {
-      // Don't resolve links to the current document
-      if (docPath === currentDocPath) continue;
+    // Normalize stored doc path: forward slashes, no leading ./
+    const normalizedDocPath = docPath.replace(/\\/g, "/").replace(/^\.\//, "");
+    if (normalizedDocPath === resolvedTarget) {
+      // Link targets this document — treat as a same-doc anchor
+      if (docPath === currentDocPath) return { docIndex: i, anchor, sameDoc: true };
       return { docIndex: i, anchor };
     }
   }
@@ -618,7 +650,7 @@ function resolveDocRef(
 /**
  * Wraps block-level elements in .doc-block containers with sequential data-block-id attributes.
  */
-function wrapBlocks(html: string, docIndex: number): { wrapped: string; blockCount: number } {
+function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
   const BLOCK_TAGS = /^<(h[1-6]|p|ul|ol|blockquote|pre|table|hr|details)[\s>]/i;
 
   const lines = html.split("\n");
@@ -639,9 +671,16 @@ function wrapBlocks(html: string, docIndex: number): { wrapped: string; blockCou
         depth = 1;
         blockLines = [line];
 
-        // Check if this is a self-contained block on one line
-        // For hr, or elements that close on the same line
-        if (currentTag === "hr" || line.includes(`</${currentTag}>`)) {
+        // Check if this is a self-contained block on one line.
+        // For <hr> (void element) or any element whose opening line already
+        // contains the matching close tag, count open/close tag occurrences
+        // using regex — more robust than a plain string search which could
+        // match closing tags inside attribute values or text content.
+        const openPat = new RegExp(`<${currentTag}[\\s>]`, "gi");
+        const closePat = new RegExp(`</${currentTag}>`, "gi");
+        const opensOnLine = (line.match(openPat) || []).length;
+        const closesOnLine = (line.match(closePat) || []).length;
+        if (currentTag === "hr" || closesOnLine >= opensOnLine) {
           // Wrap the block
           result.push(
             `<div class="doc-block" data-block-id="${blockId}">`,
@@ -726,49 +765,81 @@ function renderMarkdownDocument(
   // Create custom renderer
   const renderer = new Renderer();
 
-  // Override heading to add IDs and collect headings for TOC
+  // Track seen heading slugs for deduplication
+  const seenSlugs = new Map<string, number>();
+
+  // Override heading to add IDs and collect headings for TOC.
+  // In marked v17, data.text is raw markdown — use marked.parseInline() to
+  // render inline formatting (bold, code, etc.) and strip tags for plain text.
   renderer.heading = function (data: { text: string; depth: number }): string {
     const { text, depth } = data;
-    // Generate slug from text
-    const slug = text
-      .toLowerCase()
-      .replace(/[^\w]+/g, "-")
-      .replace(/^-|-$/g, "");
+    // Render inline markdown (e.g. **bold**, `code`) to HTML
+    const renderedText = marked.parseInline(text) as string;
+    // Strip HTML tags for the slug and TOC display text
+    const plainText = renderedText.replace(/<[^>]*>/g, "");
+    let slug = slugifyHeading(plainText);
 
-    // Collect heading for TOC
-    headings.push({ id: slug, text, level: depth });
+    // Deduplicate: append -1, -2, ... for repeated slugs (GitHub convention).
+    const count = seenSlugs.get(slug) ?? 0;
+    seenSlugs.set(slug, count + 1);
+    if (count > 0) {
+      slug = `${slug}-${count}`;
+    }
 
-    return `<h${depth} id="${slug}">${text}</h${depth}>`;
+    // Collect heading for TOC with plain text (no HTML tags)
+    headings.push({ id: slug, text: plainText, level: depth });
+
+    // Trailing \n ensures wrapBlocks sees this as its own line, not merged
+    // with the next block element
+    return `<h${depth} id="${escapeHtml(slug)}">${renderedText}</h${depth}>\n`;
   };
 
-  // Override code to add language class for highlight.js
+  // Override code to add language class for highlight.js.
+  // Escape lang to prevent attribute injection, and add trailing \n.
   renderer.code = function (data: { text: string; lang?: string }): string {
     const { text, lang } = data;
-    const langClass = lang ? ` class="language-${lang}"` : "";
-    return `<pre><code${langClass}>${escapeHtml(text)}</code></pre>`;
+    const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : "";
+    return `<pre><code${langClass}>${escapeHtml(text)}</code></pre>\n`;
   };
 
-  // Override link to resolve cross-document references
+  // Override link to resolve cross-document references.
+  // In marked v17, data.text is raw markdown — use marked.parseInline() to
+  // render inline formatting within link text.
   renderer.link = function (data: { href: string; text: string }): string {
     const { href, text } = data;
+    const renderedText = marked.parseInline(text) as string;
+
+    // Same-document anchor link (e.g. #section-one) — render as plain anchor
+    if (href.startsWith("#")) {
+      return `<a href="${escapeHtml(href)}">${renderedText}</a>`;
+    }
 
     // Try to resolve as a cross-document reference
     const resolved = resolveDocRef(href, relativePath, allDocPaths);
 
     if (resolved) {
+      if (resolved.sameDoc) {
+        if (resolved.anchor) {
+          // Same document with anchor — plain in-page link
+          return `<a href="#${escapeHtml(resolved.anchor)}">${renderedText}</a>`;
+        }
+        // Same document, no anchor — render as non-navigating inline text
+        // to avoid href="#" scrolling the page to the top.
+        return `<span class="doc-self-link">${renderedText}</span>`;
+      }
       // Cross-document link — use data attributes for client-side handling
-      return `<a href="#" data-doc-ref="${resolved.docIndex}" data-doc-anchor="${resolved.anchor}">${text}</a>`;
+      return `<a href="#" data-doc-ref="${resolved.docIndex}" data-doc-anchor="${escapeHtml(resolved.anchor)}">${renderedText}</a>`;
     }
 
     // External link — open in new tab
-    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${text}</a>`;
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${renderedText}</a>`;
   };
 
   // Parse markdown with custom renderer
   const rawHtml = marked.parse(markdown, { renderer }) as string;
 
   // Wrap blocks
-  const { wrapped, blockCount } = wrapBlocks(rawHtml, docIndex);
+  const { wrapped, blockCount } = wrapBlocks(rawHtml);
 
   return {
     html: wrapped,
@@ -845,8 +916,8 @@ export async function generate(configPath: string): Promise<void> {
   const docTabsJs = readFileSync(join(assetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(join(assetsDir, "block-select.js"), "utf-8");
   const docTocJs = readFileSync(join(assetsDir, "doc-toc.js"), "utf-8");
-  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs;
-  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + exportJs + "\n" + docTabsJs + "\n" + docTocJs;
+  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs;
+  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs + "\n" + docTocJs;
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 

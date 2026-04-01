@@ -16,6 +16,7 @@
     for (var i = 0; i < tabs.length; i++) {
       var isActive = i === index;
       tabs[i].classList.toggle("active", isActive);
+      panes[i].classList.toggle("active", isActive);
       panes[i].style.display = isActive ? "block" : "none";
     }
 
@@ -94,6 +95,14 @@
   /*  Scroll to Target                                                   */
   /* ------------------------------------------------------------------ */
 
+  // Scroll an element into view below the sticky topbar.
+  function scrollBelowTopbar(el) {
+    var topbar = document.querySelector(".topbar");
+    var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
+    var y = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  }
+
   function scrollToTarget(anchor) {
     if (!anchor) return;
 
@@ -101,7 +110,7 @@
     if (!anchor.startsWith("B")) {
       var heading = document.getElementById(anchor);
       if (heading) {
-        heading.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollBelowTopbar(heading);
       }
       return;
     }
@@ -110,9 +119,9 @@
     var blockMatch = anchor.match(/^B(\d+)(?:-B(\d+))?$/);
     if (blockMatch) {
       var blockId = blockMatch[1];
-      var block = document.querySelector('.doc-tab-pane:not([style*="display: none"]) .doc-block[data-block-id="' + blockId + '"]');
+      var block = document.querySelector('.doc-tab-pane.active .doc-block[data-block-id="' + blockId + '"]');
       if (block) {
-        block.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollBelowTopbar(block);
       }
     }
   }
@@ -205,9 +214,10 @@
   /* ------------------------------------------------------------------ */
 
   function init() {
-    // Apply hash on load if present
+    // Apply hash on load if present.
+    // Skip block-reference hashes (e.g. #file.md:B5) — block-select.js owns those.
     var hash = window.location.hash;
-    if (hash && hash.length > 1) {
+    if (hash && hash.length > 1 && !/:[Bb]\d/.test(hash)) {
       applyHash();
     }
   }

@@ -989,13 +989,6 @@ pre code {
   border-bottom-color: var(--accent);
 }
 
-.doc-tab-pane {
-  display: none;
-}
-
-.doc-tab-pane.active {
-  display: block;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Document Block Gutter and Selection                                */
@@ -1112,6 +1105,16 @@ pre code {
 
 .doc-comment-form {
   margin: 8px 0 16px 24px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document self-link (same-document reference without anchor)       */
+/* ------------------------------------------------------------------ */
+
+.doc-self-link {
+  color: var(--accent, #58a6ff);
+  cursor: default;
+  text-decoration: underline dotted;
 }
 
 /* ------------------------------------------------------------------ */

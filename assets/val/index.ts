@@ -209,8 +209,23 @@ app.post("/:slug/api/comments", async (c) => {
   const body = await c.req.json();
   const { part, file, lineFrom, lineTo, author, body: commentBody, parentId } = body;
 
-  if (!part || !file || !lineFrom || !author || !commentBody) {
-    return c.json({ error: "Missing required fields" }, 400);
+  // Validate presence and types of required fields
+  const partInt = parseInt(part, 10);
+  const lineFromInt = parseInt(lineFrom, 10);
+  if (
+    part == null || isNaN(partInt) ||
+    !file || typeof file !== "string" ||
+    lineFrom == null || isNaN(lineFromInt) ||
+    !author || typeof author !== "string" ||
+    !commentBody || typeof commentBody !== "string"
+  ) {
+    return c.json({ error: "Missing or invalid required fields" }, 400);
+  }
+
+  // lineTo defaults to lineFrom when omitted; must be an integer when provided
+  const lineToInt = lineTo != null ? parseInt(lineTo, 10) : lineFromInt;
+  if (isNaN(lineToInt)) {
+    return c.json({ error: "Invalid lineTo value" }, 400);
   }
 
   const id = crypto.randomUUID();
@@ -219,10 +234,10 @@ app.post("/:slug/api/comments", async (c) => {
     args: {
       id,
       slug,
-      part,
+      part: partInt,
       file,
-      lineFrom,
-      lineTo: lineTo || lineFrom,
+      lineFrom: lineFromInt,
+      lineTo: lineToInt,
       author,
       body: commentBody,
       parentId: parentId || null,
@@ -232,13 +247,14 @@ app.post("/:slug/api/comments", async (c) => {
   return c.json({
     id,
     slug,
-    part,
+    part: partInt,
     file,
-    lineFrom,
-    lineTo: lineTo || lineFrom,
+    lineFrom: lineFromInt,
+    lineTo: lineToInt,
     author,
     body: commentBody,
     parentId: parentId || null,
+    resolved: false,
     createdAt: new Date().toISOString(),
   }, 201);
 });

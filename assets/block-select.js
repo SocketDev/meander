@@ -131,20 +131,23 @@
     var pane = findPaneForFile(range.file);
     if (!pane) return;
 
-    // Ensure the pane is visible (switch tabs if necessary)
-    var docIndex = pane.getAttribute("data-doc-index");
-    if (docIndex !== null) {
-      var tabBtn = document.querySelector('.doc-tab-btn[data-doc-index="' + CSS.escape(docIndex) + '"]');
-      if (tabBtn && !tabBtn.classList.contains("active")) {
-        tabBtn.click();
+    // Ensure the pane is visible (switch tabs if necessary).
+    // Use the public API from doc-tabs.js to avoid double scroll/hash handling.
+    var docIndex = parseInt(pane.getAttribute("data-doc-index"), 10);
+    if (!isNaN(docIndex) && !pane.classList.contains("active")) {
+      if (typeof window.switchDocTab === "function") {
+        window.switchDocTab(docIndex);
       }
     }
 
     selectBlockRange(pane, range.file, range.from, range.to);
 
-    // Scroll the first selected block into view
+    // Scroll the first selected block into view, accounting for the sticky topbar.
     if (currentSelection.length > 0) {
-      currentSelection[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      var topbar = document.querySelector(".topbar");
+      var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
+      var y = currentSelection[0].getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
   }
 
