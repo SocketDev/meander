@@ -332,16 +332,27 @@ function buildSections(parts: readonly WalkthroughPart[], sourceMap: Map<string,
   });
 }
 
-function renderPartNav(slug: string, parts: readonly WalkthroughPart[], activePartId: number): string {
-  return parts
+function renderPartNav(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  activePartId: number,
+  hasDocuments: boolean,
+): string {
+  const docsLink = hasDocuments
+    ? `<a class="${activePartId === 0 ? "active" : ""}" href="/${slug}/documents">Documents</a>\n`
+    : "";
+  const partLinks = parts
     .map((part) => {
       const cls = part.id === activePartId ? "active" : "";
       return `<a class="${cls}" href="/${slug}/part/${part.id}">Part ${part.id}</a>`;
     })
     .join("\n");
+  return docsLink + partLinks;
 }
 
-function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, defIndex: DefinitionIndex): string {
+
+
+function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, defIndex: DefinitionIndex, hasDocuments: boolean): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
     const existing = sectionsByFile.get(section.file);
@@ -403,7 +414,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
     <h1>Part ${part.id}: ${escapeHtml(part.title)}</h1>
     <p>${escapeHtml(part.objective)}</p>
     <div class="part-nav">
-      ${renderPartNav(slug, parts, part.id)}
+      ${renderPartNav(slug, parts, part.id, hasDocuments)}
     </div>
   </header>
 
@@ -432,7 +443,10 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
 </html>`;
 }
 
-function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>): string {
+function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean): string {
+  const docsItem = hasDocuments
+    ? `<li><a href="/${slug}/documents">Documents</a></li>\n`
+    : "";
   const items = parts
     .map((part) => {
       const count = partCounts.get(part.id) ?? 0;
@@ -457,10 +471,88 @@ function renderIndexHtml(slug: string, title: string, parts: readonly Walkthroug
     <div class="annotation-card">
       <h3>Parts</h3>
       <ul>
-        ${items}
+        ${docsItem}${items}
       </ul>
     </div>
   </main>
+</body>
+</html>`;
+}
+
+type RenderedDocData = {
+  filePath: string;
+  html: string;
+  headings: Array<{ id: string; text: string; level: number }>;
+};
+
+function renderDocumentsHtml(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  documents: string[],
+  renderedDocs: RenderedDocData[],
+  inlineJs: string
+): string {
+  // Build tab bar
+  const tabButtons = renderedDocs
+    .map((doc, index) => {
+      const fileName = doc.filePath.split("/").pop() ?? doc.filePath;
+      const activeClass = index === 0 ? " active" : "";
+      return `<button class="doc-tab-btn${activeClass}" data-doc-index="${index}">${escapeHtml(fileName)}</button>`;
+    })
+    .join("\n    ");
+
+  // Build tab panes
+  const tabPanes = renderedDocs
+    .map((doc, index) => {
+      const display = index === 0 ? "" : ' style="display:none"';
+      return `<div class="doc-tab-pane" data-doc-index="${index}" data-doc-file="${escapeHtml(doc.filePath)}"${display}>
+    <article class="doc-content">${doc.html}</article>
+  </div>`;
+    })
+    .join("\n  ");
+
+  // Build objective text from first part or default
+  const objective = parts.length > 0 ? parts[0]!.objective : "Documentation for this walkthrough.";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Documents - ${escapeHtml(slug)}</title>
+  <link rel="stylesheet" href="/walkthrough.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/styles/github-dark.min.css" />
+</head>
+<body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents">
+  <header class="topbar">
+    <h1>Documents</h1>
+    <p>${escapeHtml(objective)}</p>
+    <div class="part-nav">
+      ${renderPartNav(slug, parts, 0, true)}
+    </div>
+  </header>
+
+  <nav class="doc-tab-bar">
+    ${tabButtons}
+  </nav>
+
+  <main class="doc-container">
+    ${tabPanes}
+  </main>
+
+  <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
+  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/highlight.min.js"></script>
+  <script>
+    for (const block of document.querySelectorAll('.doc-content pre code')) {
+      hljs.highlightElement(block);
+    }
+  </script>
+  <script>
+    window.__docHeadings = ${JSON.stringify(
+      renderedDocs.map((d) => ({ file: d.filePath, headings: d.headings }))
+    )};
+  </script>
+  <script>${inlineJs}</script>
 </body>
 </html>`;
 }
@@ -750,7 +842,8 @@ export async function generate(configPath: string): Promise<void> {
   const defLinkJs = readFileSync(join(assetsDir, "def-link.js"), "utf-8");
   const unresolvedJs = readFileSync(join(assetsDir, "unresolved-comments.js"), "utf-8");
   const exportJs = readFileSync(join(assetsDir, "export-comments.js"), "utf-8");
-  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs;
+  const docTabsJs = readFileSync(join(assetsDir, "doc-tabs.js"), "utf-8");
+  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs;
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 
@@ -762,16 +855,34 @@ export async function generate(configPath: string): Promise<void> {
     sectionsByPart.get(section.partId)?.push(section);
   }
 
+  const hasDocuments = !!(documents && documents.length > 0);
   const counts = new Map<number, number>();
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
-    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, defIndex);
+    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, defIndex, hasDocuments);
     writeFileSync(join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
-  const indexHtml = renderIndexHtml(slug, title, parts, counts);
+  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments);
   writeFileSync(join(outDir, "index.html"), indexHtml);
+
+  // Render documents page if documents are present
+  if (documents && documents.length > 0) {
+    const renderedDocs: RenderedDocData[] = documents.map((docPath, index) => {
+      const fullPath = join(rootDir, docPath);
+      const rendered = renderMarkdownDocument(fullPath, index, documents);
+      return {
+        filePath: docPath,
+        html: rendered.html,
+        headings: rendered.headings,
+      };
+    });
+
+    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, inlineJs);
+    writeFileSync(join(outDir, "documents.html"), documentsHtml);
+    console.log(`Generated documents.html with ${documents.length} documents`);
+  }
 
   // Copy CSS to output dir
   const css = readFileSync(join(assetsDir, "walkthrough.css"), "utf-8");
