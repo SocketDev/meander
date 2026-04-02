@@ -785,9 +785,7 @@ pre code {
   }
 
   .doc-tab-bar {
-    overflow-x: auto;
     padding: 0 16px;
-    -webkit-overflow-scrolling: touch;
   }
 
   .doc-tab-btn {
@@ -965,6 +963,19 @@ pre code {
   background: var(--bg);
   max-width: 900px;
   margin: 0 auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Fade the right edge to hint that the bar is horizontally scrollable.
+     The mask is applied only on the inline-end side so the left edge stays
+     sharp; the gradient fades from fully opaque to transparent over 48px. */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+          mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  /* Hide the scrollbar track to keep the UI clean while retaining scroll. */
+  scrollbar-width: none;
+}
+
+.doc-tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .doc-tab-btn {
