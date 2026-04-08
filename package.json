@@ -1,6 +1,6 @@
 {
   "name": "@divmain/meander",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Walkthrough generator — annotated code walkthroughs with comments, hosted on Val Town",
   "license": "MIT",
   "author": "Dale Bustad <github@dale.link>",
