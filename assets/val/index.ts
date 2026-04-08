@@ -22,6 +22,82 @@ import type { BaseComment, ExportedComment, ExportedComments, ApiComment } from 
 const app = new Hono();
 
 /* ------------------------------------------------------------------ */
+/*  Crypto (AES-256-GCM via Web Crypto API)                            */
+/* ------------------------------------------------------------------ */
+
+const VERSION_BYTE = 0x01;
+const SALT = new TextEncoder().encode("meander-walkthrough-v1");
+const ITERATIONS = 600_000;
+
+// Get password from env (same as basic auth)
+const CRYPTO_PASS = Deno.env.get("WALKTHROUGH_PASS") || "changeme";
+
+async function deriveKey(password: string): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: SALT, iterations: ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encrypt(plaintext: string, key: CryptoKey): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(plaintext);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoded
+  );
+
+  // Combine: version (1) + iv (12) + ciphertext (includes auth tag)
+  const combined = new Uint8Array(1 + iv.length + ciphertext.byteLength);
+  combined[0] = VERSION_BYTE;
+  combined.set(iv, 1);
+  combined.set(new Uint8Array(ciphertext), 1 + iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decrypt(ciphertext: string, key: CryptoKey): Promise<string> {
+  const combined = new Uint8Array(
+    atob(ciphertext).split("").map(c => c.charCodeAt(0))
+  );
+
+  if (combined.length < 1 + 12 + 16) {
+    throw new Error("Ciphertext too short");
+  }
+
+  const version = combined[0];
+  if (version !== VERSION_BYTE) {
+    throw new Error(`Unsupported encryption version: ${version}`);
+  }
+
+  const iv = combined.slice(1, 13);
+  const data = combined.slice(13);
+
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    data
+  );
+
+  return new TextDecoder().decode(plaintext);
+}
+
+// Pre-derive the key at module load (one-time, cached for warm starts)
+const cryptoKeyPromise = deriveKey(CRYPTO_PASS);
+
+/* ------------------------------------------------------------------ */
 /*  Database init                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -150,25 +226,28 @@ app.get("/:slug/part/:id", async (c) => {
 app.get("/:slug/api/comments/unresolved", async (c) => {
   await ensureDb();
   const slug = c.req.param("slug");
+  const cryptoKey = await cryptoKeyPromise;
 
   const result = await sqlite.execute({
     sql: "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND resolved = 0 AND parent_id IS NULL ORDER BY part ASC, created_at ASC",
     args: { slug },
   });
 
-  const rows = result.rows.map((row: any) => ({
-    id: row.id,
-    slug: row.slug,
-    part: row.part,
-    file: row.file,
-    lineFrom: row.line_from,
-    lineTo: row.line_to,
-    author: row.author,
-    body: row.body,
-    parentId: row.parent_id || null,
-    resolved: !!row.resolved,
-    createdAt: row.created_at,
-  }));
+  const rows = await Promise.all(
+    result.rows.map(async (row: any) => ({
+      id: row.id,
+      slug: row.slug,
+      part: row.part,
+      file: row.file,
+      lineFrom: row.line_from,
+      lineTo: row.line_to,
+      author: await decrypt(row.author, cryptoKey),
+      body: await decrypt(row.body, cryptoKey),
+      parentId: row.parent_id || null,
+      resolved: !!row.resolved,
+      createdAt: row.created_at,
+    }))
+  );
 
   return c.json(rows);
 });
@@ -181,24 +260,28 @@ app.get("/:slug/api/comments", async (c) => {
     return c.json({ error: "part query parameter required" }, 400);
   }
 
+  const cryptoKey = await cryptoKeyPromise;
+
   const result = await sqlite.execute({
     sql: "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND part = :part ORDER BY created_at ASC",
     args: { slug, part: parseInt(part, 10) },
   });
 
-  const rows = result.rows.map((row: any) => ({
-    id: row.id,
-    slug: row.slug,
-    part: row.part,
-    file: row.file,
-    lineFrom: row.line_from,
-    lineTo: row.line_to,
-    author: row.author,
-    body: row.body,
-    parentId: row.parent_id || null,
-    resolved: !!row.resolved,
-    createdAt: row.created_at,
-  }));
+  const rows = await Promise.all(
+    result.rows.map(async (row: any) => ({
+      id: row.id,
+      slug: row.slug,
+      part: row.part,
+      file: row.file,
+      lineFrom: row.line_from,
+      lineTo: row.line_to,
+      author: await decrypt(row.author, cryptoKey),
+      body: await decrypt(row.body, cryptoKey),
+      parentId: row.parent_id || null,
+      resolved: !!row.resolved,
+      createdAt: row.created_at,
+    }))
+  );
 
   return c.json(rows);
 });
@@ -228,6 +311,11 @@ app.post("/:slug/api/comments", async (c) => {
     return c.json({ error: "Invalid lineTo value" }, 400);
   }
 
+  // Encrypt author and body
+  const cryptoKey = await cryptoKeyPromise;
+  const encryptedAuthor = await encrypt(author, cryptoKey);
+  const encryptedBody = await encrypt(commentBody, cryptoKey);
+
   const id = crypto.randomUUID();
   await sqlite.execute({
     sql: "INSERT INTO comments (id, slug, part, file, line_from, line_to, author, body, parent_id) VALUES (:id, :slug, :part, :file, :lineFrom, :lineTo, :author, :body, :parentId)",
@@ -238,8 +326,8 @@ app.post("/:slug/api/comments", async (c) => {
       file,
       lineFrom: lineFromInt,
       lineTo: lineToInt,
-      author,
-      body: commentBody,
+      author: encryptedAuthor,
+      body: encryptedBody,
       parentId: parentId || null,
     },
   });
@@ -288,6 +376,7 @@ app.get("/:slug/api/comments/export", async (c) => {
   await ensureDb();
   const slug = c.req.param("slug");
   const unresolvedOnly = c.req.query("unresolved") === "true";
+  const cryptoKey = await cryptoKeyPromise;
 
   // Build query based on whether we want all or just unresolved
   let sql = "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug";
@@ -301,20 +390,22 @@ app.get("/:slug/api/comments/export", async (c) => {
     args: { slug },
   });
 
-  // Transform to API format
-  const comments: ApiComment[] = result.rows.map((row: any) => ({
-    id: row.id,
-    slug: row.slug,
-    part: row.part,
-    file: row.file,
-    lineFrom: row.line_from,
-    lineTo: row.line_to,
-    author: row.author,
-    body: row.body,
-    parentId: row.parent_id || null,
-    resolved: !!row.resolved,
-    createdAt: row.created_at,
-  }));
+  // Transform to API format (decrypt author and body)
+  const comments: ApiComment[] = await Promise.all(
+    result.rows.map(async (row: any) => ({
+      id: row.id,
+      slug: row.slug,
+      part: row.part,
+      file: row.file,
+      lineFrom: row.line_from,
+      lineTo: row.line_to,
+      author: await decrypt(row.author, cryptoKey),
+      body: await decrypt(row.body, cryptoKey),
+      parentId: row.parent_id || null,
+      resolved: !!row.resolved,
+      createdAt: row.created_at,
+    }))
+  );
 
   // Build parent lookup for thread reconstruction
   const commentById = new Map<string, ApiComment>();
@@ -371,8 +462,10 @@ app.get("/:slug/api/comments/export", async (c) => {
 async function serveBlobHtml(c: any, key: string) {
   try {
     const data = await blob.get(key);
-    const text = await data.text();
-    return c.html(text);
+    const encrypted = await data.text();
+    const cryptoKey = await cryptoKeyPromise;
+    const html = await decrypt(encrypted, cryptoKey);
+    return c.html(html);
   } catch {
     return c.text("Not found", 404);
   }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { deriveKey, encrypt } from "./crypto.js";
 
 const API_BASE = "https://api.val.town";
 
@@ -17,12 +18,22 @@ async function uploadBlob(token: string, key: string, content: string): Promise<
   console.log(`  Uploaded: ${key}`);
 }
 
+function encryptHtml(html: string, key: Buffer): string {
+  return encrypt(html, key);
+}
+
 export async function publish(configPath: string): Promise<void> {
   const token = process.env["VALTOWN_TOKEN"];
   if (!token) {
     throw new Error("VALTOWN_TOKEN environment variable is required");
   }
 
+  const password = process.env["WALKTHROUGH_PASS"];
+  if (!password) {
+    throw new Error("WALKTHROUGH_PASS environment variable is required");
+  }
+
+  const key = deriveKey(password);
   const resolved = resolve(configPath);
   const config = JSON.parse(readFileSync(resolved, "utf-8"));
   const slug: string = config.slug;
@@ -40,23 +51,23 @@ export async function publish(configPath: string): Promise<void> {
   const css = readFileSync(join(walkthroughDir, "walkthrough.css"), "utf-8");
   await uploadBlob(token, "walkthrough/walkthrough.css", css);
 
-  // Upload index.html
+  // Upload index.html (encrypted)
   const indexHtml = readFileSync(join(walkthroughDir, "index.html"), "utf-8");
-  await uploadBlob(token, `walkthrough/${slug}/index.html`, indexHtml);
+  await uploadBlob(token, `walkthrough/${slug}/index.html`, encryptHtml(indexHtml, key));
 
-  // Upload part HTML files
+  // Upload part HTML files (encrypted)
   for (const part of parts) {
     const filename = `walkthrough-part-${part.id}.html`;
     const html = readFileSync(join(walkthroughDir, filename), "utf-8");
-    await uploadBlob(token, `walkthrough/${slug}/${filename}`, html);
+    await uploadBlob(token, `walkthrough/${slug}/${filename}`, encryptHtml(html, key));
   }
 
-  // Upload documents.html if present
+  // Upload documents.html if present (encrypted)
   const documentsPath = join(walkthroughDir, "documents.html");
   let hasDocuments = false;
   if (existsSync(documentsPath)) {
     const documentsHtml = readFileSync(documentsPath, "utf-8");
-    await uploadBlob(token, `walkthrough/${slug}/documents.html`, documentsHtml);
+    await uploadBlob(token, `walkthrough/${slug}/documents.html`, encryptHtml(documentsHtml, key));
     hasDocuments = true;
   }
 

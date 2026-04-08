@@ -14,6 +14,7 @@ You write `/* ... */` prose comments directly in your source files. Meander pars
 - **Unresolved comments widget** — a dropdown listing every open thread with direct links
 - **JSON comment export** — download all (or only unresolved) comments as structured JSON
 - **Val Town hosting** — a single Hono val serves all walkthroughs behind HTTP basic auth, storing HTML in blob storage and comments in SQLite
+- **Encryption at rest** — HTML files and comment content are encrypted with AES-256-GCM; the encryption key is derived from your basic auth password
 
 ## Installation
 
@@ -164,7 +165,7 @@ export WALKTHROUGH_USER=youruser
 export WALKTHROUGH_PASS=yourpassword
 ```
 
-`WALKTHROUGH_USER` and `WALKTHROUGH_PASS` are the HTTP basic auth credentials that protect your hosted walkthroughs.
+`WALKTHROUGH_USER` and `WALKTHROUGH_PASS` are the HTTP basic auth credentials that protect your hosted walkthroughs. `WALKTHROUGH_PASS` is also used to derive the encryption key for all stored content — changing it will make existing encrypted data inaccessible until you re-publish and clear comments.
 
 ### Deploy the val (first time only)
 
@@ -183,13 +184,45 @@ meander generate walkthrough.json
 meander publish walkthrough.json
 ```
 
-`publish` uploads the generated HTML files and CSS to Val Town blob storage under keys like `walkthrough/<slug>/walkthrough-part-1.html`. After publishing, your walkthrough is live at:
+`publish` encrypts the generated HTML files with AES-256-GCM and uploads them to Val Town blob storage under keys like `walkthrough/<slug>/walkthrough-part-1.html`. The shared CSS file is uploaded unencrypted (since browsers must read it directly). After publishing, your walkthrough is live at:
 
 ```
 https://<username>-<valname>.web.val.run/<slug>/
 ```
 
 Re-publish after regenerating to update the live content. The val itself only needs to be redeployed when you want to update the server code.
+
+## Encryption at Rest
+
+All user content is encrypted before storage using AES-256-GCM via the Web Crypto API.
+
+### What is encrypted
+
+| Data | Encryption |
+|---|---|
+| Walkthrough HTML files (`index.html`, `walkthrough-part-*.html`, `documents.html`) | AES-256-GCM with unique IV per file |
+| Comment `body` and `author` fields | AES-256-GCM with unique IV per comment |
+| Comment metadata (`id`, `file`, `line_from`, `line_to`, `parent_id`, `resolved`, `created_at`) | **Not encrypted** — stored as plaintext |
+| CSS file (`walkthrough.css`) | **Not encrypted** — served directly by browsers |
+| Manifest (`manifest.json`) | **Not encrypted** — contains only metadata |
+
+### Key derivation
+
+The encryption key is derived from `WALKTHROUGH_PASS` using PBKDF2-SHA256 with 600,000 iterations and a fixed salt. This means:
+
+- **No additional credentials** — the same password protects both access (basic auth) and data (encryption)
+- **Deterministic key** — the same password always produces the same key, so the val and publish CLI stay in sync automatically
+- **Password rotation** — changing `WALKTHROUGH_PASS` requires re-publishing all walkthroughs (HTML files) and clears all existing comments (since old encrypted data becomes undecryptable)
+
+### Binary format
+
+Encrypted values are stored as base64-encoded:
+
+```
+[1 byte: version 0x01][12 bytes: random IV][N bytes: AES-GCM ciphertext + 16-byte auth tag]
+```
+
+The version byte enables future algorithm migrations without breaking existing deployments.
 
 ## Comment System
 
@@ -204,7 +237,7 @@ The hosted val exposes a REST API used by the browser client:
 | `GET` | `/:slug/api/comments/unresolved` | List all unresolved root comments |
 | `GET` | `/:slug/api/comments/export` | Download comments as JSON |
 
-Comments are stored in a Val Town SQLite database scoped by `slug` and `part`, so multiple walkthroughs share the same val without conflict.
+Comments are stored in a Val Town SQLite database scoped by `slug` and `part`, so multiple walkthroughs share the same val without conflict. Comment `body` and `author` fields are encrypted at rest using AES-256-GCM; metadata (file paths, line numbers, resolved status, timestamps) remains unencrypted.
 
 ## Supported File Types
 
