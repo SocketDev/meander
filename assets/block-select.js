@@ -4,6 +4,12 @@
   // Only activate on the documents page
   if (document.body.getAttribute("data-page-type") !== "documents") return;
 
+  // Respect OS-level "reduce motion" accessibility preference (WCAG 2.3.3).
+  var prefersReduce =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var scrollBehavior = prefersReduce ? "auto" : "smooth";
+
   var anchor = null; // { pane, blockId }
   var currentSelection = []; // array of .doc-block elements
 
@@ -147,7 +153,7 @@
       var topbar = document.querySelector(".topbar");
       var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
       var y = currentSelection[0].getBoundingClientRect().top + window.scrollY - offset;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: scrollBehavior });
     }
   }
 

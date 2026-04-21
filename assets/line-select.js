@@ -1,6 +1,12 @@
 (function () {
   "use strict";
 
+  // Respect OS-level "reduce motion" accessibility preference (WCAG 2.3.3).
+  var prefersReduce =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var scrollBehavior = prefersReduce ? "auto" : "smooth";
+
   var anchor = null; // { table, row, lineNum }
   var currentSelection = []; // array of <tr> elements
 
@@ -160,7 +166,7 @@
 
     // Scroll the first selected row into view
     if (currentSelection.length > 0) {
-      currentSelection[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      currentSelection[0].scrollIntoView({ behavior: scrollBehavior, block: "center" });
     }
   }
 

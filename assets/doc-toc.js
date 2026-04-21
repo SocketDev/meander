@@ -5,6 +5,12 @@
   var pageType = document.body.getAttribute("data-page-type");
   if (pageType !== "documents") return;
 
+  // Respect OS-level "reduce motion" accessibility preference (WCAG 2.3.3).
+  var prefersReduce =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var scrollBehavior = prefersReduce ? "auto" : "smooth";
+
   var btn = null;
   var dropdown = null;
 
@@ -147,7 +153,7 @@
             var topbar = document.querySelector(".topbar");
             var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
             var y = target.getBoundingClientRect().top + window.scrollY - offset;
-            window.scrollTo({ top: y, behavior: "smooth" });
+            window.scrollTo({ top: y, behavior: scrollBehavior });
           }
           closeTocDropdown();
         });
