@@ -2,8 +2,29 @@
 
 const command = process.argv[2];
 
+const HELP_TEXT = `meander — walkthrough generator with comments
+
+Commands:
+  meander generate <walkthrough.json>   Generate walkthrough HTML
+  meander publish <walkthrough.json>    Publish HTML to Val Town blob storage
+  meander deploy-val [val-name]         Deploy or update the Val Town val
+
+Environment variables:
+  VALTOWN_TOKEN       Val Town API bearer token (publish, deploy-val)
+  WALKTHROUGH_USER    Basic auth username (deploy-val)
+  WALKTHROUGH_PASS    Basic auth password (deploy-val)`;
+
 async function main() {
   switch (command) {
+    case undefined:
+    case "--help":
+    case "-h": {
+      // Help is a successful request — write to stdout and exit 0 so
+      // `meander --help > help.txt` works and shell scripts can check
+      // availability without capturing stderr.
+      console.log(HELP_TEXT);
+      return;
+    }
     case "generate": {
       const configPath = process.argv[3];
       if (!configPath) {
@@ -33,20 +54,7 @@ async function main() {
       break;
     }
     default: {
-      console.error(`meander — walkthrough generator with comments
-
-Commands:
-  meander generate <walkthrough.json>   Generate walkthrough HTML
-  meander publish <walkthrough.json>    Publish HTML to Val Town blob storage
-  meander deploy-val [val-name]         Deploy or update the Val Town val
-
-Environment variables:
-  VALTOWN_TOKEN       Val Town API bearer token (publish, deploy-val)
-  WALKTHROUGH_USER    Basic auth username (deploy-val)
-  WALKTHROUGH_PASS    Basic auth password (deploy-val)`);
-      if (command) {
-        console.error(`\nUnknown command: ${command}`);
-      }
+      console.error(`Unknown command: ${command}\n\nRun \`meander --help\` for usage.`);
       process.exitCode = 1;
     }
   }
