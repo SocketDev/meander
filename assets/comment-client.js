@@ -12,6 +12,23 @@
   var addBtn = null;
   var expandedGroups = {}; // group keys that should render expanded
 
+  // Default request deadline — a hung backend shouldn't leave fetches
+  // dangling forever. `AbortSignal.timeout()` self-cancels + self-cleans
+  // the associated controller, so there's no setTimeout to clear.
+  // Callers that want their own cancel signal compose it with the
+  // timeout via `AbortSignal.any()` (ES2024).
+  var DEFAULT_TIMEOUT_MS = 10000;
+  function requestSignal(userSignal) {
+    var timeout = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
+    if (!userSignal) return timeout;
+    // Older browsers without AbortSignal.any fall back to the timeout
+    // alone — the user signal is ignored, which is worse than nothing
+    // but still works in the common case (timeout protects the backend).
+    return typeof AbortSignal.any === "function"
+      ? AbortSignal.any([userSignal, timeout])
+      : timeout;
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Author                                                             */
   /* ------------------------------------------------------------------ */
@@ -35,7 +52,7 @@
   /* ------------------------------------------------------------------ */
 
   function fetchComments() {
-    fetch(apiBase + "?part=" + partId)
+    fetch(apiBase + "?part=" + partId, { signal: requestSignal() })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         comments = data;
@@ -62,6 +79,7 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: requestSignal(),
     })
       .then(function (r) { return r.json(); })
       .then(function (comment) {
@@ -75,7 +93,7 @@
   }
 
   function deleteComment(id) {
-    fetch(apiBase + "/" + id, { method: "DELETE" })
+    fetch(apiBase + "/" + id, { method: "DELETE", signal: requestSignal() })
       .then(function () {
         comments = comments.filter(function (c) { return c.id !== id; });
         renderAllComments();
@@ -88,6 +106,7 @@
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resolved: resolved }),
+      signal: requestSignal(),
     })
       .then(function () {
         for (var i = 0; i < comments.length; i++) {

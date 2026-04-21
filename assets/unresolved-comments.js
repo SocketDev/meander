@@ -8,6 +8,12 @@
   var dropdown = null;
   var unresolvedCount = 0;
 
+  // Default request deadline (see comment-client.js for rationale).
+  var DEFAULT_TIMEOUT_MS = 10000;
+  function requestSignal() {
+    return AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
+  }
+
   /* ------------------------------------------------------------------ */
   /*  SVG Icon                                                           */
   /* ------------------------------------------------------------------ */
@@ -136,7 +142,7 @@
     list.innerHTML = '<div class="unresolved-loading">Loading...</div>';
     empty.style.display = "none";
 
-    fetch(apiBase)
+    fetch(apiBase, { signal: requestSignal() })
       .then(function (r) { return r.json(); })
       .then(function (comments) {
         updateBadge(comments.length);
@@ -298,7 +304,7 @@
   }
 
   function loadUnresolved() {
-    fetch(apiBase)
+    fetch(apiBase, { signal: requestSignal() })
       .then(function (r) { return r.json(); })
       .then(function (comments) {
         updateBadge(comments.length);
