@@ -16,6 +16,24 @@
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/divmain/meander.git"
+  },
+  "bugs": {
+    "url": "https://github.com/divmain/meander/issues"
+  },
+  "homepage": "https://github.com/divmain/meander#readme",
+  "keywords": [
+    "walkthrough",
+    "annotations",
+    "comments",
+    "documentation",
+    "val-town"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@sinclair/typebox": "^0.34.48",
     "@valtown/sdk": "^1.0.0",
