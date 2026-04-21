@@ -832,7 +832,7 @@ function renderMarkdownDocument(
     }
 
     // External link — open in new tab
-    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${renderedText}</a>`;
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${renderedText}</a>`;
   };
 
   // Parse markdown with custom renderer
