@@ -38,6 +38,7 @@
     var btn = document.createElement("button");
     btn.className = "unresolved-btn";
     btn.title = "View unresolved comments";
+    btn.setAttribute("aria-label", "View unresolved comments");
 
     btn.appendChild(createIcon());
 

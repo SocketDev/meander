@@ -56,6 +56,7 @@
     var button = document.createElement("button");
     button.className = "doc-toc-btn";
     button.title = "Table of Contents";
+    button.setAttribute("aria-label", "Table of Contents");
     button.appendChild(createIcon());
     button.addEventListener("click", function (e) {
       e.stopPropagation();
