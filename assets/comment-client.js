@@ -215,7 +215,18 @@
       ? prefix + comment.lineFrom
       : prefix + comment.lineFrom + "-" + prefix + comment.lineTo;
     var resolvedLabel = isResolved ? " (resolved)" : "";
-    meta.textContent = comment.author + (isReply ? "" : " on " + range) + " \u00b7 " + formatTime(comment.createdAt) + resolvedLabel;
+    // "<author> on <range> · <relative-time>" — the time-portion is
+    // rendered as a semantic <time> element with the ISO datetime +
+    // an absolute-time tooltip for hover.
+    var authorAndRange = comment.author + (isReply ? "" : " on " + range);
+    meta.appendChild(document.createTextNode(authorAndRange + " · "));
+    var timeEl = document.createElement("time");
+    var created = new Date(comment.createdAt);
+    timeEl.dateTime = comment.createdAt;
+    timeEl.title = created.toLocaleString();
+    timeEl.textContent = formatTime(comment.createdAt);
+    meta.appendChild(timeEl);
+    if (resolvedLabel) meta.appendChild(document.createTextNode(resolvedLabel));
 
     var body = document.createElement("div");
     body.className = "comment-body";
@@ -485,10 +496,42 @@
     }
   }
 
+  // Relative-time formatter. `Intl.RelativeTimeFormat` handles the
+  // locale + plural rules — "2 hours ago" / "hace 2 horas" / "il y a
+  // 2 heures". `numeric: 'auto'` picks up platform idioms like
+  // "yesterday" / "last week" when the locale has them. Unit is
+  // chosen via a descending pass over RELATIVE_UNITS — coarsest unit
+  // that still has |quantity| >= 1.
+  var RELATIVE_UNITS = [
+    ["year", 60 * 60 * 24 * 365],
+    ["month", 60 * 60 * 24 * 30],
+    ["week", 60 * 60 * 24 * 7],
+    ["day", 60 * 60 * 24],
+    ["hour", 60 * 60],
+    ["minute", 60],
+    ["second", 1],
+  ];
+  var relativeFormatter =
+    typeof Intl !== "undefined" && Intl.RelativeTimeFormat
+      ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
+      : null;
+
   function formatTime(iso) {
     try {
       var d = new Date(iso);
-      return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      if (!relativeFormatter) {
+        // Locale absolute fallback for environments without Intl.RelativeTimeFormat.
+        return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+      var diffSec = Math.round((d.getTime() - Date.now()) / 1000);
+      for (var i = 0; i < RELATIVE_UNITS.length; i++) {
+        var unit = RELATIVE_UNITS[i][0];
+        var secs = RELATIVE_UNITS[i][1];
+        if (Math.abs(diffSec) >= secs || unit === "second") {
+          return relativeFormatter.format(Math.round(diffSec / secs), unit);
+        }
+      }
+      return d.toLocaleDateString();
     } catch (_) {
       return iso;
     }
