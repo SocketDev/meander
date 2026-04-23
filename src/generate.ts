@@ -156,17 +156,96 @@ function stripMultilineCommentsPreserveLines(code: string): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Dedicated marked instance for annotation comments. Shipped HTML
- * only — no client-side markdown parser, no shipping of the raw
- * markdown source inside a hidden <textarea>. The walkTokens hook
- * strips GFM's email auto-link because annotation prose is
- * technical (`core@7.0.0`, `name@1.2.3`) and we don't want those
- * wrapped as <a href="mailto:...">.
+ * Known JSDoc tags — only these wrap into .annotation-block cards.
+ * Unknown `@foo` tokens in prose pass through untouched.
+ */
+const JSDOC_TAGS = new Set([
+  "augments", "callback", "default", "deprecated", "description",
+  "example", "extends", "fileoverview", "inheritdoc", "internal",
+  "memberof", "module", "namespace", "override", "param",
+  "private", "prop", "property", "protected", "public", "readonly",
+  "return", "returns", "see", "since", "static", "template",
+  "this", "throw", "throws", "type", "typedef",
+]);
+
+/**
+ * Splits an annotation markdown string on JSDoc tag boundaries.
+ * Each returned chunk is either a tag block (`kind: 'tag'`) or
+ * preamble prose (`kind: 'prose'`). A tag block runs from its
+ * `@tag` line up to (but not including) the next `@tag` line or
+ * end-of-input, so multi-line @example bodies stay with their tag.
+ */
+function splitAnnotationByTags(
+  markdown: string,
+): Array<{ kind: "prose"; text: string } | {
+  kind: "tag";
+  tag: string;
+  type: string | null;
+  body: string;
+}> {
+  const lines = markdown.split("\n");
+  const out: Array<
+    | { kind: "prose"; text: string }
+    | { kind: "tag"; tag: string; type: string | null; body: string }
+  > = [];
+  let buffer: string[] = [];
+  let currentTag: { tag: string; type: string | null; body: string[] } | null =
+    null;
+  const flushProse = () => {
+    if (buffer.length > 0 && buffer.join("").trim() !== "") {
+      out.push({ kind: "prose", text: buffer.join("\n") });
+    }
+    buffer = [];
+  };
+  const flushTag = () => {
+    if (currentTag) {
+      out.push({
+        kind: "tag",
+        tag: currentTag.tag,
+        type: currentTag.type,
+        body: currentTag.body.join("\n").trim(),
+      });
+      currentTag = null;
+    }
+  };
+  for (const line of lines) {
+    const match = /^@([A-Za-z]+)(?:\s+(\{[^}]*\}))?\s*(.*)$/.exec(line.trim());
+    if (match && JSDOC_TAGS.has(match[1]!.toLowerCase())) {
+      flushProse();
+      flushTag();
+      currentTag = {
+        tag: match[1]!.toLowerCase(),
+        type: match[2] ?? null,
+        body: match[3] ? [match[3]] : [],
+      };
+      continue;
+    }
+    if (currentTag) {
+      currentTag.body.push(line);
+    } else {
+      buffer.push(line);
+    }
+  }
+  flushProse();
+  flushTag();
+  return out;
+}
+
+/**
+ * Render one annotation as a sequence of .annotation-block cards
+ * (one per JSDoc tag) + any preamble prose. Server-side so the
+ * browser ships parsed HTML; the walkTokens hook strips GFM's
+ * email auto-link (annotation prose is technical — `core@7.0.0`
+ * should not become <a href="mailto:...">).
+ *
+ * Ordering rule: @fileoverview leads, then @description, then
+ * every other tag in source order. Preamble prose (not attached
+ * to any tag) becomes a synthetic @description block.
  */
 function renderAnnotationMarkdown(markdown: string): string {
-  return marked.parse(markdown.trim(), {
-    gfm: true,
-    breaks: false,
+  const parseOptions = {
+    gfm: true as const,
+    breaks: false as const,
     walkTokens(token: { type: string; href?: string; raw?: string; text?: string }) {
       if (
         token.type === "link" &&
@@ -177,7 +256,63 @@ function renderAnnotationMarkdown(markdown: string): string {
         token.text = token.raw;
       }
     },
-  }) as string;
+  };
+  const chunks = splitAnnotationByTags(markdown.trim());
+  const blocks: Array<{ html: string; order: number }> = [];
+  let preamble: string | null = null;
+  let hasExplicitDescription = false;
+
+  for (const chunk of chunks) {
+    if (chunk.kind === "prose") {
+      if (preamble === null) {
+        preamble = chunk.text;
+      } else {
+        preamble = `${preamble}\n\n${chunk.text}`;
+      }
+      continue;
+    }
+    if (chunk.tag === "description") {
+      hasExplicitDescription = true;
+    }
+    const typeHtml = chunk.type
+      ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
+      : "";
+    const bodyHtml = chunk.body
+      ? (marked.parse(chunk.body, parseOptions) as string)
+      : "";
+    const order =
+      chunk.tag === "fileoverview" ? 0 : chunk.tag === "description" ? 1 : 2;
+    blocks.push({
+      html:
+        `<div class="annotation-block" data-tag="${chunk.tag}">` +
+        `<span class="annotation-tag">@${chunk.tag}</span>` +
+        (typeHtml ? ` ${typeHtml}` : "") +
+        `<div class="annotation-body">${bodyHtml}</div>` +
+        `</div>`,
+      order,
+    });
+  }
+  /* Preamble becomes a synthetic @description when no explicit
+   * one exists. Keeps the "description leads the card stack"
+   * ordering while still surfacing free-floating prose. */
+  if (preamble !== null && !hasExplicitDescription) {
+    const bodyHtml = marked.parse(preamble, parseOptions) as string;
+    blocks.push({
+      html:
+        `<div class="annotation-block" data-tag="description">` +
+        `<span class="annotation-tag">@description</span>` +
+        `<div class="annotation-body">${bodyHtml}</div>` +
+        `</div>`,
+      order: 1,
+    });
+  } else if (preamble !== null) {
+    /* Explicit @description exists — keep the preamble as plain
+     * prose above the cards so nothing is silently dropped. */
+    const bodyHtml = marked.parse(preamble, parseOptions) as string;
+    blocks.unshift({ html: `<div class="annotation-prose">${bodyHtml}</div>`, order: -1 });
+  }
+  blocks.sort((a, b) => a.order - b.order);
+  return blocks.map(b => b.html).join("");
 }
 
 /* ------------------------------------------------------------------ */
