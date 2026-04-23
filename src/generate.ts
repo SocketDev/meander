@@ -3,7 +3,7 @@ import { Value } from "@sinclair/typebox/value";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { marked, Renderer } from "marked";
+import { marked, Marked, Renderer, type Tokens } from "marked";
 
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
@@ -156,6 +156,45 @@ function stripMultilineCommentsPreserveLines(code: string): string {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Fixed-grammar identifier patterns we can hand-tokenize inside
+ * inline `<code>` spans. hljs auto-detect mis-parses them because
+ * `/`, `@`, `?`, `#` aren't operators in code-style grammars.
+ * Pre-tokenizing lets consumers paint each segment (scheme /
+ * type / ns / name / version / query / fragment) in its own
+ * syntax colors without shipping a client-side classifier.
+ */
+const PURL_PATTERN =
+  /^(pkg:)([A-Za-z][A-Za-z0-9.+-]*)(\/.+?)(@[^?#]+)?(\?[^#]+)?(#.+)?$/;
+
+function tokenizePurlString(text: string): string | null {
+  const match = PURL_PATTERN.exec(text);
+  if (!match) {
+    return null;
+  }
+  const [, scheme, type, path, version, query, fragment] = match;
+  const span = (cls: string, content: string) =>
+    `<span class="${cls}">${escapeHtml(content)}</span>`;
+  const pathMatch = path!.match(/^\/(.+)\/([^/]+)$/);
+  let pathHtml: string;
+  if (pathMatch) {
+    pathHtml =
+      `/${span("purl-namespace", pathMatch[1]!)}/${span("purl-name", pathMatch[2]!)}`;
+  } else {
+    pathHtml = `/${span("purl-name", path!.slice(1))}`;
+  }
+  return (
+    `<code class="purl">` +
+    span("purl-scheme", scheme!) +
+    span("purl-type", type!) +
+    pathHtml +
+    (version ? span("purl-version", version) : "") +
+    (query ? span("purl-query", query) : "") +
+    (fragment ? span("purl-fragment", fragment) : "") +
+    `</code>`
+  );
+}
+
+/**
  * Known JSDoc tags — only these wrap into .annotation-block cards.
  * Unknown `@foo` tokens in prose pass through untouched.
  */
@@ -242,21 +281,37 @@ function splitAnnotationByTags(
  * every other tag in source order. Preamble prose (not attached
  * to any tag) becomes a synthetic @description block.
  */
-function renderAnnotationMarkdown(markdown: string): string {
-  const parseOptions = {
-    gfm: true as const,
-    breaks: false as const,
-    walkTokens(token: { type: string; href?: string; raw?: string; text?: string }) {
-      if (
-        token.type === "link" &&
-        typeof token.href === "string" &&
-        token.href.startsWith("mailto:")
-      ) {
-        token.type = "text";
-        token.text = token.raw;
-      }
+/* Dedicated marked instance for annotation rendering. Setup
+ * happens once (module-load side effect) so each render call
+ * doesn't re-install hooks. */
+const annotationMarked = new Marked({
+  gfm: true,
+  breaks: false,
+  walkTokens(token: Tokens.Generic) {
+    if (
+      token.type === "link" &&
+      typeof token.href === "string" &&
+      token.href.startsWith("mailto:")
+    ) {
+      token.type = "text";
+      token.text = token.raw;
+    }
+  },
+});
+/* PURL-shaped inline code gets hand-tokenized so consumers can
+ * paint scheme / type / ns / name / version / query / fragment
+ * with their own syntax colors. Non-PURL inline code falls
+ * through to marked's default renderer (returning false from a
+ * renderer hook signals "use the default"). */
+annotationMarked.use({
+  renderer: {
+    codespan(token: Tokens.Codespan): string | false {
+      return tokenizePurlString(token.text) ?? false;
     },
-  };
+  },
+});
+
+function renderAnnotationMarkdown(markdown: string): string {
   const chunks = splitAnnotationByTags(markdown.trim());
   const blocks: Array<{ html: string; order: number }> = [];
   let preamble: string | null = null;
@@ -278,7 +333,7 @@ function renderAnnotationMarkdown(markdown: string): string {
       ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
       : "";
     const bodyHtml = chunk.body
-      ? (marked.parse(chunk.body, parseOptions) as string)
+      ? (annotationMarked.parse(chunk.body) as string)
       : "";
     const order =
       chunk.tag === "fileoverview" ? 0 : chunk.tag === "description" ? 1 : 2;
@@ -296,7 +351,7 @@ function renderAnnotationMarkdown(markdown: string): string {
    * one exists. Keeps the "description leads the card stack"
    * ordering while still surfacing free-floating prose. */
   if (preamble !== null && !hasExplicitDescription) {
-    const bodyHtml = marked.parse(preamble, parseOptions) as string;
+    const bodyHtml = annotationMarked.parse(preamble) as string;
     blocks.push({
       html:
         `<div class="annotation-block" data-tag="description">` +
@@ -308,7 +363,7 @@ function renderAnnotationMarkdown(markdown: string): string {
   } else if (preamble !== null) {
     /* Explicit @description exists — keep the preamble as plain
      * prose above the cards so nothing is silently dropped. */
-    const bodyHtml = marked.parse(preamble, parseOptions) as string;
+    const bodyHtml = annotationMarked.parse(preamble) as string;
     blocks.unshift({ html: `<div class="annotation-prose">${bodyHtml}</div>`, order: -1 });
   }
   blocks.sort((a, b) => a.order - b.order);
