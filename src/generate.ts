@@ -407,7 +407,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
   <link rel="stylesheet" href="/walkthrough.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="${part.id}">
   <header class="topbar">
@@ -423,7 +423,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   </main>
 
   <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
-  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script>
     marked.setOptions({ gfm: true, breaks: false });
     for (const card of document.querySelectorAll('.annotation-card')) {
@@ -523,7 +523,7 @@ function renderDocumentsHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documents - ${escapeHtml(slug)}</title>
   <link rel="stylesheet" href="/walkthrough.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents">
   <header class="topbar">
@@ -542,7 +542,7 @@ function renderDocumentsHtml(
     ${tabPanes}
   </main>
 
-  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.10.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script>
     for (const block of document.querySelectorAll('.doc-content pre code')) {
       hljs.highlightElement(block);
