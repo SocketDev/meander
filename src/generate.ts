@@ -152,6 +152,35 @@ function stripMultilineCommentsPreserveLines(code: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Annotation markdown renderer                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Dedicated marked instance for annotation comments. Shipped HTML
+ * only — no client-side markdown parser, no shipping of the raw
+ * markdown source inside a hidden <textarea>. The walkTokens hook
+ * strips GFM's email auto-link because annotation prose is
+ * technical (`core@7.0.0`, `name@1.2.3`) and we don't want those
+ * wrapped as <a href="mailto:...">.
+ */
+function renderAnnotationMarkdown(markdown: string): string {
+  return marked.parse(markdown.trim(), {
+    gfm: true,
+    breaks: false,
+    walkTokens(token: { type: string; href?: string; raw?: string; text?: string }) {
+      if (
+        token.type === "link" &&
+        typeof token.href === "string" &&
+        token.href.startsWith("mailto:")
+      ) {
+        token.type = "text";
+        token.text = token.raw;
+      }
+    },
+  }) as string;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Definition index (go-to-definition)                                */
 /* ------------------------------------------------------------------ */
 
@@ -378,9 +407,9 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
             })
             .join("\n");
 
+          const annotationHtml = renderAnnotationMarkdown(section.annotation);
           return `<article class="annotation-card" id="ann-${section.id}">
-  <textarea class="annotation-md-source" hidden>${escapeHtml(section.annotation)}</textarea>
-  <div class="annotation-md"></div>
+  <div class="annotation-md">${annotationHtml}</div>
 </article>
 <section class="code-section" id="${section.id}">
   <pre><table class="code-table" data-file="${escapeHtml(section.file)}">${tableRows}</table></pre>
@@ -422,29 +451,8 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
     ${fileBlocks || '<div class="empty">No walkthrough sections matched this part.</div>'}
   </main>
 
-  <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
   <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script>
-    marked.setOptions({ gfm: true, breaks: false });
-    // Drop GFM's email auto-link: annotation prose is technical
-    // (\`core@7.0.0\`, \`name@1.2.3\`) and was being wrapped as
-    // <a href="mailto:..."> on every paragraph. walkTokens is the
-    // documented hook for post-processing link tokens.
-    marked.use({
-      walkTokens(token) {
-        if (token.type === 'link' && token.href && token.href.startsWith('mailto:')) {
-          token.type = 'text';
-          token.text = token.raw;
-        }
-      }
-    });
-    for (const card of document.querySelectorAll('.annotation-card')) {
-      const source = card.querySelector('.annotation-md-source');
-      const target = card.querySelector('.annotation-md');
-      if (!source || !target) continue;
-      const markdown = source.value.trim();
-      target.innerHTML = marked.parse(markdown);
-    }
     for (const block of document.querySelectorAll('.line-code code')) {
       hljs.highlightElement(block);
     }
