@@ -426,6 +426,18 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script>
     marked.setOptions({ gfm: true, breaks: false });
+    // Drop GFM's email auto-link: annotation prose is technical
+    // (\`core@7.0.0\`, \`name@1.2.3\`) and was being wrapped as
+    // <a href="mailto:..."> on every paragraph. walkTokens is the
+    // documented hook for post-processing link tokens.
+    marked.use({
+      walkTokens(token) {
+        if (token.type === 'link' && token.href && token.href.startsWith('mailto:')) {
+          token.type = 'text';
+          token.text = token.raw;
+        }
+      }
+    });
     for (const card of document.querySelectorAll('.annotation-card')) {
       const source = card.querySelector('.annotation-md-source');
       const target = card.querySelector('.annotation-md');
