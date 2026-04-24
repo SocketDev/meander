@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { deriveKey, encrypt } from "./crypto.js";
+import { deriveKey, encrypt } from "./crypto.mjs";
 
 const API_BASE = "https://api.val.town";
 

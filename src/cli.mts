@@ -36,7 +36,7 @@ async function main() {
           options.assetDir = arg.slice("--asset-dir=".length);
         }
       }
-      const { generate } = await import("./generate.js");
+      const { generate } = await import("./generate.mjs");
       await generate(configPath, options);
       break;
     }
@@ -47,13 +47,13 @@ async function main() {
         process.exitCode = 1;
         return;
       }
-      const { publish } = await import("./publish.js");
+      const { publish } = await import("./publish.mjs");
       await publish(configPath);
       break;
     }
     case "deploy-val": {
       const valName = process.argv[3] || "walkthrough";
-      const { deployVal } = await import("./deploy-val.js");
+      const { deployVal } = await import("./deploy-val.mjs");
       await deployVal(valName);
       break;
     }

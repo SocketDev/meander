@@ -11,7 +11,7 @@ import {
   isScopedPackage,
   isUrl,
   _PURL_RE,
-} from "./classifiers.js";
+} from "./classifiers.mjs";
 
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
