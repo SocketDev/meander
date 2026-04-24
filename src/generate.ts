@@ -1,6 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { marked, Marked, Renderer, type Tokens } from "marked";
@@ -25,6 +25,55 @@ const WalkthroughPartSchema = Type.Object({
   files: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
 });
 
+/**
+ * Favicon override. Consumers can disable entirely (`false`),
+ * omit to get meander's default bezel-derived favicon, or
+ * provide their own assets.
+ *
+ * When provided, keys are resolved relative to the consumer's
+ * walkthrough.json and copied into the output dir at the
+ * corresponding `/favicon-*` paths. Omitted keys fall back to
+ * the meander defaults for that size.
+ *
+ * Example — single vector:
+ *   { "favicon": { "svg": "assets/my-favicon.svg" } }
+ *
+ * Example — sized PNG overrides:
+ *   { "favicon": {
+ *       "svg": "assets/my-favicon.svg",
+ *       "png": { "180": "assets/apple-touch-icon.png" }
+ *   } }
+ *
+ * Example — disabled (consumer emits their own via
+ * post-processing):
+ *   { "favicon": false }
+ *
+ * Example — set theme-color meta per scheme:
+ *   { "favicon": {
+ *       "themeColor": { "light": "#ffffff", "dark": "#0a0a0a" }
+ *   } }
+ */
+const FaviconSchema = Type.Union([
+  Type.Literal(false),
+  Type.Object({
+    svg: Type.Optional(Type.String({ minLength: 1 })),
+    ico: Type.Optional(Type.String({ minLength: 1 })),
+    png: Type.Optional(Type.Object({
+      "16":  Type.Optional(Type.String({ minLength: 1 })),
+      "32":  Type.Optional(Type.String({ minLength: 1 })),
+      "48":  Type.Optional(Type.String({ minLength: 1 })),
+      "180": Type.Optional(Type.String({ minLength: 1 })),
+    })),
+    themeColor: Type.Optional(Type.Union([
+      Type.String({ minLength: 1 }),
+      Type.Object({
+        light: Type.String({ minLength: 1 }),
+        dark:  Type.String({ minLength: 1 }),
+      }),
+    ])),
+  }),
+]);
+
 const WalkthroughConfigSchema = Type.Object({
   slug: Type.String({ minLength: 1, pattern: "^[a-z0-9][a-z0-9-]*$" }),
   title: Type.String({ minLength: 1 }),
@@ -40,6 +89,14 @@ const WalkthroughConfigSchema = Type.Object({
    * concatenated into the emitted pages.
    */
   comments: Type.Optional(Type.Boolean()),
+  /**
+   * Favicon override. Default: meander ships its own
+   * bezel-derived favicon set (svg + ico + sized pngs). Set
+   * `false` to skip emitting any favicon link tags, or
+   * provide an object to swap individual assets. See
+   * FaviconSchema above for examples.
+   */
+  favicon: Type.Optional(FaviconSchema),
 });
 
 type WalkthroughPart = Static<typeof WalkthroughPartSchema>;
@@ -662,7 +719,7 @@ function renderPartNav(
 
 
 
-function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, symbols: SymbolTable, hasDocuments: boolean, basePath: string, cssHref: string): string {
+function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, symbols: SymbolTable, hasDocuments: boolean, basePath: string, cssHref: string, headExtra: string): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
     const existing = sectionsByFile.get(section.file);
@@ -716,6 +773,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
+  ${headExtra}
   <link rel="stylesheet" href="${cssHref}" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
@@ -744,7 +802,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
 </html>`;
 }
 
-function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean, basePath: string, cssHref: string): string {
+function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean, basePath: string, cssHref: string, headExtra: string): string {
   const docsItem = hasDocuments
     ? `<li><a href="${basePath}/${slug}/documents">Documents</a></li>\n`
     : "";
@@ -761,6 +819,7 @@ function renderIndexHtml(slug: string, title: string, parts: readonly Walkthroug
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
+  ${headExtra}
   <link rel="stylesheet" href="${cssHref}" />
 </head>
 <body>
@@ -794,6 +853,7 @@ function renderDocumentsHtml(
   inlineJs: string,
   basePath: string,
   cssHref: string,
+  headExtra: string,
 ): string {
   // Build tab bar
   const tabButtons = renderedDocs
@@ -825,6 +885,7 @@ function renderDocumentsHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documents - ${escapeHtml(slug)}</title>
+  ${headExtra}
   <link rel="stylesheet" href="${cssHref}" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
@@ -1314,17 +1375,108 @@ export async function generate(
 
   const hasDocuments = !!(documents && documents.length > 0);
   const counts = new Map<number, number>();
+
+  /* Copy CSS to output dir — under `assetDir` if configured,
+   * else at output root. `bundledAssetsDir` (declared above) is
+   * the npm-package-bundled asset *source* path; `assetDir` is
+   * the user-chosen emit subdir. Must land before renders so
+   * the cssHref in emitted HTML resolves correctly. */
+  const css = readFileSync(join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  const cssOutDir = assetDir ? join(outDir, assetDir) : outDir;
+  mkdirSync(cssOutDir, { recursive: true });
+  writeFileSync(join(cssOutDir, "walkthrough.css"), css);
+
+  /* Copy favicon assets. Default: meander ships a bezel-derived
+   * set (svg + ico + sized pngs + apple-touch-icon). Consumer
+   * can override individual sizes via walkthrough.json's
+   * `favicon` key, or set `favicon: false` to skip entirely.
+   * Assets land at the output-dir root so <link href="/..."> +
+   * basePath rewrites work uniformly. */
+  const faviconOpt = config.favicon;
+  const faviconEnabled = faviconOpt !== false;
+  type FaviconAssets = {
+    svg?: string;   // filename in outDir
+    ico?: string;
+    png16?: string;
+    png32?: string;
+    png48?: string;
+    png180?: string;
+  };
+  const faviconAssets: FaviconAssets = {};
+  if (faviconEnabled) {
+    const bundledFavDir = join(bundledAssetsDir, "favicon");
+    const override = (faviconOpt && typeof faviconOpt === "object")
+      ? faviconOpt
+      : null;
+    /* For each slot, prefer the consumer's override path
+     * (resolved relative to walkthrough.json's dir), falling
+     * back to the bundled default if the override isn't
+     * provided or doesn't exist. */
+    const resolveOverride = (p?: string): string | undefined => {
+      if (!p) return undefined;
+      const full = resolve(rootDir, p);
+      return existsSync(full) ? full : undefined;
+    };
+    const slots: Array<[keyof FaviconAssets, string, string | undefined]> = [
+      ["svg",    "favicon.svg",           override?.svg],
+      ["ico",    "favicon.ico",           override?.ico],
+      ["png16",  "favicon-16.png",        override?.png?.["16"]],
+      ["png32",  "favicon-32.png",        override?.png?.["32"]],
+      ["png48",  "favicon-48.png",        override?.png?.["48"]],
+      ["png180", "apple-touch-icon.png",  override?.png?.["180"]],
+    ];
+    for (const [slot, outName, overridePath] of slots) {
+      const src = resolveOverride(overridePath)
+        ?? join(bundledFavDir, outName);
+      if (!existsSync(src)) continue;
+      copyFileSync(src, join(outDir, outName));
+      faviconAssets[slot] = outName;
+    }
+  }
+
+  /* Assemble the <link> + <meta> tags injected into every
+   * rendered page's <head>. Uses assetHref so basePath /
+   * assetDir rewrites apply. */
+  const faviconTags = faviconEnabled
+    ? [
+        faviconAssets.svg    && `<link rel="icon" type="image/svg+xml" href="${assetHref(faviconAssets.svg)}" />`,
+        faviconAssets.ico    && `<link rel="icon" type="image/x-icon" href="${assetHref(faviconAssets.ico)}" />`,
+        faviconAssets.png16  && `<link rel="icon" type="image/png" sizes="16x16" href="${assetHref(faviconAssets.png16)}" />`,
+        faviconAssets.png32  && `<link rel="icon" type="image/png" sizes="32x32" href="${assetHref(faviconAssets.png32)}" />`,
+        faviconAssets.png180 && `<link rel="apple-touch-icon" href="${assetHref(faviconAssets.png180)}" />`,
+      ].filter(Boolean).join("\n  ")
+    : "";
+
+  /* theme-color meta — either a single color or per-scheme
+   * light/dark variants. Emitted as zero, one, or two meta tags.
+   * Consumers that didn't opt in get no theme-color (browsers
+   * use their default). */
+  const themeColor = (faviconOpt && typeof faviconOpt === "object")
+    ? faviconOpt.themeColor
+    : undefined;
+  const themeColorTags = (() => {
+    if (!themeColor) return "";
+    if (typeof themeColor === "string") {
+      return `<meta name="theme-color" content="${themeColor}" />`;
+    }
+    return [
+      `<meta name="theme-color" content="${themeColor.light}" media="(prefers-color-scheme: light)" />`,
+      `<meta name="theme-color" content="${themeColor.dark}" media="(prefers-color-scheme: dark)" />`,
+    ].join("\n  ");
+  })();
+
+  const headExtra = [faviconTags, themeColorTags].filter(Boolean).join("\n  ");
+
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
-    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, symbols, hasDocuments, basePath, assetHref("walkthrough.css"));
+    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, symbols, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
     writeFileSync(join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
-  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments, basePath, assetHref("walkthrough.css"));
+  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
   writeFileSync(join(outDir, "index.html"), indexHtml);
 
-  // Render documents page if documents are present
   if (documents && documents.length > 0) {
     const renderedDocs: RenderedDocData[] = documents.map((docPath, index) => {
       const fullPath = join(rootDir, docPath);
@@ -1335,20 +1487,10 @@ export async function generate(
         headings: rendered.headings,
       };
     });
-
-    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs, basePath, assetHref("walkthrough.css"));
+    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs, basePath, assetHref("walkthrough.css"), headExtra);
     writeFileSync(join(outDir, "documents.html"), documentsHtml);
     console.log(`Generated documents.html with ${documents.length} documents`);
   }
-
-  /* Copy CSS to output dir — under `assetDir` if configured,
-   * else at output root. `bundledAssetsDir` (declared above) is
-   * the npm-package-bundled asset *source* path; `assetDir` is
-   * the user-chosen emit subdir. */
-  const css = readFileSync(join(bundledAssetsDir, "walkthrough.css"), "utf-8");
-  const cssOutDir = assetDir ? join(outDir, assetDir) : outDir;
-  mkdirSync(cssOutDir, { recursive: true });
-  writeFileSync(join(cssOutDir, "walkthrough.css"), css);
 
   const summary = {
     generatedAt: new Date().toISOString(),
