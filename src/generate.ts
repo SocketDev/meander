@@ -443,69 +443,84 @@ function renderAnnotationMarkdown(markdown: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Definition index (go-to-definition)                                */
+/*  Symbol table (go-to-definition)                                    */
 /* ------------------------------------------------------------------ */
 
-type Definition = {
-  name: string;
+type SymbolLocation = {
   file: string;
   line: number;
-  partId: number;
+  part: number;
 };
 
-type DefinitionIndex = Record<string, { file: string; line: number; part: number }>;
+/**
+ * Symbol table: exported-name → array of source locations.
+ *
+ * Shape is always an array so consumers see one path regardless
+ * of whether a name is defined once (length 1) or in multiple
+ * places (length > 1, e.g. a `parse` function exported from
+ * several ecosystem-specific files, or TypeScript overload
+ * signatures on consecutive lines). The consumer
+ * (assets/sym-ref.js) picks a single target for the trivial
+ * case and shows a disambiguator for the multi-target case —
+ * rather than silently dropping ambiguous names like the old
+ * singleton shape did.
+ *
+ * Published to the page as
+ * `window[Symbol.for("meander:symbols")]` so it doesn't
+ * pollute the plain-property namespace.
+ */
+type SymbolTable = Record<string, SymbolLocation[]>;
 
-function extractDefinitions(file: string, source: string): Omit<Definition, "partId">[] {
-  const defs: Omit<Definition, "partId">[] = [];
+type ExtractedSymbol = { name: string; line: number };
+
+function extractSymbols(source: string): ExtractedSymbol[] {
+  const out: ExtractedSymbol[] = [];
   const lines = source.split("\n");
-
-  const pattern = /^export\s+(?:async\s+)?(?:type|interface|class|function|const|enum)\s+([A-Za-z][A-Za-z0-9_]*)/;
-
+  const pattern =
+    /^export\s+(?:async\s+)?(?:type|interface|class|function|const|enum)\s+([A-Za-z][A-Za-z0-9_]*)/;
   for (let i = 0; i < lines.length; i++) {
     const match = pattern.exec(lines[i]!.trim());
     if (match?.[1]) {
-      defs.push({ name: match[1], file, line: i + 1 });
+      out.push({ name: match[1], line: i + 1 });
     }
   }
-  return defs;
+  return out;
 }
 
-function buildDefinitionIndex(
+function buildSymbols(
   parts: readonly WalkthroughPart[],
   sources: Map<string, string>,
-): DefinitionIndex {
-  const allDefs: Definition[] = [];
+): SymbolTable {
+  const byName = new Map<string, SymbolLocation[]>();
   for (const part of parts) {
     for (const file of part.files) {
       const source = sources.get(file);
       if (!source) continue;
-      const fileDefs = extractDefinitions(file, source);
-      for (const def of fileDefs) {
-        allDefs.push({ ...def, partId: part.id });
+      for (const sym of extractSymbols(source)) {
+        const loc: SymbolLocation = { file, line: sym.line, part: part.id };
+        const existing = byName.get(sym.name);
+        if (existing) {
+          existing.push(loc);
+        } else {
+          byName.set(sym.name, [loc]);
+        }
       }
     }
   }
 
-  const byName = new Map<string, Definition[]>();
-  for (const def of allDefs) {
-    const existing = byName.get(def.name);
-    if (existing) {
-      existing.push(def);
-    } else {
-      byName.set(def.name, [def]);
-    }
-  }
-
-  const index: DefinitionIndex = {};
-  for (const [name, defs] of byName) {
+  const table: SymbolTable = {};
+  for (const [name, locs] of byName) {
+    /* Skip short names (`id`, `fn`, etc.) — too noisy against
+     * real code. 3-char floor matches the previous filter.
+     * Ambiguous names (defined in multiple files, or with
+     * overload signatures on separate lines) flow through
+     * unchanged — the array shape preserves every location so
+     * consumers can disambiguate instead of silently losing
+     * them. */
     if (name.length < 3) continue;
-    const uniqueFiles = new Set(defs.map((d) => d.file));
-    if (uniqueFiles.size > 1) continue;
-    const def = defs[0]!;
-    index[name] = { file: def.file, line: def.line, part: def.partId };
+    table[name] = locs;
   }
-
-  return index;
+  return table;
 }
 
 function uniqueFiles(parts: readonly WalkthroughPart[]): string[] {
@@ -644,7 +659,7 @@ function renderPartNav(
 
 
 
-function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, defIndex: DefinitionIndex, hasDocuments: boolean, basePath: string, cssHref: string): string {
+function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, symbols: SymbolTable, hasDocuments: boolean, basePath: string, cssHref: string): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
     const existing = sectionsByFile.get(section.file);
@@ -720,7 +735,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
       hljs.highlightElement(block);
     }
   </script>
-  <script>window.__defIndex = ${JSON.stringify(defIndex)};</script>
+  <script>window[Symbol.for("meander:symbols")] = ${JSON.stringify(symbols)};</script>
   <script>${inlineJs}</script>
 </body>
 </html>`;
@@ -834,7 +849,7 @@ function renderDocumentsHtml(
     }
   </script>
   <script>
-    window.__docHeadings = ${JSON.stringify(
+    window[Symbol.for("meander:doc-headings")] = ${JSON.stringify(
       renderedDocs.map((d) => ({ file: d.filePath, headings: d.headings }))
     )};
   </script>
@@ -1252,14 +1267,14 @@ export async function generate(
   const files = uniqueFiles(parts);
   const sources = loadSources(rootDir, files);
   const sections = buildSections(parts, sources);
-  const defIndex = buildDefinitionIndex(parts, sources);
+  const symbols = buildSymbols(parts, sources);
 
   const bundledAssetsDir = getAssetsDir();
   /* Non-comment scripts — always inlined (line-select is nav-ish
-   * UX, def-link is the definition-jump feature, doc-tabs/doc-toc
+   * UX, sym-ref is the symbol-reference link feature, doc-tabs/doc-toc
    * power the documents page layout). */
   const lineSelectJs = readFileSync(join(bundledAssetsDir, "line-select.js"), "utf-8");
-  const defLinkJs = readFileSync(join(bundledAssetsDir, "def-link.js"), "utf-8");
+  const symRefJs = readFileSync(join(bundledAssetsDir, "sym-ref.js"), "utf-8");
   const docTabsJs = readFileSync(join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(join(bundledAssetsDir, "block-select.js"), "utf-8");
   const docTocJs = readFileSync(join(bundledAssetsDir, "doc-toc.js"), "utf-8");
@@ -1278,13 +1293,13 @@ export async function generate(
     ? readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
-    ? [lineSelectJs, commentClientJs, defLinkJs, unresolvedJs, exportJs].join("\n")
-    : [lineSelectJs, defLinkJs].join("\n");
+    ? [lineSelectJs, commentClientJs, symRefJs, unresolvedJs, exportJs].join("\n")
+    : [lineSelectJs, symRefJs].join("\n");
   const documentsInlineJs = commentsEnabled
     ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
     : [blockSelectJs, docTabsJs, docTocJs].join("\n");
 
-  console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
+  console.log(`Symbol table: ${Object.keys(symbols).length} unique names`);
 
   const sectionsByPart = new Map<number, Section[]>();
   for (const part of parts) {
@@ -1299,7 +1314,7 @@ export async function generate(
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
-    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, defIndex, hasDocuments, basePath, assetHref("walkthrough.css"));
+    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, symbols, hasDocuments, basePath, assetHref("walkthrough.css"));
     writeFileSync(join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
