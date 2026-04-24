@@ -1,6 +1,18 @@
-# meander
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-bezel-dark.svg">
+    <img alt="meander" src="assets/logo/logo-bezel-light.svg" width="420">
+  </picture>
+</p>
 
-Annotated code walkthrough pages with a live comment system, hosted on [Val Town](https://val.town).
+<h1 align="center">meander</h1>
+
+<p align="center">
+  Annotated code walkthrough pages with a live comment system, hosted on <a href="https://val.town">Val Town</a>.
+</p>
+
+---
+
 
 You write `/* ... */` prose comments directly in your source files. Meander parses them, pairs each comment with the code that follows it, and generates a set of static HTML pages — one per walkthrough part — served through a Hono HTTP handler deployed to your Val Town account. Readers can leave threaded comments on any line range, resolve discussions, and export the full comment history as JSON.
 
