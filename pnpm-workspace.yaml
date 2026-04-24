@@ -1,8 +1,9 @@
-allowBuilds:
-  esbuild: true
 
 # Register .claude/hooks/* as workspace packages so `pnpm install`
 # resolves each hook's deps + taze (via `pnpm run update`) bumps
 # them alongside the root manifest. Keeps hook deps in lockstep.
 packages:
   - .claude/hooks/*
+allowBuilds:
+  esbuild: true
+  puppeteer: set this to true or false

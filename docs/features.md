@@ -198,6 +198,52 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Service worker (offline cache)
+
+**Opt-in.** When enabled, meander writes `sw.js` to the output
+root and injects a registration script into every page's
+`<head>` so readers get offline replay of whatever they've
+visited.
+
+### Enabling
+
+```json
+{
+  "serviceWorker": true
+}
+```
+
+Or pin a version string to force all cached clients to upgrade:
+
+```json
+{
+  "serviceWorker": {
+    "version": "2026-04-24-commit-a1b2c3d"
+  }
+}
+```
+
+- `version`: the `CACHE_VERSION` string embedded in the SW.
+  Bumping it flips the SW bytes, which triggers the browser's
+  update check and causes the `activate` handler to prune the
+  old cache. Default: today's date in `YYYYMMDD` form.
+
+### Behavior
+
+- **Cache-first with stale-while-revalidate** for static assets
+  (CSS, JS, icons, fonts). Readers get an instant response;
+  the background fetch refreshes the cache for next time.
+- **Network-first** for HTML navigations. Stale HTML is the
+  worst cache-miss mode — the page ships pointing at asset
+  URLs that may have moved. Falls back to cache only on
+  offline.
+- **Bypass** on POST/PUT/DELETE, cross-origin, and `/api/*`
+  paths so mutations and APIs always reach the network.
+
+Registration is gated on `location.hostname` not being
+`localhost` / `127.0.0.1`, so dev servers don't cache between
+reloads.
+
 ## Subresource Integrity (SRI)
 
 **Opt-in.** When enabled, every emitted `<script src>` and

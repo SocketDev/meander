@@ -95,6 +95,25 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Register a service worker for offline cache + cross-deploy
+   * replay. Cache-first for static assets, network-first for
+   * HTML navigation (so a new deploy is picked up on next
+   * revisit).
+   *
+   * Default: false.
+   *
+   * Pass `true` for defaults, or an object to customize:
+   *   { serviceWorker: { version: "commit-sha-here" } }
+   */
+  serviceWorker: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        version: Type.Optional(Type.String({ minLength: 1 })),
+      }),
+    ]),
+  ),
+  /**
    * Inject Subresource Integrity (SRI) hashes on <script src>
    * and <link rel=stylesheet|preload|modulepreload>, so
    * tampered CDN or origin responses are rejected by the
@@ -1610,7 +1629,28 @@ export async function generate(
   const jsdocGroupJs = readFileSync(path.join(bundledAssetsDir, "jsdoc-group.js"), "utf-8");
   const annotationReadyJs = readFileSync(path.join(bundledAssetsDir, "annotation-ready.js"), "utf-8");
   const jsdocJs = [jsdocWrapJs, jsdocGroupJs, annotationReadyJs].join("\n");
-  const headJs = [bootJs, themeJs].join("\n");
+
+  /* Service worker — emit sw.js with the consumer's version
+   * token replacing __MEANDER_CACHE_VERSION__, plus an inline
+   * registration script gated on non-localhost (dev servers
+   * shouldn't cache between reloads). */
+  const swEnabled = !!config.serviceWorker;
+  const swOpts = typeof config.serviceWorker === "object" ? config.serviceWorker : undefined;
+  const swVersion = swOpts?.version ?? new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  let swRegisterJs = "";
+  if (swEnabled) {
+    const swSrc = readFileSync(path.join(bundledAssetsDir, "sw.js"), "utf-8");
+    const swOut = swSrc.replaceAll("__MEANDER_CACHE_VERSION__", swVersion);
+    /* sw.js must land at origin root (or basePath root) so its
+     * scope covers the whole site. */
+    writeFileSync(path.join(outDir, "sw.js"), swOut);
+    swRegisterJs = `
+if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+  navigator.serviceWorker.register(${JSON.stringify(assetHref("sw.js"))}).catch(() => {});
+}`;
+  }
+
+  const headJs = [bootJs, themeJs, swRegisterJs].filter(Boolean).join("\n");
   /* Comment-client bundle — only inlined when comments are
    * enabled. Consumers shipping their own system (e.g. encrypted
    * or SSO-gated) can set `comments: false` in walkthrough.json
