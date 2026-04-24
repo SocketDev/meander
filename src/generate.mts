@@ -1192,7 +1192,7 @@ function renderIndexHtml(
             ${badge}
           </span>
           <span class="mdr-toc-card-title">${escapeHtml(part.title)}</span>
-          <span class="mdr-toc-card-desc">${escapeHtml(part.objective)}</span>
+          <span class="mdr-toc-card-desc">${polishProse(escapeHtml(part.objective))}</span>
           <span class="mdr-toc-card-meta">${count} section${count === 1 ? "" : "s"}</span>
         </a>`;
     })
@@ -1211,10 +1211,14 @@ function renderIndexHtml(
   /* Hero is optional; consumer provides subtitle + description.
    * Inline markdown (bold, italic, code, links) is supported in
    * description via marked.parseInline. Subtitle is plain text. */
+  /* Hero description runs through polishProse like every other
+   * prose surface — number highlighting + parenthetical italics
+   * stay consistent across pages. The description markdown is
+   * inline (no headings), so anchorifyHeadings is a no-op here. */
   const heroHtml = hero
     ? `<section class="mdr-hero">
     ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ""}
-    ${hero.description ? `<p class="mdr-hero-desc">${marked.parseInline(hero.description) as string}</p>` : ""}
+    ${hero.description ? `<p class="mdr-hero-desc">${polishProse(marked.parseInline(hero.description) as string)}</p>` : ""}
   </section>`
     : "";
 
@@ -2180,6 +2184,14 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   if (minifyEnabled) {
     minifyMod = await import("./minify.mts");
   }
+  /* Lazy-loaded URL rewriter for user-authored root-relative
+   * links that bypassed the build-time assetHref/partUrl
+   * helpers. Only imported when basePath is non-empty. */
+  let urlRewriteMod: typeof import("./url-rewrite.mts") | null = null;
+  if (basePath) {
+    urlRewriteMod = await import("./url-rewrite.mts");
+  }
+
   const finalizeHtml = async (html: string): Promise<string> => {
     let out = html;
     if (minifyMod && (minifyJs || minifySvg)) {
@@ -2187,6 +2199,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         js: minifyJs,
         svg: minifySvg,
       });
+    }
+    if (urlRewriteMod) {
+      out = urlRewriteMod.applyBasePathToHtml(out, basePath);
     }
     if (securityMod && cspEnabled) {
       out = securityMod.injectCspMeta(out, {
