@@ -1,14 +1,26 @@
 /**
- * Update: taze bumps every dep to the latest compatible version.
- * Config lives in .config/taze.config.mts — key policy bits:
- *   - maturityPeriod: 7  (skip versions released in the last 7 days;
- *                         matches the fleet-wide cooldown to avoid
- *                         adopting compromised or broken releases
- *                         before the ecosystem catches them)
- *   - mode: 'latest'     (bump to latest across major boundaries)
- *   - write: true        (edit package.json in place)
+ * Update: two-pass taze to apply the fleet's maturity policy
+ * correctly.
  *
- * `pnpm update` — runs taze + pnpm install to refresh the lockfile.
+ *   Pass 1: taze with its default config loaded (maturityPeriod
+ *     7, Socket-owned scopes in exclude). Non-Socket deps bump
+ *     only if they've been stable for a week — the cooldown
+ *     lets the ecosystem catch compromised releases.
+ *
+ *   Pass 2: taze with CLI flags scoped to Socket-owned packages
+ *     only, maturityPeriod 0. Fresh Socket releases land
+ *     immediately since we trust our own publish pipeline.
+ *     Done via CLI flags rather than a second config file
+ *     because taze's config auto-discovery is path-based and
+ *     doesn't support a --config override.
+ *
+ *   Pass 3: pnpm install to refresh the lockfile against the
+ *     updated package.json.
+ *
+ * SOCKET_SCOPES below MUST match the `exclude` list in
+ * .config/taze.config.mts — if they drift, packages either get
+ * double-bumped or missed entirely.
+ *
  * Review the diff before committing.
  */
 import { spawnSync } from "node:child_process";
@@ -20,5 +32,30 @@ function run(cmd: string, args: string[]): void {
   }
 }
 
+/* Socket-owned scopes — kept in lockstep with the exclude list
+ * in .config/taze.config.mts. */
+const SOCKET_SCOPES = [
+  "@socketregistry/*",
+  "@socketsecurity/*",
+  "@socketdev/*",
+  "socket-*",
+  "ecc-agentshield",
+  "sfw",
+];
+
+/* Pass 1 — everything except Socket packages, with cooldown. */
 run("pnpm", ["exec", "taze"]);
+
+/* Pass 2 — Socket packages only, no cooldown. taze's
+ * --include filter is comma-separated. */
+run("pnpm", [
+  "exec",
+  "taze",
+  "--include",
+  SOCKET_SCOPES.join(","),
+  "--maturity-period",
+  "0",
+  "--write",
+]);
+
 run("pnpm", ["install"]);
