@@ -98,12 +98,13 @@ meander generate walkthrough.json
 This writes the following files into a `walkthrough/` directory next to your config:
 
 ```
-walkthrough/
-  index.html                  # Part listing
-  walkthrough-part-1.html     # One file per part
-  walkthrough-part-2.html
-  walkthrough.css             # Styles (copied from package assets)
-  manifest.json               # Build summary
+pages/                  # default emit dir; override via walkthrough.json's outDir
+  index.html            # Part listing
+  part-1.html           # One file per part (when part has no `filename`)
+  part-2.html
+  parts/<name>.html     # When a part carries `filename: "name"`
+  meander.css           # Styles (copied from package assets)
+  manifest.json         # Build summary
 ```
 
 Open any HTML file directly in a browser to preview locally. (The comment system requires the Val Town backend to function.)
@@ -216,7 +217,7 @@ All user content is encrypted before storage using AES-256-GCM via the Web Crypt
 | Walkthrough HTML files (`index.html`, `walkthrough-part-*.html`, `documents.html`) | AES-256-GCM with unique IV per file |
 | Comment `body` and `author` fields | AES-256-GCM with unique IV per comment |
 | Comment metadata (`id`, `file`, `line_from`, `line_to`, `parent_id`, `resolved`, `created_at`) | **Not encrypted** — stored as plaintext |
-| CSS file (`walkthrough.css`) | **Not encrypted** — served directly by browsers |
+| CSS file (`meander.css`) | **Not encrypted** — served directly by browsers |
 | Manifest (`manifest.json`) | **Not encrypted** — contains only metadata |
 
 ### Key derivation
@@ -266,7 +267,7 @@ Syntax highlighting is applied automatically based on file extension:
 
 ## Local Preview
 
-Generated HTML files reference assets from the deployed val (`/walkthrough.css`, highlight.js CDN). To preview locally without a val, open any generated `.html` file directly — layout and code formatting will work, but the nav links and comment API will not.
+Generated HTML files reference assets from the deployed val (`/meander.css`, highlight.js CDN). To preview locally without a val, open any generated `.html` file directly — layout and code formatting will work, but the nav links and comment API will not.
 
 ## License
 

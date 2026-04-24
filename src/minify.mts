@@ -5,7 +5,7 @@
  *     <script> body through esbuild, every inline <svg> through
  *     SVGO. Returns the transformed HTML string.
  *   - `minifyAsset(bytes, kind)` — minify a standalone JS or
- *     CSS file's contents. Used for walkthrough.css + sw.js.
+ *     CSS file's contents. Used for meander.css + sw.js.
  *
  * All passes are best-effort: a single malformed asset (rare
  * SVGO parser choke, invalid JS in a consumer-provided snippet)
@@ -143,7 +143,7 @@ export type MinifyAssetOptions = {
 
 /**
  * Minify a standalone JS or CSS source string via esbuild.
- * Used for the external walkthrough.css and sw.js. Returns
+ * Used for the external meander.css and sw.js. Returns
  * the original string on failure so callers don't ship an
  * empty/broken asset.
  */

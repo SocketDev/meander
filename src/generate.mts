@@ -171,7 +171,7 @@ const WalkthroughConfigSchema = Type.Object({
   /**
    * Minify emitted assets — shrinks inline <script> bodies via
    * esbuild, inline <svg> elements via SVGO, and the standalone
-   * walkthrough.css + sw.js files. Safe to combine with other
+   * meander.css + sw.js files. Safe to combine with other
    * opt-ins; runs last in the finalize pipeline so hashing
    * (CSP, SRI) sees the minified bytes.
    *
@@ -1870,8 +1870,8 @@ export type GenerateOptions = {
   /**
    * URL path prefix. When the site is hosted under a subpath
    * (e.g. GitHub Pages at `/my-repo/`), every emitted `href` /
-   * `src` to a same-site asset is rewritten from `/walkthrough.css`
-   * to `{basePath}/walkthrough.css`. It's a path, not a URL —
+   * `src` to a same-site asset is rewritten from `/meander.css`
+   * to `{basePath}/meander.css`. It's a path, not a URL —
    * matches Next.js `basePath` semantics, not Vite's `base`
    * (which allows full URLs).
    * Default: "" (site hosted at origin root).
@@ -1879,9 +1879,9 @@ export type GenerateOptions = {
   basePath?: string | undefined;
   /**
    * Subdirectory under the output dir where emitted static
-   * assets (currently `walkthrough.css`) land. Default: ""
+   * assets (currently `meander.css`) land. Default: ""
    * (emit flat). Example: `--asset-dir assets` writes
-   * `assets/walkthrough.css` and rewrites the <link href>.
+   * `assets/meander.css` and rewrites the <link href>.
    */
   assetDir?: string | undefined;
 };
@@ -2065,7 +2065,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * the npm-package-bundled asset *source* path; `assetDir` is
    * the user-chosen emit subdir. Must land before renders so
    * the cssHref in emitted HTML resolves correctly. */
-  let css = readFileSync(path.join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  let css = readFileSync(path.join(bundledAssetsDir, "meander.css"), "utf-8");
   {
     /* CSS minify. Inline read of config.minify (the shared
      * minifyMod binding lives further down, set up as part of
@@ -2080,7 +2080,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   }
   const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir;
   mkdirSync(cssOutDir, { recursive: true });
-  writeFileSync(path.join(cssOutDir, "walkthrough.css"), css);
+  writeFileSync(path.join(cssOutDir, "meander.css"), css);
 
   /* Copy favicon assets. Default: meander ships a bezel-derived
    * set (svg + ico + sized pngs + apple-touch-icon). Consumer
@@ -2268,7 +2268,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       symbols,
       hasDocuments,
       basePath,
-      assetHref("walkthrough.css"),
+      assetHref("meander.css"),
       headExtra,
       footerHtml,
       commentBackendAttr,
@@ -2285,7 +2285,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     counts,
     hasDocuments,
     basePath,
-    assetHref("walkthrough.css"),
+    assetHref("meander.css"),
     headExtra,
     lineCounts,
     !!config.sizeTiers,
@@ -2342,7 +2342,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       renderedDocs,
       documentsInlineJs,
       basePath,
-      assetHref("walkthrough.css"),
+      assetHref("meander.css"),
       headExtra,
       footerHtml,
       commentBackendAttr,

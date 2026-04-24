@@ -127,7 +127,7 @@ export async function doctor(): Promise<void> {
     {
       name: "esbuild",
       required: ">=0.25",
-      description: "Minify inline <script> + walkthrough.css + sw.js",
+      description: "Minify inline <script> + meander.css + sw.js",
     },
   ];
 

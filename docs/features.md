@@ -535,7 +535,7 @@ pass against emitted assets:
   (cleanupIds + removeUnknownsAndDefaults overridden off so
   mermaid diagrams keep their edge-to-node links and the
   preserveAspectRatio variants browsers read).
-- **External `walkthrough.css`** + **`sw.js`** — esbuild on
+- **External `meander.css`** + **`sw.js`** — esbuild on
   the file bytes before they're written.
 
 Typical savings on the fixture:
@@ -616,7 +616,7 @@ Or customize:
 - Remote URLs (currently `unpkg.com`, `cdn.jsdelivr.net`) are
   fetched, hashed, and cached on disk. Subsequent builds reuse
   the cache.
-- Same-origin refs (`/walkthrough.css`, etc.) are read from the
+- Same-origin refs (`/meander.css`, etc.) are read from the
   output dir and hashed from bytes.
 - Remote tags also get `crossorigin="anonymous"` (required for
   SRI to run on cross-origin responses).

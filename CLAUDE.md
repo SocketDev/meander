@@ -111,7 +111,7 @@ Walkthrough generator + live comment system. Scans source files for multiline `/
 - `src/crypto.mts` — AES-256-GCM key derivation + encryption for at-rest content
 - `src/publish.mts` — encrypt + upload generated HTML to Val Town blob storage
 - `src/deploy-val.mts` — one-shot Val Town val deploy
-- `assets/` — client-side JS (classic scripts, `"use strict"` at top of IIFE), logos, favicon, walkthrough.css
+- `assets/` — client-side JS (classic scripts, `"use strict"` at top of IIFE), logos, favicon, meander.css
 - `assets/val/` — the Hono HTTP handler deployed to Val Town
 - `scripts/` — development automation (lint, fix, check, update, clean, dev, optimize-svgs)
 

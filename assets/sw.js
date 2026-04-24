@@ -26,7 +26,7 @@ const BASE_PATH = self.location.pathname.replace(/\/[^/]*$/, "");
  * cache-first path. This keeps first-install cost small (a few
  * KB) while still giving the reader offline-replay of anything
  * they've visited. */
-const PRECACHE = [`${BASE_PATH}/walkthrough.css`];
+const PRECACHE = [`${BASE_PATH}/meander.css`];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

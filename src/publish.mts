@@ -79,8 +79,8 @@ export async function publish(
   console.log(`Publishing walkthrough "${slug}" (${parts.length} parts)...`);
 
   // Upload shared CSS
-  const css = readFileSync(path.join(walkthroughDir, "walkthrough.css"), "utf-8");
-  await uploadBlob(token, "walkthrough/walkthrough.css", css);
+  const css = readFileSync(path.join(walkthroughDir, "meander.css"), "utf-8");
+  await uploadBlob(token, "walkthrough/meander.css", css);
 
   // Upload index.html (encrypted)
   const indexHtml = readFileSync(path.join(walkthroughDir, "index.html"), "utf-8");
