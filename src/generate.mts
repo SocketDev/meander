@@ -95,6 +95,25 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Emit llms.txt (index with title + URLs + summaries) and
+   * llms-full.txt (index + full markdown bodies of every doc)
+   * for LLM agents following the llmstxt.org convention.
+   *
+   * Default: false.
+   *
+   * Pass `true` for defaults, or an object with `siteUrl` so
+   * the emitted URLs are absolute (useful when the page is
+   * served under a canonical origin).
+   */
+  llmsIndex: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        siteUrl: Type.Optional(Type.String({ minLength: 1 })),
+      }),
+    ]),
+  ),
+  /**
    * Register a service worker for offline cache + cross-deploy
    * replay. Cache-first for static assets, network-first for
    * HTML navigation (so a new deploy is picked up on next
@@ -1927,6 +1946,56 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     }),
   };
   writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(summary, null, 2) + "\n");
+
+  /* Optional llms.txt / llms-full.txt emission for LLM agents
+   * following the llmstxt.org convention. llms.txt is a
+   * linked index; llms-full.txt is the index + the markdown
+   * source of every referenced doc concatenated so an agent
+   * can ingest the whole walkthrough in one pass. */
+  if (config.llmsIndex) {
+    const llmsOpts = typeof config.llmsIndex === "object" ? config.llmsIndex : undefined;
+    const siteUrl = llmsOpts?.siteUrl?.replace(/\/+$/, "") ?? "";
+    const abs = (href: string): string => {
+      const rel = href.startsWith("/") ? href : `/${href}`;
+      return siteUrl ? `${siteUrl}${rel}` : rel;
+    };
+    const partLines = parts.map((part) => {
+      const url = abs(`${basePath}/${slug}/part/${part.id}`);
+      return `- [Part ${part.id}: ${part.title}](${url}): ${part.objective}`;
+    });
+    const docLines = (documents ?? []).map((docPath) => {
+      const url = abs(`${basePath}/${slug}/documents#${encodeURIComponent(docPath)}`);
+      const name = docPath.split("/").pop() ?? docPath;
+      return `- [${name}](${url})`;
+    });
+    const lines: string[] = [
+      `# ${title}`,
+      "",
+      "## Parts",
+      "",
+      ...partLines,
+    ];
+    if (docLines.length > 0) {
+      lines.push("", "## Documents", "", ...docLines);
+    }
+    const llmsTxt = lines.join("\n") + "\n";
+    writeFileSync(path.join(outDir, "llms.txt"), llmsTxt);
+
+    /* llms-full.txt — the index plus every doc's raw markdown
+     * body, separated by `---`. Parts only have source code
+     * annotations (no standalone markdown), so they're
+     * surfaced by URL reference only. */
+    const fullChunks: string[] = [llmsTxt];
+    for (const docPath of documents ?? []) {
+      const fullDocPath = path.join(rootDir, docPath);
+      if (!existsSync(fullDocPath)) {
+        continue;
+      }
+      const body = readFileSync(fullDocPath, "utf-8");
+      fullChunks.push("\n\n---\n\n", `# ${docPath}\n\n`, body);
+    }
+    writeFileSync(path.join(outDir, "llms-full.txt"), fullChunks.join(""));
+  }
 
   /* file-anchors.json — file-path → first-section anchor-id
    * map, for consumers wiring Cmd-click-to-source links (a

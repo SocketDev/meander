@@ -198,6 +198,37 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## llms.txt / llms-full.txt
+
+**Opt-in.** When enabled, meander writes two extra files to
+the output dir for LLM agents following the
+[llmstxt.org](https://llmstxt.org) convention:
+
+- **llms.txt** — title + parts + docs as a linked markdown
+  index. URLs are root-relative by default.
+- **llms-full.txt** — the index plus every document's full
+  markdown body, separated by `---`. Agents can ingest the
+  whole walkthrough in one pass.
+
+### Enabling
+
+```json
+{
+  "llmsIndex": true
+}
+```
+
+Or to emit absolute URLs (useful when the walkthrough is
+served under a canonical origin):
+
+```json
+{
+  "llmsIndex": {
+    "siteUrl": "https://example.com"
+  }
+}
+```
+
 ## Service worker (offline cache)
 
 **Opt-in.** When enabled, meander writes `sw.js` to the output
