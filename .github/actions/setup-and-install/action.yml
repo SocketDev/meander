@@ -276,29 +276,18 @@ runs:
         fi
 
     # ecc-agentshield is pinned as a devDep so the install above
-    # drops its bin at node_modules/.bin/agentshield. Resolve the
-    # binary path via Node's require.resolve rather than a file
-    # check so the guard fires the same way we'd actually fail at
-    # runtime if the dep wasn't installed. Export the path so
-    # downstream jobs can invoke it without re-resolving.
+    # drops its bin shim at node_modules/.bin/agentshield. Use the
+    # shim directly: the package's `exports` field omits
+    # `./package.json`, so `require.resolve('ecc-agentshield/package.json')`
+    # throws ERR_PACKAGE_PATH_NOT_EXPORTED. The bin shim is a stable
+    # contract from pnpm's install layer regardless of the package's
+    # exports map. Export the path so downstream jobs can invoke it.
     - name: Provision ecc-agentshield
       shell: bash
       run: | # zizmor: ignore[github-env]
-        BIN="$(node -e "
-          const { join } = require('node:path');
-          const pkg = require.resolve('ecc-agentshield/package.json');
-          const dir = join(pkg, '..');
-          const meta = require(pkg);
-          const binPath = typeof meta.bin === 'string' ? meta.bin : meta.bin.agentshield;
-          process.stdout.write(join(dir, binPath));
-        ")"
-        if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
-          # The binary dropped by pnpm install may be a shell shim
-          # at node_modules/.bin/agentshield — fall back to that.
-          BIN="$PWD/node_modules/.bin/agentshield"
-        fi
+        BIN="$PWD/node_modules/.bin/agentshield"
         if [ ! -x "$BIN" ]; then
-          echo "× agentshield binary not found after install" >&2
+          echo "× agentshield binary not found at $BIN after install" >&2
           exit 1
         fi
         VERSION="$("$BIN" --version 2>/dev/null || echo unknown)"
