@@ -27,6 +27,7 @@ You write `/* ... */` prose comments directly in your source files. Meander pars
 - **JSON comment export** — download all (or only unresolved) comments as structured JSON
 - **Val Town hosting** — a single Hono val serves all walkthroughs behind HTTP basic auth, storing HTML in blob storage and comments in SQLite
 - **Encryption at rest** — HTML files and comment content are encrypted with AES-256-GCM; the encryption key is derived from your basic auth password
+- **Reader UX** — resizable prose/code splitter, jump-to-file and jump-to-section menus, theme toggle (system/light/dark), Cmd/Ctrl-click hotlinks in code, JSDoc annotation pipeline, prose polishers, opt-in Mermaid diagram pre-rendering. See [`docs/features.md`](docs/features.md) for details and config.
 
 ## Installation
 
