@@ -1,0 +1,99 @@
+name: 🌐 Deploy (Val Town)
+
+# Deploys the comment backend val to Val Town when val source
+# changes on main. Also runnable manually via workflow_dispatch.
+#
+# One-time setup required in the repo settings:
+# ─────────────────────────────────────────────
+#   1. Mint a Val Town API token (val.town → Settings → API Tokens).
+#      Scope: val:write only — nothing broader. No blob, no user.
+#      Write down the token; Val Town won't show it again.
+#
+#   2. Store it as a GitHub repository secret:
+#        Settings → Secrets and variables → Actions → New
+#        Name:  VALTOWN_TOKEN
+#        Value: the token from step 1.
+#
+#   3. Also add WALKTHROUGH_USER + WALKTHROUGH_PASS secrets for
+#      the basic-auth credentials the val enforces.
+#
+#   4. Rotate by repeating 1-2 and deleting the old token in
+#      Val Town.
+#
+# The workflow never logs the token. Job-level env scope means
+# only the deploy job sees it; fork PRs are excluded (secrets
+# aren't plumbed to pull_request triggers, and we don't declare
+# one here).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/val/**'
+      - 'src/deploy-val.mts'
+      - 'src/publish.mts'
+      - '.github/workflows/valtown.yml'
+      - '.github/actions/**'
+      - 'external-tools.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Queue deploys serially. Never cancel mid-deploy — a partial
+# upload can leave Val Town mixing old + new file versions.
+concurrency:
+  group: valtown
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Upload val files to Val Town
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Job-level scope — only this job sees the secrets. Anything
+      # we add later runs without them unless explicitly granted.
+      VALTOWN_TOKEN: ${{ secrets.VALTOWN_TOKEN }}
+      WALKTHROUGH_USER: ${{ secrets.WALKTHROUGH_USER }}
+      WALKTHROUGH_PASS: ${{ secrets.WALKTHROUGH_PASS }}
+    steps:
+      - name: Preflight — verify secrets are configured
+        # Fail fast with a clear message if any secret is missing.
+        # Runs BEFORE any setup so a misconfigured repo doesn't
+        # waste install time. Never echoes secret values.
+        run: |
+          MISSING=0
+          if [ -z "$VALTOWN_TOKEN" ]; then
+            echo "::error::VALTOWN_TOKEN secret is not configured."
+            MISSING=1
+          fi
+          if [ -z "$WALKTHROUGH_USER" ] || [ -z "$WALKTHROUGH_PASS" ]; then
+            echo "::error::WALKTHROUGH_USER and WALKTHROUGH_PASS secrets are required for deploy-val."
+            MISSING=1
+          fi
+          if [ "$MISSING" = "1" ]; then
+            echo "::error::See .github/workflows/valtown.yml header for setup steps."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+
+      - name: Build (emits dist/cli.mjs)
+        run: pnpm run build
+
+      - name: Deploy val
+        # Uses the built CLI's deploy-val command which uploads
+        # assets/val/index.ts to the target val, creating it if
+        # missing, and pushes the basic-auth env vars.
+        run: pnpm exec meander deploy-val

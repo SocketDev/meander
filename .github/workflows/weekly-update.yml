@@ -1,0 +1,126 @@
+name: 🔄 Weekly dependency update
+
+# Runs taze weekly to bump npm deps, then opens a PR against
+# main with the resulting lockfile diff. Skipped via a `dry-run`
+# input for testing the check step without filing a PR.
+#
+# Runs with `--no-frozen-lockfile` so pnpm install can actually
+# mutate the lockfile after taze edits package.json.
+
+on:
+  schedule:
+    # Monday 09:00 UTC — far enough past weekend releases to
+    # catch weekend backports, early enough to leave Monday
+    # review time.
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Check for updates without creating a PR'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-updates:
+    name: Check for npm updates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has-updates: ${{ steps.check.outputs.has-updates }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+        with:
+          frozen-lockfile: 'false'
+
+      - name: Check with taze + tools refresh
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # taze's default output lists bumps; an empty run prints
+          # "All dependencies are up-to-date". We don't trust that
+          # exact string across taze versions — instead check
+          # whether package.json, pnpm-lock.yaml, or
+          # external-tools.json changed after a full refresh pass.
+          pnpm run update || true
+          node scripts/update-tools.mts || true
+          if git diff --quiet -- package.json pnpm-lock.yaml external-tools.json; then
+            echo "has-updates=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-updates=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  apply-updates:
+    name: Open update PR
+    needs: check-updates
+    if: needs.check-updates.outputs.has-updates == 'true' && inputs.dry-run != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # persist-credentials: true is required so the later
+      # `git push origin "$BRANCH"` step can authenticate. This
+      # is the one job that legitimately writes to the repo; the
+      # scope is bounded by the `permissions:` block above. The
+      # zizmor artipacked rule is intentionally suppressed on the
+      # checkout step below.
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 # zizmor: ignore[artipacked]
+        with:
+          fetch-depth: 1
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+        with:
+          frozen-lockfile: 'false'
+
+      - name: Apply taze updates + verify
+        run: |
+          pnpm run update
+          pnpm run check
+          pnpm run build
+
+      # Refresh external-tools.json checksums so a new pnpm /
+      # zizmor / sfw release can roll into the same PR. The
+      # script is idempotent — no-op when everything's current.
+      - name: Refresh external-tools.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/update-tools.mts
+          # Re-run the full check so the refreshed checksums are
+          # schema-valid before we commit.
+          pnpm run check
+
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BRANCH="weekly-update-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add package.json pnpm-lock.yaml external-tools.json
+          git commit -m "chore(deps): weekly dependency bump"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(deps): weekly dependency bump" \
+            --body "Automated weekly bump via taze. Reviewed changes: \`pnpm run check\` + \`pnpm run build\` passed on this branch in the workflow run."

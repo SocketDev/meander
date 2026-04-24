@@ -1,0 +1,71 @@
+name: 📦 Publish to npm
+
+# Publishes @divmain/meander to npm with Sigstore-backed
+# provenance. Manual trigger only — we don't auto-publish on
+# every tag because that's an over-powerful default for a
+# public package.
+#
+# One-time setup:
+#   1. In npm's UI, enable Trusted Publishing for
+#      @divmain/meander, pointing at this repo + this workflow
+#      name. npm will trust short-lived OIDC tokens from this
+#      workflow; no NPM_TOKEN secret needed.
+#   2. (Alternative if trusted publishing is off) mint an npm
+#      automation token with publish scope, add as NPM_TOKEN
+#      secret, and flip use-trusted-publishing in the inputs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist-tag:
+        description: 'npm dist-tag (latest, next, beta, canary)'
+        required: false
+        default: 'latest'
+        type: string
+
+permissions:
+  # id-token + contents write are required for provenance +
+  # trusted publishing; everything else stays read-only.
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build + publish
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 100
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run checks
+        run: pnpm run check
+
+      - name: Publish with provenance
+        env:
+          # Falls through to trusted publishing when NPM_TOKEN is
+          # unset. npm's publish detects OIDC-from-workflow
+          # automatically and exchanges it for a short-lived token.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            # shellcheck disable=SC2016
+            echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+          fi
+          pnpm publish --access public --no-git-checks \
+            --tag "$DIST_TAG" \
+            --provenance

@@ -1,0 +1,309 @@
+# Pinned pnpm + Node + sfw shims + AgentShield + install
+#
+# Mirrors the shape of socket-registry's setup-and-install but
+# standalone (no fleet dependency). All tool versions + SHA256
+# checksums live in `external-tools.json` at the repo root so a
+# bump hits one file, not one per workflow.
+#
+# IMPORTANT: the caller must `actions/checkout` BEFORE invoking
+# this composite. A local composite (`uses: ./.github/actions/*`)
+# can only be resolved once the repo is checked out, so we don't
+# put checkout inside. Every meander workflow runs
+#   - uses: actions/checkout@<sha>
+#   - uses: ./.github/actions/setup-and-install
+# in that order.
+#
+# What this runs, in order:
+#   1. Install pnpm from the pinned tarball, SHA256-verified.
+#   2. setup-node against .node-version.
+#   3. Install sfw (Socket Firewall) — free tier, enterprise when
+#      SOCKET_API_KEY is provided.
+#   4. Install zizmor (SHA256-verified) and audit .github/.
+#   5. Shim npm/yarn/pnpm so every dep-installer call routes
+#      through sfw's malware gate.
+#   6. pnpm install (frozen by default).
+#   7. Provision ecc-agentshield (pinned devDep resolves it).
+#
+# Inputs:
+#   frozen-lockfile       'false' on weekly-update job; 'true' elsewhere.
+#   socket-api-key        Enables sfw-enterprise when set.
+#   skip-zizmor-audit     Skip the zizmor .github audit step.
+
+name: Setup and install
+description: Pinned-pnpm + Node + sfw-shimmed pnpm install + zizmor audit + AgentShield provision (requires prior checkout)
+
+inputs:
+  frozen-lockfile:
+    description: Passed to pnpm install (true → --frozen-lockfile)
+    required: false
+    default: 'true'
+  socket-api-key:
+    description: Socket API key — enables sfw-enterprise when set
+    required: false
+    default: ''
+  skip-zizmor-audit:
+    description: Skip the zizmor .github audit step
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # pnpm — download + SHA256 verify per external-tools.json.
+    # Tarball extracts to a directory containing the pnpm binary;
+    # we only need that binary on PATH. Bumping pnpm means editing
+    # external-tools.json in one place; no duplicate pin here.
+    - name: Install pnpm (pinned + verified)
+      shell: bash
+      run: | # zizmor: ignore[github-env]
+        TOOLS_FILE="${GITHUB_ACTION_PATH}/../../../external-tools.json"
+        PNPM_VERSION="$(jq -r .pnpm.version "$TOOLS_FILE")"
+        PNPM_DIR="${RUNNER_TEMP:-/tmp}/pnpm-bin"
+        KERNEL="$(uname -s | cut -d- -f1)"
+        ARCH="$(uname -m)"
+        case "${KERNEL}-${ARCH}" in
+          Linux-x86_64)                      PLATFORM="linux-x64"    ;;
+          Linux-aarch64)                     PLATFORM="linux-arm64"  ;;
+          Darwin-x86_64)                     PLATFORM="darwin-x64"   ;;
+          Darwin-arm64)                      PLATFORM="darwin-arm64" ;;
+          MINGW64_NT-x86_64|MSYS_NT-x86_64) PLATFORM="win-x64"       ;;
+          *) echo "Unsupported platform: ${KERNEL}-${ARCH}" >&2; exit 1 ;;
+        esac
+        ASSET="$(jq -r ".pnpm.checksums[\"$PLATFORM\"].asset" "$TOOLS_FILE")"
+        EXPECTED_SHA256="$(jq -r ".pnpm.checksums[\"$PLATFORM\"].sha256" "$TOOLS_FILE")"
+        PNPM_BIN="$PNPM_DIR/pnpm"
+        [[ "$ASSET" == *.zip ]] && PNPM_BIN="$PNPM_DIR/pnpm.exe"
+        if [ ! -x "$PNPM_BIN" ]; then
+          mkdir -p "$PNPM_DIR"
+          ARCHIVE_PATH="$PNPM_DIR/$ASSET"
+          curl -fsSL -o "$ARCHIVE_PATH" "https://github.com/pnpm/pnpm/releases/download/v${PNPM_VERSION}/${ASSET}"
+          ACTUAL_SHA256="$( (sha256sum "$ARCHIVE_PATH" 2>/dev/null || shasum -a 256 "$ARCHIVE_PATH") | cut -d' ' -f1 | tr -d '\\')"
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+            echo "Checksum mismatch for ${ASSET}!" >&2
+            echo "  Expected: ${EXPECTED_SHA256}" >&2
+            echo "  Actual:   ${ACTUAL_SHA256}" >&2
+            rm -f "$ARCHIVE_PATH"
+            exit 1
+          fi
+          if [[ "$ASSET" == *.zip ]]; then
+            powershell -NoProfile -Command "Expand-Archive -Path '$ARCHIVE_PATH' -DestinationPath '$PNPM_DIR' -Force"
+          else
+            tar xzf "$ARCHIVE_PATH" -C "$PNPM_DIR"
+          fi
+          rm -f "$ARCHIVE_PATH"
+          chmod +x "$PNPM_BIN"
+        fi
+        echo "$PNPM_DIR" >> "${GITHUB_PATH:-/dev/null}"
+
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version-file: .node-version
+
+    # sfw — free tier unless SOCKET_API_KEY is supplied (enterprise).
+    # Download + SHA256 verify per external-tools.json.
+    - name: Install sfw (Socket Firewall)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SOCKET_API_KEY: ${{ inputs.socket-api-key }}
+      run: | # zizmor: ignore[github-env]
+        TOOLS_FILE="${GITHUB_ACTION_PATH}/../../../external-tools.json"
+        USE_ENTERPRISE=false
+        [ -n "$SOCKET_API_KEY" ] && USE_ENTERPRISE=true
+        if $USE_ENTERPRISE; then
+          TOOL_KEY="sfw-enterprise"
+          REPO="SocketDev/firewall-release"
+        else
+          TOOL_KEY="sfw-free"
+          REPO="SocketDev/sfw-free"
+        fi
+        SFW_VERSION="$(jq -r ".\"${TOOL_KEY}\".version" "$TOOLS_FILE")"
+        KERNEL="$(uname -s | cut -d- -f1)"
+        ARCH="$(uname -m)"
+        case "${KERNEL}-${ARCH}" in
+          Linux-x86_64)                      PLATFORM="linux-x64"    ;;
+          Linux-aarch64)                     PLATFORM="linux-arm64"  ;;
+          Darwin-x86_64)                     PLATFORM="darwin-x64"   ;;
+          Darwin-arm64)                      PLATFORM="darwin-arm64" ;;
+          MINGW64_NT-x86_64|MSYS_NT-x86_64) PLATFORM="win-x64"       ;;
+          *) echo "Unsupported platform: ${KERNEL}-${ARCH}" >&2; exit 1 ;;
+        esac
+        ASSET="$(jq -r ".\"${TOOL_KEY}\".checksums[\"$PLATFORM\"].asset" "$TOOLS_FILE")"
+        EXPECTED_SHA256="$(jq -r ".\"${TOOL_KEY}\".checksums[\"$PLATFORM\"].sha256" "$TOOLS_FILE")"
+        SFW_DIR="${RUNNER_TEMP:-/tmp}/sfw-bin"
+        SFW_BIN="$SFW_DIR/sfw"
+        [[ "$ASSET" == *.exe ]] && SFW_BIN="$SFW_DIR/sfw.exe"
+        if [ ! -x "$SFW_BIN" ]; then
+          mkdir -p "$SFW_DIR"
+          URL="$(gh api "repos/${REPO}/releases/tags/v${SFW_VERSION}" \
+            --jq ".assets[] | select(.name == \"$ASSET\") | .browser_download_url")"
+          if [ -z "$URL" ]; then
+            echo "Asset ${ASSET} not found in ${REPO}@v${SFW_VERSION}" >&2
+            exit 1
+          fi
+          curl -fsSL -o "$SFW_BIN" "$URL"
+          ACTUAL_SHA256="$( (sha256sum "$SFW_BIN" 2>/dev/null || shasum -a 256 "$SFW_BIN") | cut -d' ' -f1 | tr -d '\\')"
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+            echo "Checksum mismatch for ${ASSET}!" >&2
+            echo "  Expected: ${EXPECTED_SHA256}" >&2
+            echo "  Actual:   ${ACTUAL_SHA256}" >&2
+            rm -f "$SFW_BIN"
+            exit 1
+          fi
+          chmod +x "$SFW_BIN"
+        fi
+        {
+          echo "SFW_BIN=$SFW_BIN"
+          echo "SFW_IS_ENTERPRISE=$USE_ENTERPRISE"
+        } >> "${GITHUB_ENV:-/dev/null}"
+        if $USE_ENTERPRISE; then
+          echo "SOCKET_API_KEY=$SOCKET_API_KEY" >> "${GITHUB_ENV:-/dev/null}"
+        fi
+
+    # zizmor — install + self-audit the .github/ dir at `medium`
+    # severity (opinionated default; matches socket-registry's
+    # behavior). skip-zizmor-audit is available for the rare
+    # job that shouldn't run the audit (e.g. a workflow that
+    # edits .github itself and temporarily fails the audit).
+    - name: Install zizmor
+      shell: bash
+      run: | # zizmor: ignore[github-env]
+        TOOLS_FILE="${GITHUB_ACTION_PATH}/../../../external-tools.json"
+        ZIZMOR_VERSION="$(jq -r .zizmor.version "$TOOLS_FILE")"
+        ZIZMOR_DIR="${RUNNER_TEMP:-/tmp}/zizmor-bin"
+        KERNEL="$(uname -s | cut -d- -f1)"
+        ARCH="$(uname -m)"
+        case "${KERNEL}-${ARCH}" in
+          Linux-x86_64)                      PLATFORM="linux-x64"    ;;
+          Linux-aarch64)                     PLATFORM="linux-arm64"  ;;
+          Darwin-x86_64)                     PLATFORM="darwin-x64"   ;;
+          Darwin-arm64)                      PLATFORM="darwin-arm64" ;;
+          MINGW64_NT-x86_64|MSYS_NT-x86_64) PLATFORM="win-x64"       ;;
+          *) echo "Unsupported platform: ${KERNEL}-${ARCH}" >&2; exit 1 ;;
+        esac
+        ASSET="$(jq -r ".zizmor.checksums[\"$PLATFORM\"].asset" "$TOOLS_FILE")"
+        EXPECTED_SHA256="$(jq -r ".zizmor.checksums[\"$PLATFORM\"].sha256" "$TOOLS_FILE")"
+        ZIZMOR_BIN="$ZIZMOR_DIR/zizmor"
+        [[ "$ASSET" == *.zip ]] && ZIZMOR_BIN="$ZIZMOR_DIR/zizmor.exe"
+        if [ ! -x "$ZIZMOR_BIN" ]; then
+          mkdir -p "$ZIZMOR_DIR"
+          DOWNLOAD_URL="https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/${ASSET}"
+          DOWNLOAD_FILE="${ZIZMOR_DIR}/${ASSET}"
+          curl -fsSL -o "$DOWNLOAD_FILE" "$DOWNLOAD_URL"
+          ACTUAL_SHA256="$( (sha256sum "$DOWNLOAD_FILE" 2>/dev/null || shasum -a 256 "$DOWNLOAD_FILE") | cut -d' ' -f1 | tr -d '\\')"
+          if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+            echo "Checksum mismatch for ${ASSET}!" >&2
+            echo "  Expected: ${EXPECTED_SHA256}" >&2
+            echo "  Actual:   ${ACTUAL_SHA256}" >&2
+            exit 1
+          fi
+          if [[ "$ASSET" == *.zip ]]; then
+            unzip -qo "$DOWNLOAD_FILE" -d "$ZIZMOR_DIR"
+          else
+            tar xzf "$DOWNLOAD_FILE" -C "$ZIZMOR_DIR"
+          fi
+          rm -f "$DOWNLOAD_FILE"
+          chmod +x "$ZIZMOR_BIN"
+        fi
+        echo "$ZIZMOR_DIR" >> "${GITHUB_PATH:-/dev/null}"
+
+    - name: Audit .github/ with zizmor
+      if: inputs.skip-zizmor-audit != 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        if [ -d .github ]; then
+          zizmor .github --gh-token "${GITHUB_TOKEN}" --min-severity medium
+        fi
+
+    # Shim npm/yarn/pnpm through sfw. Each shim strips itself from
+    # PATH on exec so it can't recurse; Windows .cmd variants are
+    # emitted on MSYS/Cygwin.
+    - name: Shim npm/yarn/pnpm via sfw
+      shell: bash
+      run: | # zizmor: ignore[github-env]
+        SHIM_DIR="${RUNNER_TEMP:-/tmp}/sfw-shim"
+        rm -rf "$SHIM_DIR"
+        mkdir -p "$SHIM_DIR"
+        IS_WINDOWS=false
+        [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]] && IS_WINDOWS=true
+        CLEAN_PATH="$(echo "$PATH" | tr ':' '\n' | grep -vxF "$SHIM_DIR" | paste -sd: -)"
+        for CMD in npm yarn pnpm; do
+          REAL="$(PATH="$CLEAN_PATH" command -v "$CMD" 2>/dev/null || true)"
+          [ -z "$REAL" ] && continue
+          {
+            echo '#!/bin/bash'
+            echo "export PATH=\"\$(echo \"\$PATH\" | tr ':' '\n' | grep -vxF '${SHIM_DIR}' | paste -sd: -)\""
+            # sfw-free doesn't yet set GIT_SSL_CAINFO; disable verify
+            # on the free tier so git-backed deps still install.
+            [ "$SFW_IS_ENTERPRISE" = "false" ] && echo 'export GIT_SSL_NO_VERIFY=true'
+            echo "exec \"$SFW_BIN\" \"$REAL\" \"\$@\""
+          } > "$SHIM_DIR/$CMD"
+          chmod +x "$SHIM_DIR/$CMD"
+          if $IS_WINDOWS; then
+            printf '@echo off\r\nset "PATH=;%%PATH%%;"\r\nset "PATH=%%PATH:;%s;=;%%"\r\nset "PATH=%%PATH:~1,-1%%"\r\n"%s" "%s" %%*\r\n' \
+              "$SHIM_DIR" "$SFW_BIN" "$REAL" > "$SHIM_DIR/$CMD.cmd"
+          fi
+        done
+        echo "$SHIM_DIR" >> "${GITHUB_PATH:-/dev/null}"
+
+    - name: Disable tool telemetry
+      shell: bash
+      run: | # zizmor: ignore[github-env]
+        echo "DO_NOT_TRACK=1" >> "${GITHUB_ENV:-/dev/null}"
+        echo "GH_TELEMETRY=0" >> "${GITHUB_ENV:-/dev/null}"
+
+    # pnpm install — goes through the sfw shim we just installed.
+    # Frozen by default; the weekly-update job passes 'false' so
+    # taze can mutate the lockfile.
+    #
+    # The input is routed through `env:` so the shell source never
+    # holds a template-expanded string — zizmor flags direct
+    # `${{ inputs.x }}` expansion inside a run block as a
+    # template-injection risk (an attacker who can set the input
+    # could slip shell metacharacters in).
+    - name: pnpm install
+      shell: bash
+      env:
+        FROZEN_LOCKFILE: ${{ inputs.frozen-lockfile }}
+      run: |
+        if [ "$FROZEN_LOCKFILE" = "false" ]; then
+          pnpm install --no-frozen-lockfile
+        else
+          pnpm install --frozen-lockfile
+        fi
+
+    # ecc-agentshield is pinned as a devDep so the install above
+    # drops its bin at node_modules/.bin/agentshield. Resolve the
+    # binary path via Node's require.resolve rather than a file
+    # check so the guard fires the same way we'd actually fail at
+    # runtime if the dep wasn't installed. Export the path so
+    # downstream jobs can invoke it without re-resolving.
+    - name: Provision ecc-agentshield
+      shell: bash
+      run: | # zizmor: ignore[github-env]
+        BIN="$(node -e "
+          const { join } = require('node:path');
+          const pkg = require.resolve('ecc-agentshield/package.json');
+          const dir = join(pkg, '..');
+          const meta = require(pkg);
+          const binPath = typeof meta.bin === 'string' ? meta.bin : meta.bin.agentshield;
+          process.stdout.write(join(dir, binPath));
+        ")"
+        if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+          # The binary dropped by pnpm install may be a shell shim
+          # at node_modules/.bin/agentshield — fall back to that.
+          BIN="$PWD/node_modules/.bin/agentshield"
+        fi
+        if [ ! -x "$BIN" ]; then
+          echo "× agentshield binary not found after install" >&2
+          exit 1
+        fi
+        VERSION="$("$BIN" --version 2>/dev/null || echo unknown)"
+        {
+          echo "MEANDER_AGENTSHIELD_BIN=$BIN"
+          echo "MEANDER_AGENTSHIELD_VERSION=$VERSION"
+        } >> "${GITHUB_ENV:-/dev/null}"
+        echo "AgentShield ready: $BIN (${VERSION})"

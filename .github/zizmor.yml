@@ -1,0 +1,13 @@
+# zizmor configuration
+# https://docs.zizmor.sh/configuration/
+
+rules:
+  # Our workflows read secrets at the job level via env: rather than
+  # using environments. zizmor's secrets-outside-env rule flags
+  # this, but it's the pattern GH recommends for jobs that are
+  # gated by required_status_checks + branch protection — the
+  # secret never reaches fork PRs because pull_request triggers
+  # don't inject them. Keeping it disabled matches the
+  # socket-packageurl-js + socket-registry convention.
+  secrets-outside-env:
+    disable: true

@@ -1,0 +1,82 @@
+name: 📘 Demo site (GH Pages)
+
+# Builds the fixture walkthrough and deploys it to
+# https://divmain.github.io/meander/ as a live demo.
+#
+# Consumers can copy this workflow into their own repo — replace
+# --base-path with your repo name, point at your own
+# walkthrough.json, and set up GH Pages in repo settings.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'test-walkthrough-docs/**'
+      - '.github/workflows/pages.yml'
+      - '.github/actions/**'
+      - 'external-tools.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Queue Pages deploys serially — don't cancel a running deploy
+# with a newer commit. A half-deployed site is worse than a
+# slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build demo
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+
+      # Generate the fixture into its own dir so the emit output
+      # is what we upload. --base-path=/meander matches the GH
+      # Pages repo URL; consumers in their own repos change this
+      # to /<their-repo-name>.
+      - name: Build tour
+        run: |
+          node --input-type=module -e "
+            import { generate } from './src/generate.mts';
+            await generate('./test-walkthrough-docs/walkthrough.json', { basePath: '/meander', __proto__: null });
+          "
+          # GH Pages ignores files/dirs starting with _ unless we
+          # create a .nojekyll marker.
+          touch test-walkthrough-docs/walkthrough/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: test-walkthrough-docs/walkthrough
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

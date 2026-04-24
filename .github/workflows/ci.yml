@@ -1,0 +1,60 @@
+name: ⚡ CI
+
+# Lint + typecheck on every PR and every push to main. Runs the
+# setup-and-install composite which also self-audits .github/
+# via zizmor and routes pnpm install through sfw.
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint + typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 100
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+
+      - name: Run checks
+        run: pnpm run check
+
+      - name: AgentShield audit (.claude configs)
+        # Audits this repo's .claude/ settings + hooks for known
+        # misconfigs + injection risks. Info/low findings don't
+        # fail the job — only medium+ block the merge. Without
+        # --fix; medium+ findings show up in the run output so a
+        # maintainer can review before promoting them to fixes.
+        run: |
+          if [ -d .claude ]; then
+            "$MEANDER_AGENTSHIELD_BIN" scan --path .claude --format terminal
+          fi
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Generate fixture (smoke test)
+        run: |
+          node --input-type=module -e "
+            import { generate } from './src/generate.mts';
+            await generate('./test-walkthrough-docs/walkthrough.json', { __proto__: null });
+          "

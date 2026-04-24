@@ -1,0 +1,15 @@
+# Dependabot disabled — we manage dependencies manually via the
+# weekly-update workflow (taze for npm, an inline step for
+# external-tools.json + pinned GitHub Actions SHAs). Using
+# open-pull-requests-limit: 0 is the GitHub-recommended way to
+# keep the file discoverable without dependabot opening any PRs.
+# See: https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/configuration-options-for-dependency-updates
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: yearly
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
