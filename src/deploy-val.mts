@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { missingTokenMessage, resolveValTownToken } from "./valtown-token.mts";
+
 const API_BASE = "https://api.val.town";
 
 function getValSourcePath(): string {
@@ -10,16 +12,46 @@ function getValSourcePath(): string {
   return path.join(path.dirname(thisFile), "..", "assets", "val", "index.ts");
 }
 
-export async function deployVal(valName: string): Promise<void> {
-  const token = process.env["VALTOWN_TOKEN"];
+export type DeployValOptions = {
+  /** Override the env var read for the bearer token. Default:
+   *  MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN. */
+  tokenEnv?: string | undefined;
+  /** When true, missing token / auth creds log a warning and
+   *  return 0 instead of throwing. Used by CI workflows where
+   *  the comment-backend deploy is opt-in (e.g. public fork PRs
+   *  that never get the secret). */
+  graceful?: boolean | undefined;
+};
+
+export async function deployVal(
+  valName: string,
+  options: DeployValOptions = { __proto__: null } as DeployValOptions,
+): Promise<void> {
+  const { tokenEnv, graceful = false } = {
+    __proto__: null,
+    ...options,
+  } as DeployValOptions;
+
+  const { envName, token } = resolveValTownToken(tokenEnv);
   if (!token) {
-    throw new Error("VALTOWN_TOKEN environment variable is required");
+    const msg = missingTokenMessage(envName);
+    if (graceful) {
+      console.log(`[deploy-val] skipped — ${msg}`);
+      return;
+    }
+    throw new Error(msg);
   }
 
   const walkthroughUser: string = process.env["WALKTHROUGH_USER"] ?? "";
   const walkthroughPass: string = process.env["WALKTHROUGH_PASS"] ?? "";
   if (!walkthroughUser || !walkthroughPass) {
-    throw new Error("WALKTHROUGH_USER and WALKTHROUGH_PASS environment variables are required");
+    const msg =
+      "WALKTHROUGH_USER and WALKTHROUGH_PASS environment variables are required for deploy-val.";
+    if (graceful) {
+      console.log(`[deploy-val] skipped — ${msg}`);
+      return;
+    }
+    throw new Error(msg);
   }
 
   const client = new ValTown({ bearerToken: token });

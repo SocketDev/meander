@@ -2,6 +2,37 @@
 
 const command = process.argv[2];
 
+/**
+ * Parse the two flags shared by `publish` + `deploy-val`:
+ *   --token-env <NAME>  env var meander reads for the Val Town bearer token
+ *                       (default: $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
+ *   --graceful          missing token / creds warn + exit 0 instead of
+ *                       throwing. For CI workflows that should not fail when
+ *                       the secret isn't provisioned (fork PRs, demo setups).
+ */
+function parseValTownFlags(args: readonly string[]): {
+  tokenEnv?: string | undefined;
+  graceful?: boolean | undefined;
+  __proto__: null;
+} {
+  const out: {
+    tokenEnv?: string | undefined;
+    graceful?: boolean | undefined;
+    __proto__: null;
+  } = { __proto__: null };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--token-env") {
+      out.tokenEnv = args[++i];
+    } else if (arg.startsWith("--token-env=")) {
+      out.tokenEnv = arg.slice("--token-env=".length);
+    } else if (arg === "--graceful") {
+      out.graceful = true;
+    }
+  }
+  return out;
+}
+
 async function main() {
   switch (command) {
     case "generate": {
@@ -41,20 +72,27 @@ async function main() {
       break;
     }
     case "publish": {
-      const configPath = process.argv[3];
+      const args = process.argv.slice(3);
+      const configPath = args.find((a) => !a.startsWith("--"));
       if (!configPath) {
-        console.error("Usage: meander publish <path-to-walkthrough.json>");
+        console.error(
+          "Usage: meander publish <walkthrough.json> [--token-env <name>] [--graceful]",
+        );
         process.exitCode = 1;
         return;
       }
+      const options = parseValTownFlags(args);
       const { publish } = await import("./publish.mts");
-      await publish(configPath);
+      await publish(configPath, options);
       break;
     }
     case "deploy-val": {
-      const valName = process.argv[3] || "walkthrough";
+      const args = process.argv.slice(3);
+      const valName =
+        args.find((a) => !a.startsWith("--")) ?? "walkthrough";
+      const options = parseValTownFlags(args);
       const { deployVal } = await import("./deploy-val.mts");
-      await deployVal(valName);
+      await deployVal(valName, options);
       break;
     }
     case "doctor": {
@@ -106,10 +144,24 @@ Commands:
   meander deploy-val [val-name]         Deploy or update the Val Town val
   meander doctor                        Report system + peer-dep status
 
+Flags (publish, deploy-val):
+  --token-env <NAME>    Env var to read for the bearer token (default:
+                        $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
+  --graceful            Missing token / creds → warn + exit 0 instead of
+                        throwing. For CI jobs that shouldn't fail when the
+                        secret isn't provisioned (fork PRs, demo setups).
+
 Environment variables:
-  VALTOWN_TOKEN       Val Town API bearer token (publish, deploy-val)
-  WALKTHROUGH_USER    Basic auth username (deploy-val)
-  WALKTHROUGH_PASS    Basic auth password (deploy-val)`);
+  VALTOWN_TOKEN              Val Town API bearer token (default env name).
+                             Scopes needed: see .github/workflows/valtown.yml.
+  MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
+                             token from. Set to e.g. "MY_VT_TOKEN" if your
+                             GitHub secret has a different name.
+  WALKTHROUGH_USER           Basic-auth username (deploy-val, publish).
+  WALKTHROUGH_PASS           Basic-auth password (deploy-val, publish).
+                             Also used as the at-rest encryption key for
+                             publish — rotating means re-publishing every
+                             encrypted HTML file.`);
       if (command) {
         console.error(`\nUnknown command: ${command}`);
       }

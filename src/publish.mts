@@ -1,8 +1,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+
 import { deriveKey, encrypt } from "./crypto.mts";
+import { missingTokenMessage, resolveValTownToken } from "./valtown-token.mts";
 
 const API_BASE = "https://api.val.town";
+
+export type PublishOptions = {
+  /** Override the env var read for the bearer token. Default:
+   *  MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN. */
+  tokenEnv?: string | undefined;
+  /** When true, missing token / password log a warning and
+   *  return 0 instead of throwing. Used by CI workflows that
+   *  shouldn't fail just because the publish secret isn't
+   *  provisioned (e.g. fork PRs). */
+  graceful?: boolean | undefined;
+};
 
 async function uploadBlob(token: string, key: string, content: string): Promise<void> {
   const res = await fetch(`${API_BASE}/v1/blob/${encodeURIComponent(key)}`, {
@@ -22,15 +35,33 @@ function encryptHtml(html: string, key: Buffer): string {
   return encrypt(html, key);
 }
 
-export async function publish(configPath: string): Promise<void> {
-  const token = process.env["VALTOWN_TOKEN"];
+export async function publish(
+  configPath: string,
+  options: PublishOptions = { __proto__: null } as PublishOptions,
+): Promise<void> {
+  const { tokenEnv, graceful = false } = {
+    __proto__: null,
+    ...options,
+  } as PublishOptions;
+
+  const { envName, token } = resolveValTownToken(tokenEnv);
   if (!token) {
-    throw new Error("VALTOWN_TOKEN environment variable is required");
+    const msg = missingTokenMessage(envName);
+    if (graceful) {
+      console.log(`[publish] skipped — ${msg}`);
+      return;
+    }
+    throw new Error(msg);
   }
 
   const password = process.env["WALKTHROUGH_PASS"];
   if (!password) {
-    throw new Error("WALKTHROUGH_PASS environment variable is required");
+    const msg = "WALKTHROUGH_PASS environment variable is required for publish (used to derive the at-rest encryption key).";
+    if (graceful) {
+      console.log(`[publish] skipped — ${msg}`);
+      return;
+    }
+    throw new Error(msg);
   }
 
   const key = deriveKey(password);
