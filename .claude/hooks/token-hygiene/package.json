@@ -1,5 +1,5 @@
 {
-  "name": "@socketsecurity/hook-token-hygiene",
+  "name": "@meander/hook-token-hygiene",
   "private": true,
   "type": "module",
   "main": "./index.mts",

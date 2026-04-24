@@ -1,6 +1,6 @@
 # token-hygiene
 
-Claude Code `PreToolUse` hook that refuses Bash tool calls that would leak secrets to tool output. Mandatory across the Socket fleet — every repo ships this file byte-for-byte via `scripts/sync-scaffolding.mjs`.
+Claude Code `PreToolUse` hook that refuses Bash tool calls that would leak secrets to tool output.
 
 ## What it blocks
 
@@ -41,17 +41,7 @@ The hook reads the tool-use payload from stdin, type-checks `tool_name === 'Bash
 ## Testing
 
 ```bash
-pnpm --filter @socketsecurity/hook-token-hygiene test
+pnpm --filter @meander/hook-token-hygiene test
 ```
 
 Adding new token-shape detections: update `LITERAL_TOKEN_PATTERNS` in `index.mts`, add a positive and negative test in `test/token-hygiene.test.mts`.
-
-## Updating across the fleet
-
-This file is in `IDENTICAL_FILES` in `scripts/sync-scaffolding.mjs`. After editing, run from `socket-repo-template`:
-
-```bash
-node scripts/sync-scaffolding.mjs --all --fix
-```
-
-to propagate the change to every fleet repo.

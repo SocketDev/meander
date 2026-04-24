@@ -84,8 +84,6 @@ The hook is registered in `.claude/settings.json`:
 
 ## Dependencies
 
-All dependencies use `catalog:` references from the workspace root (`pnpm-workspace.yaml`):
-
 - `@socketsecurity/sdk` — Socket.dev SDK v4 with `checkMalware()` API
 - `@socketsecurity/lib` — shared constants and path utilities
 - `@socketregistry/packageurl-js` — Package URL (PURL) parsing and stringification

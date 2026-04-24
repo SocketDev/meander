@@ -1,5 +1,5 @@
 {
-  "name": "@socketsecurity/hook-check-new-deps",
+  "name": "@meander/hook-check-new-deps",
   "private": true,
   "type": "module",
   "main": "./index.mts",

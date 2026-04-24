@@ -51,7 +51,7 @@ The umbrella rule: never run a git command that mutates state belonging to a pat
 - Type imports: always `import type` (separate statements, never inline `type` in value imports).
 - Prefer `undefined` over `null` except for `__proto__: null` or external API requirements.
 - ALWAYS use `{ __proto__: null, ... }` for config/return/internal-state objects. Prevents prototype pollution and accidental inheritance.
-- NEVER use `fetch()` in new code — this repo has no HTTP dep of its own; if a feature needs one, propose adding `@socketsecurity/lib/http-request` first.
+- This repo has no HTTP dep of its own. If a feature needs one, propose the addition first (don't silently introduce `fetch()` or a new client).
 - File existence: ALWAYS `existsSync` from `node:fs`. NEVER `fs.access`, `fs.stat`-for-existence, or an async `fileExists` wrapper.
 - `fs` cherry-pick: `import { existsSync, promises as fs, readFileSync, writeFileSync } from "node:fs"`. `path`/`os`/`url`/`crypto` use default imports (`import path from "node:path"`). Exception: `fileURLToPath` is cherry-picked from `node:url`.
 - ALWAYS use the Edit tool for code modifications, NEVER sed/awk.
