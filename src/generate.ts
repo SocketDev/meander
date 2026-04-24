@@ -556,14 +556,15 @@ function renderPartNav(
   parts: readonly WalkthroughPart[],
   activePartId: number,
   hasDocuments: boolean,
+  basePath: string,
 ): string {
   const docsLink = hasDocuments
-    ? `<a class="${activePartId === 0 ? "active" : ""}" href="/${slug}/documents">Documents</a>\n`
+    ? `<a class="${activePartId === 0 ? "active" : ""}" href="${basePath}/${slug}/documents">Documents</a>\n`
     : "";
   const partLinks = parts
     .map((part) => {
       const cls = part.id === activePartId ? "active" : "";
-      return `<a class="${cls}" href="/${slug}/part/${part.id}">Part ${part.id}</a>`;
+      return `<a class="${cls}" href="${basePath}/${slug}/part/${part.id}">Part ${part.id}</a>`;
     })
     .join("\n");
   return docsLink + partLinks;
@@ -571,7 +572,7 @@ function renderPartNav(
 
 
 
-function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, defIndex: DefinitionIndex, hasDocuments: boolean): string {
+function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, defIndex: DefinitionIndex, hasDocuments: boolean, basePath: string, cssHref: string): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
     const existing = sectionsByFile.get(section.file);
@@ -625,7 +626,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
-  <link rel="stylesheet" href="/walkthrough.css" />
+  <link rel="stylesheet" href="${cssHref}" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="${part.id}">
@@ -633,7 +634,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
     <h1>Part ${part.id}: ${escapeHtml(part.title)}</h1>
     <p>${escapeHtml(part.objective)}</p>
     <div class="part-nav">
-      ${renderPartNav(slug, parts, part.id, hasDocuments)}
+      ${renderPartNav(slug, parts, part.id, hasDocuments, basePath)}
     </div>
   </header>
 
@@ -653,14 +654,14 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
 </html>`;
 }
 
-function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean): string {
+function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean, basePath: string, cssHref: string): string {
   const docsItem = hasDocuments
-    ? `<li><a href="/${slug}/documents">Documents</a></li>\n`
+    ? `<li><a href="${basePath}/${slug}/documents">Documents</a></li>\n`
     : "";
   const items = parts
     .map((part) => {
       const count = partCounts.get(part.id) ?? 0;
-      return `<li><a href="/${slug}/part/${part.id}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span></li>`;
+      return `<li><a href="${basePath}/${slug}/part/${part.id}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span></li>`;
     })
     .join("\n");
 
@@ -670,7 +671,7 @@ function renderIndexHtml(slug: string, title: string, parts: readonly Walkthroug
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="/walkthrough.css" />
+  <link rel="stylesheet" href="${cssHref}" />
 </head>
 <body>
   <header class="topbar">
@@ -700,7 +701,9 @@ function renderDocumentsHtml(
   parts: readonly WalkthroughPart[],
   documents: string[],
   renderedDocs: RenderedDocData[],
-  inlineJs: string
+  inlineJs: string,
+  basePath: string,
+  cssHref: string,
 ): string {
   // Build tab bar
   const tabButtons = renderedDocs
@@ -732,7 +735,7 @@ function renderDocumentsHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documents - ${escapeHtml(slug)}</title>
-  <link rel="stylesheet" href="/walkthrough.css" />
+  <link rel="stylesheet" href="${cssHref}" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents">
@@ -740,7 +743,7 @@ function renderDocumentsHtml(
     <h1>Documents</h1>
     <p>${escapeHtml(objective)}</p>
     <div class="part-nav">
-      ${renderPartNav(slug, parts, 0, true)}
+      ${renderPartNav(slug, parts, 0, true, basePath)}
     </div>
   </header>
 
@@ -1079,9 +1082,71 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
 /*  Main                                                               */
 /* ------------------------------------------------------------------ */
 
-export async function generate(configPath: string): Promise<void> {
+export type GenerateOptions = {
+  /**
+   * URL path prefix. When the site is hosted under a subpath
+   * (e.g. GitHub Pages at `/my-repo/`), every emitted `href` /
+   * `src` to a same-site asset is rewritten from `/walkthrough.css`
+   * to `{basePath}/walkthrough.css`. It's a path, not a URL —
+   * matches Next.js `basePath` semantics, not Vite's `base`
+   * (which allows full URLs).
+   * Default: "" (site hosted at origin root).
+   */
+  basePath?: string | undefined;
+  /**
+   * Subdirectory under the output dir where emitted static
+   * assets (currently `walkthrough.css`) land. Default: ""
+   * (emit flat). Example: `--asset-dir assets` writes
+   * `assets/walkthrough.css` and rewrites the <link href>.
+   */
+  assetDir?: string | undefined;
+};
+
+/**
+ * Normalise a user-supplied base path so it starts with `/` and
+ * has no trailing slash. Empty input → empty string (no prefixing).
+ */
+function normaliseBasePath(basePath: string | undefined): string {
+  if (!basePath) {
+    return "";
+  }
+  let out = basePath.trim();
+  if (out === "" || out === "/") {
+    return "";
+  }
+  if (!out.startsWith("/")) {
+    out = "/" + out;
+  }
+  return out.replace(/\/$/, "");
+}
+
+/**
+ * Normalise a user-supplied asset dir — drop any leading/trailing
+ * slashes so we can join it cleanly, and collapse empty values.
+ */
+function normaliseAssetDir(assetDir: string | undefined): string {
+  if (!assetDir) {
+    return "";
+  }
+  return assetDir.trim().replace(/^\/+|\/+$/g, "");
+}
+
+export async function generate(
+  configPath: string,
+  options: GenerateOptions = { __proto__: null } as GenerateOptions,
+): Promise<void> {
   const config = loadAndValidateConfig(configPath);
   const { slug, title, parts, documents } = config;
+  const basePath = normaliseBasePath(options.basePath);
+  const assetDir = normaliseAssetDir(options.assetDir);
+  /* URL prefix for asset <href>/<src>: `{basePath}/{assetDir}/`.
+   * Both parts are optional. Empty → assets at site root, flat. */
+  const assetHref = (filename: string): string => {
+    const segments = [basePath, assetDir, filename]
+      .map(p => p.replace(/^\/+|\/+$/g, ""))
+      .filter(Boolean);
+    return "/" + segments.join("/");
+  };
 
   const rootDir = process.cwd();
 
@@ -1117,15 +1182,15 @@ export async function generate(configPath: string): Promise<void> {
   const sections = buildSections(parts, sources);
   const defIndex = buildDefinitionIndex(parts, sources);
 
-  const assetsDir = getAssetsDir();
-  const lineSelectJs = readFileSync(join(assetsDir, "line-select.js"), "utf-8");
-  const commentClientJs = readFileSync(join(assetsDir, "comment-client.js"), "utf-8");
-  const defLinkJs = readFileSync(join(assetsDir, "def-link.js"), "utf-8");
-  const unresolvedJs = readFileSync(join(assetsDir, "unresolved-comments.js"), "utf-8");
-  const exportJs = readFileSync(join(assetsDir, "export-comments.js"), "utf-8");
-  const docTabsJs = readFileSync(join(assetsDir, "doc-tabs.js"), "utf-8");
-  const blockSelectJs = readFileSync(join(assetsDir, "block-select.js"), "utf-8");
-  const docTocJs = readFileSync(join(assetsDir, "doc-toc.js"), "utf-8");
+  const bundledAssetsDir = getAssetsDir();
+  const lineSelectJs = readFileSync(join(bundledAssetsDir, "line-select.js"), "utf-8");
+  const commentClientJs = readFileSync(join(bundledAssetsDir, "comment-client.js"), "utf-8");
+  const defLinkJs = readFileSync(join(bundledAssetsDir, "def-link.js"), "utf-8");
+  const unresolvedJs = readFileSync(join(bundledAssetsDir, "unresolved-comments.js"), "utf-8");
+  const exportJs = readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8");
+  const docTabsJs = readFileSync(join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
+  const blockSelectJs = readFileSync(join(bundledAssetsDir, "block-select.js"), "utf-8");
+  const docTocJs = readFileSync(join(bundledAssetsDir, "doc-toc.js"), "utf-8");
   const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs;
   const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs + "\n" + docTocJs;
 
@@ -1144,11 +1209,11 @@ export async function generate(configPath: string): Promise<void> {
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
-    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, defIndex, hasDocuments);
+    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, defIndex, hasDocuments, basePath, assetHref("walkthrough.css"));
     writeFileSync(join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
-  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments);
+  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments, basePath, assetHref("walkthrough.css"));
   writeFileSync(join(outDir, "index.html"), indexHtml);
 
   // Render documents page if documents are present
@@ -1163,14 +1228,19 @@ export async function generate(configPath: string): Promise<void> {
       };
     });
 
-    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs);
+    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs, basePath, assetHref("walkthrough.css"));
     writeFileSync(join(outDir, "documents.html"), documentsHtml);
     console.log(`Generated documents.html with ${documents.length} documents`);
   }
 
-  // Copy CSS to output dir
-  const css = readFileSync(join(assetsDir, "walkthrough.css"), "utf-8");
-  writeFileSync(join(outDir, "walkthrough.css"), css);
+  /* Copy CSS to output dir — under `assetDir` if configured,
+   * else at output root. `bundledAssetsDir` (declared above) is
+   * the npm-package-bundled asset *source* path; `assetDir` is
+   * the user-chosen emit subdir. */
+  const css = readFileSync(join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  const cssOutDir = assetDir ? join(outDir, assetDir) : outDir;
+  mkdirSync(cssOutDir, { recursive: true });
+  writeFileSync(join(cssOutDir, "walkthrough.css"), css);
 
   const summary = {
     generatedAt: new Date().toISOString(),

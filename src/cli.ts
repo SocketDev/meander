@@ -5,14 +5,39 @@ const command = process.argv[2];
 async function main() {
   switch (command) {
     case "generate": {
-      const configPath = process.argv[3];
+      const args = process.argv.slice(3);
+      const configPath = args.find((a) => !a.startsWith("--"));
       if (!configPath) {
-        console.error("Usage: meander generate <path-to-walkthrough.json>");
+        console.error(
+          "Usage: meander generate <walkthrough.json> [--base-path <path>] [--asset-dir <dir>]",
+        );
         process.exitCode = 1;
         return;
       }
+      /* Flags:
+       *   --base-path <path>  URL path prefix (Next.js semantics;
+       *                       it's a path, not a URL)
+       *   --asset-dir <dir>   Subdir under output for CSS/JS
+       *                       assets; default is flat emission */
+      const options: {
+        basePath?: string | undefined;
+        assetDir?: string | undefined;
+        __proto__: null;
+      } = { __proto__: null };
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i]!;
+        if (arg === "--base-path") {
+          options.basePath = args[++i];
+        } else if (arg.startsWith("--base-path=")) {
+          options.basePath = arg.slice("--base-path=".length);
+        } else if (arg === "--asset-dir") {
+          options.assetDir = args[++i];
+        } else if (arg.startsWith("--asset-dir=")) {
+          options.assetDir = arg.slice("--asset-dir=".length);
+        }
+      }
       const { generate } = await import("./generate.js");
-      await generate(configPath);
+      await generate(configPath, options);
       break;
     }
     case "publish": {
