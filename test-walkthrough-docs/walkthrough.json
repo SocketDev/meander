@@ -11,7 +11,7 @@
       "title": "Getting Started",
       "objective": "Learn the basics of the system.",
       "keywords": ["setup", "config"],
-      "files": ["src/config.ts"]
+      "files": ["src/config.ts", "src/server.ts"]
     }
   ]
 }
