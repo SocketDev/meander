@@ -524,6 +524,65 @@ Registration is gated on `location.hostname` not being
 `localhost` / `127.0.0.1`, so dev servers don't cache between
 reloads.
 
+## Minify
+
+**Opt-in.** When enabled, meander runs a final minification
+pass against emitted assets:
+
+- **Inline `<script>`** bodies — esbuild, target es2022, strips
+  comments.
+- **Inline `<svg>`** elements — SVGO with `preset-default`
+  (cleanupIds + removeUnknownsAndDefaults overridden off so
+  mermaid diagrams keep their edge-to-node links and the
+  preserveAspectRatio variants browsers read).
+- **External `walkthrough.css`** + **`sw.js`** — esbuild on
+  the file bytes before they're written.
+
+Typical savings on the fixture:
+
+| Asset | Before  | After   | Saved |
+| ----- | ------- | ------- | ----- |
+| HTML  | 113 KB  | 54 KB   | 52%   |
+| CSS   | 48 KB   | 31 KB   | 36%   |
+| SW    | 4.4 KB  | 1.2 KB  | 72%   |
+
+### Enabling
+
+```json
+{
+  "minify": true
+}
+```
+
+Or selectively:
+
+```json
+{
+  "minify": {
+    "js": true,
+    "svg": false,
+    "css": true
+  }
+}
+```
+
+All keys default to the top-level value (so `{ minify: true }`
+enables all three).
+
+### Ordering
+
+Minify runs **before** CSP hashing so the `sha256` hashes in
+the emitted CSP meta match the minified inline-script bytes
+the browser sees. SRI runs last (attribute-only; doesn't
+touch content).
+
+### Peer dep
+
+`svgo` is an optional peer dep (alongside mermaid + puppeteer).
+Without it installed, the SVG pass silently no-ops. esbuild is
+already a meander devDep so JS/CSS minification is always
+available when enabled.
+
 ## Subresource Integrity (SRI)
 
 **Opt-in.** When enabled, every emitted `<script src>` and

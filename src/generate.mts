@@ -156,6 +156,29 @@ const WalkthroughConfigSchema = Type.Object({
     }),
   ),
   /**
+   * Minify emitted assets — shrinks inline <script> bodies via
+   * esbuild, inline <svg> elements via SVGO, and the standalone
+   * walkthrough.css + sw.js files. Safe to combine with other
+   * opt-ins; runs last in the finalize pipeline so hashing
+   * (CSP, SRI) sees the minified bytes.
+   *
+   * Default: false.
+   *
+   * Pass `true` for defaults (all three kinds), or an object
+   * to selectively enable:
+   *   { minify: { js: true, svg: false, css: true } }
+   */
+  minify: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        js: Type.Optional(Type.Boolean()),
+        svg: Type.Optional(Type.Boolean()),
+        css: Type.Optional(Type.Boolean()),
+      }),
+    ]),
+  ),
+  /**
    * Emit size-tier badges on the index TOC so readers can see
    * at a glance which parts are large vs. small. Tiers are
    * derived from total section-code lines per part:
@@ -1961,7 +1984,18 @@ export async function generate(
   let swRegisterJs = "";
   if (swEnabled) {
     const swSrc = readFileSync(path.join(bundledAssetsDir, "sw.js"), "utf-8");
-    const swOut = swSrc.replaceAll("__MEANDER_CACHE_VERSION__", swVersion);
+    let swOut = swSrc.replaceAll("__MEANDER_CACHE_VERSION__", swVersion);
+    /* Minify the SW when the consumer opted in. Its Service-
+     * Worker registration-gated bytes decide the install hash,
+     * so shrinking here is strictly a bytes-over-the-wire win —
+     * no correctness impact. */
+    const minifyJsHere =
+      !!config.minify &&
+      (typeof config.minify === "object" ? config.minify.js !== false : true);
+    if (minifyJsHere) {
+      const m = await import("./minify.mts");
+      swOut = await m.minifyAsset(swOut, { kind: "js" });
+    }
     /* sw.js must land at origin root (or basePath root) so its
      * scope covers the whole site. */
     writeFileSync(path.join(outDir, "sw.js"), swOut);
@@ -2012,7 +2046,19 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * the npm-package-bundled asset *source* path; `assetDir` is
    * the user-chosen emit subdir. Must land before renders so
    * the cssHref in emitted HTML resolves correctly. */
-  const css = readFileSync(path.join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  let css = readFileSync(path.join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  {
+    /* CSS minify. Inline read of config.minify (the shared
+     * minifyMod binding lives further down, set up as part of
+     * the finalizeHtml pipeline; we write CSS before that). */
+    const minifyCssHere =
+      !!config.minify &&
+      (typeof config.minify === "object" ? config.minify.css !== false : true);
+    if (minifyCssHere) {
+      const m = await import("./minify.mts");
+      css = await m.minifyAsset(css, { kind: "css" });
+    }
+  }
   const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir;
   mkdirSync(cssOutDir, { recursive: true });
   writeFileSync(path.join(cssOutDir, "walkthrough.css"), css);
@@ -2106,10 +2152,22 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   const headExtra = [faviconTags, themeColorTags, headJsTag].filter(Boolean).join("\n  ");
   const footerHtml = renderFooter(config.footer);
 
-  /* Post-render security pass. CSP runs first because it hashes
-   * inline <script>/<style> bodies — running SRI first would
-   * change nothing for inline tags, but run-order documents
-   * the dependency for future maintainers. */
+  /* Post-render pipeline. Order matters:
+   *   1. minify — shrinks inline <script>/<svg>. Must run first
+   *      because CSP hashes inline-script bodies; hashing
+   *      pre-minified bytes then minifying would break the
+   *      hash match.
+   *   2. CSP — reads every inline <script>/<style> body (now
+   *      post-minify) and injects a <meta> tag with sha256
+   *      hashes.
+   *   3. SRI — attribute-only; adds integrity= to <script src>
+   *      and <link>. Doesn't touch inline content. */
+  const minifyCfg = config.minify;
+  const minifyEnabled = !!minifyCfg;
+  const minifyOpts = typeof minifyCfg === "object" ? minifyCfg : undefined;
+  const minifyJs = minifyOpts?.js ?? minifyEnabled;
+  const minifySvg = minifyOpts?.svg ?? minifyEnabled;
+  const minifyCssEnabled = minifyOpts?.css ?? minifyEnabled;
   const cspEnabled = !!config.csp;
   const sriEnabled = !!config.sri;
   const cspOpts = typeof config.csp === "object" ? config.csp : undefined;
@@ -2118,8 +2176,18 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   if (cspEnabled || sriEnabled) {
     securityMod = await import("./security.mts");
   }
+  let minifyMod: typeof import("./minify.mts") | null = null;
+  if (minifyEnabled) {
+    minifyMod = await import("./minify.mts");
+  }
   const finalizeHtml = async (html: string): Promise<string> => {
     let out = html;
+    if (minifyMod && (minifyJs || minifySvg)) {
+      out = await minifyMod.minifyEmittedHtml(out, {
+        js: minifyJs,
+        svg: minifySvg,
+      });
+    }
     if (securityMod && cspEnabled) {
       out = securityMod.injectCspMeta(out, {
         connectSrc: cspOpts?.connectSrc,
