@@ -5,6 +5,10 @@
   "license": "MIT",
   "author": "Dale Bustad <github@dale.link>",
   "type": "module",
+  "packageManager": "pnpm@11.0.0-rc.5",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "bin": {
     "meander": "./dist/cli.js"
   },
@@ -14,15 +18,23 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.48",
-    "@valtown/sdk": "^1.0.0",
-    "marked": "^17.0.5"
+    "@sinclair/typebox": "0.34.48",
+    "@valtown/sdk": "1.0.0",
+    "marked": "18.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "24.9.2",
+    "@typescript/native-preview": "7.0.0-dev.20260415.1",
+    "esbuild": "0.25.11",
+    "fast-glob": "3.3.3",
+    "oxfmt": "0.37.0",
+    "oxlint": "1.52.0",
+    "svgo": "4.0.1",
+    "taze": "19.9.2",
+    "typescript": "5.9.2",
+    "yoctocolors-cjs": "2.1.3"
   }
 }
