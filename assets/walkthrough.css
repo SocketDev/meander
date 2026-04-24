@@ -122,7 +122,17 @@ a:hover {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+.mdr-parts-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 4px;
 }
 
 .part-nav a {
@@ -137,6 +147,17 @@ a:hover {
   border-color: var(--accent);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Docs pill gets a separator + a slightly different chrome so the
+ * eye reads "Topics: A B C | Docs" as one nav block. A left
+ * border acts as the visual divider without an actual <hr>. */
+.part-nav a.mdr-topic-doc {
+  margin-left: 8px;
+  border-left: 2px solid var(--border);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 12px;
 }
 
 .layout {

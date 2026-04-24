@@ -922,16 +922,23 @@ function renderPartNav(
   hasDocuments: boolean,
   basePath: string,
 ): string {
-  const docsLink = hasDocuments
-    ? `<a class="${activePartId === 0 ? "active" : ""}" href="${basePath}/${slug}/documents">Documents</a>\n`
-    : "";
+  /* Three-zone pill strip: label, part pills (with compact
+   * one-word titles via firstSignificantWord), then docs pill
+   * (when present). Label + docs are styled separately so the
+   * eye reads "Topics: A B C | Docs" as one nav block. */
+  const label = `<span class="mdr-parts-label">Topics:</span>`;
   const partLinks = parts
     .map((part) => {
       const cls = part.id === activePartId ? "active" : "";
-      return `<a class="${cls}" href="${partUrl(slug, part, basePath)}">Part ${part.id}</a>`;
+      const shortTitle = firstSignificantWord(part.title);
+      const full = `Part ${part.id}: ${part.title}`;
+      return `<a class="${cls}" href="${partUrl(slug, part, basePath)}" title="${escapeHtml(full)}">${escapeHtml(shortTitle)}</a>`;
     })
     .join("\n");
-  return docsLink + partLinks;
+  const docsLink = hasDocuments
+    ? `<a class="mdr-topic-doc ${activePartId === 0 ? "active" : ""}" href="${basePath}/${slug}/documents" title="Documents">Docs</a>`
+    : "";
+  return `${label}${partLinks}${docsLink}`;
 }
 
 function renderPartHtml(
@@ -1663,6 +1670,41 @@ function renderFooter(
   return `<footer class="mdr-footer">
     <a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>
   </footer>`;
+}
+
+/**
+ * First "significant" word of a title — the first token that
+ * isn't a stopword. Useful when rendering a compact label
+ * that should still carry the title's subject:
+ *   "Anatomy of a PURL"              → "Anatomy"
+ *   "Building & Stringifying PURLs"  → "Building"
+ *   "The Security Model"             → "Security"
+ * Trailing punctuation is stripped from each token so
+ * "Anatomy, of a PURL" still lands on "Anatomy".
+ */
+function firstSignificantWord(title: string): string {
+  const stop = new Set([
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "of",
+    "for",
+    "to",
+    "in",
+    "on",
+    "with",
+    "&",
+  ]);
+  const words = title.split(/\s+/);
+  for (const w of words) {
+    const cleaned = w.replace(/[,:;.!?]+$/, "");
+    if (cleaned && !stop.has(cleaned.toLowerCase())) {
+      return cleaned;
+    }
+  }
+  return words[0] ?? title;
 }
 
 /**
