@@ -49,6 +49,23 @@ html[data-theme="dark"] {
   --code-bg: #0d1117;
 }
 
+/* Neo-Kijū — retro mech-beast palette. Deep purple background
+ * with electric-violet accent. Not a light/dark variant; own
+ * coherent palette. Named internally as neo-kiju (ASCII, macron-
+ * free) so CSS selectors and localStorage keys stay plain. */
+html[data-theme="neo-kiju"] {
+  --bg: #1a0830;
+  --bg-elev: #2a1044;
+  --bg-card: #2a1044;
+  --bg-tint: #3a1a5a;
+  --text: #f6eeff;
+  --muted: #b8a4dc;
+  --accent: #b24bff;
+  --border: #3d2a5a;
+  --border-strong: #5a3d7a;
+  --code-bg: #22143a;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1669,7 +1686,8 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
 
 .theme-toggle-wrapper[data-pref="system"] .theme-icon-system,
 .theme-toggle-wrapper[data-pref="light"] .theme-icon-light,
-.theme-toggle-wrapper[data-pref="dark"] .theme-icon-dark {
+.theme-toggle-wrapper[data-pref="dark"] .theme-icon-dark,
+.theme-toggle-wrapper[data-pref="neo-kiju"] .theme-icon-neo-kiju {
   opacity: 1;
 }
 
@@ -2098,4 +2116,131 @@ pre.mdr-repo-tree code {
 .mdr-footer a:hover {
   color: var(--accent);
   text-decoration-color: var(--accent);
+}
+
+/* ── Neo-Kijū — bolt strike + spark sequence ─────────────────── */
+
+/* Bolt strike — when neo-kiju is picked, the lightning bolt
+ * icon plays a one-shot "energize": scales up, overshoots,
+ * settles. Runs exactly once per user click (gated by
+ * .mdr-theme-toggle-fired). On page reload with neo-kiju
+ * already stored, the bolt just paints at rest — no unprompted
+ * motion on a state the user didn't actively select. */
+@keyframes mdr-bolt-strike {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+html[data-theme="neo-kiju"].mdr-theme-toggle-fired .theme-icon-neo-kiju {
+  transform-origin: center;
+  animation: mdr-bolt-strike 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
+}
+
+/* Sparks — hidden by default, visible only on the toggle button
+ * when neo-kiju is active and the user just clicked. Three
+ * sparks fire in a choreographed 3-beat sequence over 1.5s,
+ * each visible for ~17% of the cycle at peak scale(1.2). */
+.mdr-spark {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes mdr-spark-middle {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes mdr-spark-top {
+  0%,
+  33% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  43% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  56% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  67%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes mdr-spark-bottom {
+  0%,
+  67% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  77% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Spark-1 is the top-right spark on the bolt SVG path. Each
+ * spark has its own keyframe set so the 3-beat sequence reads
+ * distinctly instead of all three flickering at the same offset. */
+html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-1 {
+  animation: mdr-spark-top 1.5s ease 0.55s 1 forwards;
+}
+
+html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-2 {
+  animation: mdr-spark-middle 1.5s ease 0.55s 1 forwards;
+}
+
+html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+  .theme-toggle
+  .theme-icon-neo-kiju
+  .mdr-spark-3 {
+  animation: mdr-spark-bottom 1.5s ease 0.55s 1 forwards;
 }

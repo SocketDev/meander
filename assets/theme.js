@@ -55,6 +55,21 @@
     <path class="theme-star" d="M18.3707 1C18.3707 3.22825 16.2282 5.37069 14 5.37069C16.2282 5.37069 18.3707 7.51313 18.3707 9.74138C18.3707 7.51313 20.5132 5.37069 22.7414 5.37069C20.5132 5.37069 18.3707 3.22825 18.3707 1Z"/>
   `,
     },
+    "neo-kiju": {
+      /* Retro-mech theme — deep purple palette with a lightning
+       * bolt icon. Three sparks ride the bolt and flicker once
+       * in a choreographed sequence when the user switches TO
+       * this theme (gated on .mdr-theme-toggle-fired so a page
+       * reload with the theme already stored is quiet). */
+      label: "Neo-Kijū",
+      style: "solid",
+      path: `
+    <path d="M20 6 L14 6 L4 16 L11 16 L7 24 L20 13 L13 13 Z"/>
+    <path class="mdr-spark mdr-spark-1" d="M5 2 L5.5 4.5 L8 5 L5.5 5.5 L5 8 L4.5 5.5 L2 5 L4.5 4.5 Z"/>
+    <path class="mdr-spark mdr-spark-2" d="M22 6.5 L22.5 9 L25 9.5 L22.5 10 L22 12.5 L21.5 10 L19 9.5 L21.5 9 Z"/>
+    <path class="mdr-spark mdr-spark-3" d="M3.5 17.5 L4 20 L6.5 20.5 L4 21 L3.5 23.5 L3 21 L0.5 20.5 L3 20 Z"/>
+  `,
+    },
   };
   const themeIconSvg = (pref, extraClass = "") => {
     const { style, path } = THEME_ICONS[pref];
@@ -67,13 +82,16 @@
 
   const readStoredTheme = () => {
     const t = storageGet(THEME_KEY);
-    return t === "dark" || t === "light" ? t : "system";
+    return t === "dark" || t === "light" || t === "neo-kiju" ? t : "system";
   };
   const persistTheme = (theme) =>
     storageSet(THEME_KEY, theme === "system" ? null : theme);
   const systemPrefersDark = () =>
     window.matchMedia &&
     window.matchMedia("(prefers-color-scheme: dark)").matches;
+  /* `neo-kiju` is its own palette — not a light/dark variant —
+   * so system preference can't resolve to it. Only the explicit
+   * pick reaches applyTheme with "neo-kiju". */
   const resolveTheme = (pref) =>
     pref === "system" ? (systemPrefersDark() ? "dark" : "light") : pref;
   const applyTheme = (theme) => {
@@ -177,11 +195,27 @@
       }
     });
 
+    /* Flag a user-initiated switch so one-shot animations (neo-kiju
+     * bolt strike + sparks) fire only on a live click, not on every
+     * page reload that just restores the stored theme. Stripped
+     * after ~2.5s — long enough for the longest spark sequence to
+     * complete, short enough that if the user navigates mid-
+     * animation the next page doesn't re-fire it. */
+    let firedTimer = 0;
+    const markFired = () => {
+      document.documentElement.classList.add("mdr-theme-toggle-fired");
+      clearTimeout(firedTimer);
+      firedTimer = setTimeout(() => {
+        document.documentElement.classList.remove("mdr-theme-toggle-fired");
+      }, 2500);
+    };
+
     for (const item of menu.querySelectorAll(".theme-menu-item")) {
       item.addEventListener("click", () => {
         const pref = item.getAttribute("data-pref");
         persistTheme(pref);
         applyTheme(resolveTheme(pref));
+        markFired();
         render();
         closeMenu();
         btn.focus();

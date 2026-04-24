@@ -44,17 +44,34 @@ on files with many sections.
 
 No configuration — always on when ≥2 sections per file.
 
-## Theme toggle (system / light / dark)
+## Theme toggle (system / light / dark / neo-kijū)
 
-A 30×30 icon in `.topbar-actions` opens a menu with three
+A 30×30 icon in `.topbar-actions` opens a menu with four
 choices. The pick persists to `localStorage` under
 `meander:pages:theme`; a stored value resolves synchronously in
 `<head>` before first paint, so dark-preferring systems never
 flash the light theme.
 
-The three SVG icons stack on top of each other via
+The four SVG icons stack on top of each other via
 `position: absolute; inset: 0; margin: auto`, so switching
 preference only flips opacity — the button never reflows.
+
+### Neo-Kijū
+
+A fourth theme option, labeled **Neo-Kijū** in the menu
+(internal id: `neo-kiju`). Deep-purple palette with an
+electric-violet accent, code keywords in hot pink. Its icon
+is a lightning bolt flanked by three small sparks; on a live
+user-click switch, the bolt plays a one-shot scale-up strike
+and the three sparks flicker in sequence over ~1.5s. A page
+reload that just restores `neo-kiju` from localStorage paints
+the bolt at rest — animations are gated on
+`mdr-theme-toggle-fired` so the reader only sees motion on
+their own action.
+
+Unlike `system` / `light` / `dark`, `neo-kiju` is its own
+palette rather than a light/dark variant. `system` preference
+still resolves only to light or dark.
 
 No configuration — always on.
 
