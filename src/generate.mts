@@ -1,5 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+import { polishProse } from "./prose-polishers.mts";
 import { copyFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -515,7 +516,9 @@ function renderAnnotationMarkdown(markdown: string): string {
     const typeHtml = chunk.type
       ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
       : "";
-    const bodyHtml = chunk.body ? (annotationMarked.parse(chunk.body) as string) : "";
+    const bodyHtml = chunk.body
+      ? polishProse(annotationMarked.parse(chunk.body) as string)
+      : "";
     const order = chunk.tag === "fileoverview" ? 0 : chunk.tag === "description" ? 1 : 2;
     blocks.push({
       html:
@@ -531,7 +534,7 @@ function renderAnnotationMarkdown(markdown: string): string {
    * one exists. Keeps the "description leads the card stack"
    * ordering while still surfacing free-floating prose. */
   if (preamble !== null && !hasExplicitDescription) {
-    const bodyHtml = annotationMarked.parse(preamble) as string;
+    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string);
     blocks.push({
       html:
         `<div class="annotation-block" data-tag="description">` +
@@ -543,7 +546,7 @@ function renderAnnotationMarkdown(markdown: string): string {
   } else if (preamble !== null) {
     /* Explicit @description exists — keep the preamble as plain
      * prose above the cards so nothing is silently dropped. */
-    const bodyHtml = annotationMarked.parse(preamble) as string;
+    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string);
     blocks.unshift({ html: `<div class="annotation-prose">${bodyHtml}</div>`, order: -1 });
   }
   blocks.sort((a, b) => a.order - b.order);
@@ -1304,8 +1307,19 @@ function renderMarkdownDocument(
   // Parse markdown with custom renderer
   const rawHtml = marked.parse(markdown, { renderer }) as string;
 
+  /* Prose polishers (generic, idempotent):
+   *   - strip "Further reading" README cross-reference lists,
+   *   - tag ASCII repo-tree blocks for CSS,
+   *   - add permalink anchors to h2/h3/h4,
+   *   - accent-color numeric tokens,
+   *   - italicize parentheticals.
+   * Runs before wrapBlocks so block-wrapping logic sees the
+   * transformed markup — headings carry their new ids when they
+   * become anchor targets, tree blocks carry their classes. */
+  const polishedHtml = polishProse(rawHtml);
+
   // Wrap blocks
-  const { wrapped, blockCount } = wrapBlocks(rawHtml);
+  const { wrapped, blockCount } = wrapBlocks(polishedHtml);
 
   return {
     html: wrapped,

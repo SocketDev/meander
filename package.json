@@ -30,7 +30,8 @@
   "dependencies": {
     "@sinclair/typebox": "0.34.48",
     "@valtown/sdk": "1.0.0",
-    "marked": "18.0.0"
+    "marked": "18.0.0",
+    "node-html-parser": "7.1.0"
   },
   "devDependencies": {
     "@types/node": "24.9.2",

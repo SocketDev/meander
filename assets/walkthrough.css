@@ -1625,3 +1625,52 @@ html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
     display: none;
   }
 }
+
+/* ── Prose polishers ─────────────────────────────────────────── */
+
+/* highlightProseNumbers — accent-color digits + version strings
+ * wrapped in <span class="wt-num"> by the server-side polisher. */
+.wt-num {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* anchorifyHeadings — GitHub-style `#` permalink that appears
+ * on heading hover. Hidden at rest to keep the heading clean,
+ * fades in when the reader is visibly close. */
+.wt-heading-anchor {
+  opacity: 0;
+  margin-left: 0.35em;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: none;
+  transition: opacity 120ms ease;
+}
+
+h2:hover .wt-heading-anchor,
+h3:hover .wt-heading-anchor,
+h4:hover .wt-heading-anchor,
+.wt-heading-anchor:focus {
+  opacity: 1;
+}
+
+.wt-heading-anchor:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* enhanceRepoTrees — ASCII directory trees (├── └── │).
+ * Dim the drawing glyphs so the filename + annotation columns
+ * read as the signal. `nohighlight` on the inner <code> tells
+ * hljs to skip, so drawing chars never get random token
+ * colors. */
+pre.wt-repo-tree {
+  /* Re-assert mono so we don't inherit a proportional font from
+   * any surrounding prose container. */
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+pre.wt-repo-tree code {
+  color: var(--text);
+}

@@ -1,0 +1,267 @@
+/**
+ * Generic HTML prose enhancers — pure string transforms that
+ * make rendered annotation + document HTML read better without
+ * touching source content:
+ *
+ *   - highlightProseNumbers: wrap digit tokens in <span class="wt-num">
+ *   - italicizeParentheticals: wrap `(aside)` in <em>
+ *   - anchorifyHeadings: give h2/h3/h4 an id + trailing `#` permalink
+ *   - enhanceRepoTrees: mark ASCII directory-tree code blocks for
+ *     CSS styling (dim the drawing glyphs, skip hljs)
+ *   - stripFurtherReading: drop "<h2>Further reading</h2>" plus
+ *     every sibling until the next h2
+ *
+ * All functions consume an HTML string and return an HTML string.
+ * Safe to call multiple times; each is idempotent (second call is
+ * a no-op on already-transformed content).
+ */
+import { HTMLElement, parse as parseHtml } from "node-html-parser";
+
+/**
+ * Highlight numeric tokens in prose so counts + version numbers
+ * pop in accent color. Touches text inside paragraphs, list items,
+ * table cells, blockquotes, and h1-h4; skips code/pre/a/kbd/samp.
+ *
+ * Matches: version numbers (1.2.3, 11.0.0-rc.0), percentages (95%),
+ * "23+", simple counts (42), optional ≥/≤/~ prefix. Skips digits
+ * inside HTML numeric entities and bold list markers like `**1.**`.
+ */
+export function highlightProseNumbers(html: string): string {
+  const root = parseHtml(html);
+  const allowed = new Set([
+    "P",
+    "LI",
+    "TD",
+    "TH",
+    "BLOCKQUOTE",
+    "DD",
+    "DT",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+  ]);
+  const skip = new Set(["CODE", "PRE", "A", "KBD", "SAMP"]);
+  const pattern =
+    /(?<!&#)(?<!&#x)(?<![\w.-])([≥≤~]?\s?\d+(?:\.\d+)+(?:-[a-z]+(?:\.\d+)*)?[+%]?|[≥≤~]?\s?\d+[+%]?)(?![\w-])(?!\.\s|\.\d)/gi;
+  const walk = (node: HTMLElement): void => {
+    if (skip.has(node.tagName)) {
+      return;
+    }
+    const tag = node.tagName;
+    /* Inside <strong> at the start of an <li>, the number is a
+     * manually-bolded list marker ("**1.** Branch"). Don't
+     * re-colorize. */
+    const parent = node.parentNode as HTMLElement | null;
+    const isLiStartMarker =
+      tag === "STRONG" &&
+      parent?.tagName === "LI" &&
+      parent.firstElementChild === node &&
+      /^\d+\./.test(node.text.trim());
+    if (isLiStartMarker) {
+      return;
+    }
+    const children = [...node.childNodes];
+    for (const child of children) {
+      const any = child as unknown as { nodeType: number; rawText?: string };
+      if (any.nodeType === 3) {
+        if (!allowed.has(tag)) {
+          continue;
+        }
+        const text: string = any.rawText ?? "";
+        if (!pattern.test(text)) {
+          continue;
+        }
+        pattern.lastIndex = 0;
+        any.rawText = text.replace(pattern, '<span class="wt-num">$1</span>');
+      } else if (any.nodeType === 1) {
+        walk(child as HTMLElement);
+      }
+    }
+  };
+  walk(root as unknown as HTMLElement);
+  return root.toString();
+}
+
+/**
+ * Wrap parenthetical asides in prose with <em> so "(extra info)"
+ * reads as a quiet aside. Only touches text inside paragraphs,
+ * list items, table cells, and blockquotes; leaves <code>, <pre>,
+ * headings, and their descendants alone.
+ *
+ * Matches `(…)` with 2+ chars inside and no parens/tags/quotes,
+ * so nested or complex expressions fall through untouched.
+ */
+export function italicizeParentheticals(html: string): string {
+  const root = parseHtml(html);
+  const allowed = new Set(["P", "LI", "TD", "TH", "BLOCKQUOTE", "DD", "DT"]);
+  const walk = (node: HTMLElement): void => {
+    const tag = node.tagName;
+    if (
+      tag === "CODE" ||
+      tag === "PRE" ||
+      tag === "KBD" ||
+      tag === "SAMP" ||
+      tag === "A"
+    ) {
+      return;
+    }
+    for (const child of node.childNodes) {
+      const any = child as unknown as { nodeType: number; rawText?: string };
+      if (any.nodeType === 3) {
+        if (!allowed.has(tag)) {
+          continue;
+        }
+        const text: string = any.rawText ?? "";
+        if (!/\([^()<>"'`]{2,}\)/.test(text)) {
+          continue;
+        }
+        const rewritten = text.replace(
+          /\(([^()<>"'`]{2,})\)/g,
+          (_, inner) => `(<em>${inner}</em>)`,
+        );
+        if (rewritten !== text) {
+          any.rawText = rewritten;
+        }
+      } else if (any.nodeType === 1) {
+        walk(child as HTMLElement);
+      }
+    }
+  };
+  walk(root as unknown as HTMLElement);
+  return root.toString();
+}
+
+/**
+ * Give every heading (h2-h4) in rendered doc HTML an id slug
+ * + a trailing `<a class="wt-heading-anchor">#</a>` so readers
+ * can copy a deep-link to the section. h1 is skipped — it's the
+ * page title and the URL itself already anchors it.
+ *
+ * Slug derivation: lowercase, strip non-letter/number/whitespace,
+ * collapse whitespace to `-`. Collisions get `-2`, `-3`, …
+ */
+export function anchorifyHeadings(html: string): string {
+  const root = parseHtml(html);
+  const used = new Set<string>();
+  const headings = root.querySelectorAll("h2, h3, h4");
+  for (const h of headings) {
+    /* Idempotency: skip if a permalink anchor was already
+     * inserted (double-polishing a page shouldn't produce two
+     * `#` links per heading). */
+    if (h.querySelector(".wt-heading-anchor")) {
+      continue;
+    }
+    const existingId = h.getAttribute("id");
+    let slug = existingId ?? "";
+    if (!slug) {
+      const text = h.text.trim();
+      if (!text) {
+        continue;
+      }
+      const baseSlug = text
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s-]+/gu, "")
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+      if (!baseSlug) {
+        continue;
+      }
+      slug = baseSlug;
+      let n = 2;
+      while (used.has(slug)) {
+        slug = `${baseSlug}-${n++}`;
+      }
+      h.setAttribute("id", slug);
+    }
+    used.add(slug);
+    h.insertAdjacentHTML(
+      "beforeend",
+      ` <a class="wt-heading-anchor" href="#${slug}" aria-label="Permalink to this section">#</a>`,
+    );
+  }
+  return root.toString();
+}
+
+/**
+ * Mark ASCII repo-tree code blocks (ones that draw a directory
+ * hierarchy with `├──`, `└──`, `│`) so CSS can dim the drawing
+ * glyphs and lift the trailing annotation column. Adds
+ * `.wt-repo-tree` to the <pre> and `nohighlight` to the <code>
+ * so hljs skips it — drawing glyphs become random tokens
+ * otherwise.
+ */
+export function enhanceRepoTrees(html: string): string {
+  const root = parseHtml(html);
+  const preBlocks = root.querySelectorAll("pre");
+  for (const pre of preBlocks) {
+    const text = pre.text;
+    if (!/[├└│]/.test(text)) {
+      continue;
+    }
+    const existingClass = pre.getAttribute("class") ?? "";
+    pre.setAttribute("class", `${existingClass} wt-repo-tree`.trim());
+    for (const code of pre.querySelectorAll("code")) {
+      const cc = code.getAttribute("class") ?? "";
+      code.setAttribute("class", `${cc} nohighlight`.trim());
+    }
+  }
+  return root.toString();
+}
+
+/**
+ * Remove any `<h2>Further reading</h2>` section from a rendered
+ * doc. README-style docs often close with a cross-reference list
+ * that makes sense in a git repo but becomes dead links in a
+ * generated walkthrough. Case-insensitive title match, catches
+ * variants like "Further Reading" and "Further reading:".
+ */
+export function stripFurtherReading(html: string): string {
+  const root = parseHtml(html);
+  const headings = root.querySelectorAll("h2");
+  for (const h of headings) {
+    const text = h.text
+      .trim()
+      .toLowerCase()
+      .replace(/[:.…]+$/, "");
+    if (text !== "further reading") {
+      continue;
+    }
+    const parent = h.parentNode as HTMLElement | null;
+    if (!parent) {
+      continue;
+    }
+    const children = parent.childNodes;
+    const startIdx = children.indexOf(h);
+    if (startIdx < 0) {
+      continue;
+    }
+    const toRemove: unknown[] = [];
+    for (let i = startIdx; i < children.length; i++) {
+      const c = children[i];
+      if (i > startIdx && (c as HTMLElement).tagName === "H2") {
+        break;
+      }
+      toRemove.push(c);
+    }
+    for (const n of toRemove) {
+      (n as { remove?: () => void }).remove?.();
+    }
+  }
+  return root.toString();
+}
+
+/**
+ * Run the full default stack in the canonical order. Consumers
+ * who only want a subset should call the individual functions.
+ */
+export function polishProse(html: string): string {
+  let out = html;
+  out = stripFurtherReading(out);
+  out = enhanceRepoTrees(out);
+  out = anchorifyHeadings(out);
+  out = highlightProseNumbers(out);
+  out = italicizeParentheticals(out);
+  return out;
+}
