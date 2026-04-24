@@ -25,6 +25,7 @@
     "fix": "node scripts/fix.mts",
     "lint": "node scripts/lint.mts",
     "test": "node scripts/test.mts",
+    "test:val": "node --test assets/val/lib/*.test.ts",
     "type": "tsc --noEmit",
     "update": "node scripts/update.mts",
     "prepublishOnly": "pnpm run build"

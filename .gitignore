@@ -35,10 +35,9 @@ Thumbs.db
 #*#
 .#*
 
-# Cache directories
-**/.cache
-
-# Dependencies
+# Dependencies (includes node_modules/.cache/ where vitest,
+# esbuild SRI, and mermaid cache dirs live — cleared by pnpm
+# install automatically).
 /node_modules
 
 # Dev-generated preview output from `pnpm dev` / `meander serve`

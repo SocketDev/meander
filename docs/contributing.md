@@ -22,6 +22,7 @@ pnpm build    # tsc emits dist/
 | --------------- | ----------------------------------------------------------------------------- |
 | `pnpm dev`      | Generate the fixture and serve it at http://127.0.0.1:8080 with file-watcher. |
 | `pnpm test`     | Run the vitest suite under `test/`.                                            |
+| `pnpm test:val` | Run the val's co-located `node:test` suite under `assets/val/lib/`.            |
 | `pnpm cover`    | vitest + type-coverage, prints a combined summary.                             |
 | `pnpm check`    | lint + type-check (what CI runs).                                              |
 | `pnpm fix`      | oxfmt + oxlint --fix; mutates files in place.                                  |
@@ -43,6 +44,22 @@ pnpm build    # tsc emits dist/
   `mkdtempSync(path.join(os.tmpdir(), '…'))` + `safeDelete`
   from `@socketsecurity/lib/fs` in `afterEach`. Never write
   into the repo tree.
+
+### Val tests
+
+The val (`assets/val/index.ts`) runs under Deno at Val Town.
+Its pure helpers — crypto, JWT, auth-domain matching — live in
+`assets/val/lib/*.ts` and have co-located `*.test.ts` files
+that run under `node:test` via `pnpm test:val`. Web Crypto is
+available in both Deno and Node so the helpers behave
+identically; tests don't mock anything.
+
+The val's HTTP routes (the Hono app + blob/sqlite interactions)
+are not unit-tested — they're exercised end-to-end by
+`meander deploy-val` against a staging val and the human
+sign-in flow. If a future route changes pull logic out of the
+request handler, move that logic into `lib/` too and test it
+there.
 
 ## CI
 

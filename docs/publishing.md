@@ -156,6 +156,4 @@ message and exits 0 instead of failing the job:
 `<outDir>` defaults to `pages`. Override via
 `meander.config.json`'s `outDir` field, and pass the same value
 to `deploy-val --out-dir=…` so the val reads from the matching
-prefix. A backward-compat read falls back to the legacy
-`walkthrough/` prefix if the new key misses, so mid-rename
-deployments don't 404.
+prefix.

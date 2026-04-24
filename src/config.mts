@@ -237,9 +237,6 @@ export const MeanderConfigSchema = Type.Object({
    *
    * Changing this for an existing deployment requires a
    * republish — old blob keys stay under the previous prefix.
-   * The val has a backward-compat read that falls back to
-   * "walkthrough/" when the new prefix misses, so migration
-   * doesn't 404 existing content during the transition.
    */
   outDir: Type.Optional(
     Type.String({ pattern: '^[a-z0-9][a-z0-9-]*$', minLength: 1 }),

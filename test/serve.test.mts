@@ -138,12 +138,6 @@ describe('readWalkthroughMeta', () => {
     expect(meta.hasDocuments).toBe(false)
   })
 
-  it('fallback scan recognizes the legacy walkthrough-part-<n>.html filename', async () => {
-    writeFileSync(path.join(tmpDir, 'walkthrough-part-2.html'), '', 'utf-8')
-    const meta = await readWalkthroughMeta(tmpDir)
-    expect([...meta.partIds]).toEqual([2])
-  })
-
   it('fallback scan flags documents.html when present', async () => {
     writeFileSync(path.join(tmpDir, 'documents.html'), '', 'utf-8')
     const meta = await readWalkthroughMeta(tmpDir)
@@ -347,46 +341,6 @@ describe('serve (config + fallback resolution)', () => {
       server = null
     }
     await safeDelete(tmpDir, { recursive: true, force: true })
-  })
-
-  it('falls back to legacy walkthrough/ dir when pages/ is missing', async () => {
-    /* No pages/ dir — just a walkthrough/ dir with minimal
-     * content. serve() should find it via the backward-compat
-     * branch. */
-    const legacyDir = path.join(tmpDir, 'walkthrough')
-    mkdirSync(legacyDir, { recursive: true })
-    writeFileSync(
-      path.join(legacyDir, 'index.html'),
-      '<!doctype html><title>legacy</title>',
-      'utf-8',
-    )
-    writeFileSync(
-      path.join(tmpDir, 'meander.config.json'),
-      JSON.stringify({
-        slug: 'legacy',
-        title: 'Legacy',
-        parts: [
-          {
-            id: 1,
-            title: 'x',
-            objective: 'y',
-            keywords: ['z'],
-            files: ['a.ts'],
-          },
-        ],
-      }),
-      'utf-8',
-    )
-    const result = await serve(path.join(tmpDir, 'meander.config.json'), {
-      port: 0,
-    })
-    if (!result) {
-      throw new Error('serve() returned undefined')
-    }
-    server = result.server
-    const res = await fetch(result.url)
-    expect(res.status).toBe(200)
-    expect(await res.text()).toContain('legacy')
   })
 
   it('honors outDir from the config', async () => {

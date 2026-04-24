@@ -74,8 +74,11 @@ jobs:
       - name: Setup and install
         uses: ./.github/actions/setup-and-install
 
-      - name: Run tests
+      - name: Run tests (meander CLI)
         run: pnpm run test
+
+      - name: Run tests (val helpers)
+        run: pnpm run test:val
 
       - name: Coverage
         run: pnpm run cover --summary

@@ -27,18 +27,24 @@
  *
  * Blob key conventions:
  *   <outDir>/<slug>/index.html           encrypted
- *   <outDir>/<slug>/part-<N>.html        encrypted (new name)
- *   <outDir>/<slug>/walkthrough-part-<N>.html   encrypted (legacy; read-only fallback)
+ *   <outDir>/<slug>/part-<N>.html        encrypted
  *   <outDir>/<slug>/documents.html       encrypted (when documents configured)
  *   <outDir>/<slug>/manifest.json        plaintext
- *   <outDir>/meander.css                 plaintext (new name)
- *   walkthrough/walkthrough.css          plaintext (legacy; read-only fallback)
+ *   <outDir>/meander.css                 plaintext
  */
 
 import { blob } from 'https://esm.town/v/std/blob'
 import { sqlite } from 'https://esm.town/v/std/sqlite/main.ts'
 import { Hono } from 'npm:hono@4'
 import type { Context } from 'npm:hono@4'
+import {
+  emailDomainAllowed,
+  hashCode,
+  parseAllowedDomains,
+  sixDigitCode,
+} from './lib/auth.ts'
+import { decrypt, deriveKey, encrypt } from './lib/crypto.ts'
+import { signJwt, verifyJwt } from './lib/jwt.ts'
 import type {
   ApiComment,
   BaseComment,
@@ -53,166 +59,32 @@ const app = new Hono()
 /* ------------------------------------------------------------------ */
 
 const OUT_DIR = (Deno.env.get('MEANDER_OUT_DIR') || 'pages').replace(/\/$/, '')
-const LEGACY_OUT_DIR = 'walkthrough'
-const CRYPTO_PASS =
-  Deno.env.get('MEANDER_ENCRYPTION_KEY') ||
-  /* Backward-compat shim: if a mid-migration deploy still has the
-   * old var, keep decrypting so content isn't instantly bricked.
-   * New deploys should set MEANDER_ENCRYPTION_KEY only. */
-  Deno.env.get('WALKTHROUGH_PASS') ||
-  ''
+const CRYPTO_PASS = Deno.env.get('MEANDER_ENCRYPTION_KEY') || ''
 const JWT_SECRET = Deno.env.get('MEANDER_JWT_SECRET') || ''
-const ALLOWED_EMAIL_DOMAINS = (
-  Deno.env.get('MEANDER_ALLOWED_EMAIL_DOMAINS') || ''
+const ALLOWED_EMAIL_DOMAINS = parseAllowedDomains(
+  Deno.env.get('MEANDER_ALLOWED_EMAIL_DOMAINS'),
 )
-  .split(',')
-  .map(s => s.trim().toLowerCase())
-  .filter(Boolean)
 const DEMO_MODE = Deno.env.get('MEANDER_DEMO_MODE') === 'true'
 
 /* ------------------------------------------------------------------ */
-/*  Crypto (AES-256-GCM + JWT HS256)                                    */
+/*  Crypto + JWT                                                        */
 /* ------------------------------------------------------------------ */
-
-const VERSION_BYTE = 0x01
-const SALT = new TextEncoder().encode('meander-walkthrough-v1')
-const ITERATIONS = 600_000
-
-async function deriveKey(password: string): Promise<CryptoKey> {
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey'],
-  )
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: SALT, iterations: ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  )
-}
-
-async function encrypt(plaintext: string, key: CryptoKey): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const encoded = new TextEncoder().encode(plaintext)
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    encoded,
-  )
-  const combined = new Uint8Array(1 + iv.length + ciphertext.byteLength)
-  combined[0] = VERSION_BYTE
-  combined.set(iv, 1)
-  combined.set(new Uint8Array(ciphertext), 1 + iv.length)
-  return btoa(String.fromCharCode(...combined))
-}
-
-async function decrypt(ciphertext: string, key: CryptoKey): Promise<string> {
-  const combined = new Uint8Array(
-    atob(ciphertext)
-      .split('')
-      .map(c => c.charCodeAt(0)),
-  )
-  if (combined.length < 1 + 12 + 16) {
-    throw new Error('Ciphertext too short')
-  }
-  if (combined[0] !== VERSION_BYTE) {
-    throw new Error(`Unsupported encryption version: ${combined[0]}`)
-  }
-  const iv = combined.slice(1, 13)
-  const data = combined.slice(13)
-  const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    data,
-  )
-  return new TextDecoder().decode(plaintext)
-}
 
 const cryptoKeyPromise = CRYPTO_PASS ? deriveKey(CRYPTO_PASS) : null
 
-function b64urlEncode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
-}
-
-function b64urlDecode(s: string): Uint8Array {
-  const padded = s.replaceAll('-', '+').replaceAll('_', '/')
-  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
-  return new Uint8Array(
-    atob(padded + pad)
-      .split('')
-      .map(c => c.charCodeAt(0)),
-  )
-}
-
-async function hmacKey(): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(JWT_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  )
-}
-
-/**
- * Mint an HS256 JWT with { email, exp }. 30-day expiry.
- */
-async function signJwt(email: string): Promise<string> {
-  const header = { alg: 'HS256', typ: 'JWT' }
+/** Mint a 30-day session JWT with the caller's email. */
+async function mintSession(email: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  const payload = { email, iat: now, exp: now + 60 * 60 * 24 * 30 }
-  const encode = (o: object) =>
-    b64urlEncode(new TextEncoder().encode(JSON.stringify(o)))
-  const head = encode(header)
-  const body = encode(payload)
-  const key = await hmacKey()
-  const sig = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(`${head}.${body}`),
-  )
-  return `${head}.${body}.${b64urlEncode(new Uint8Array(sig))}`
+  return signJwt({ email, iat: now, exp: now + 60 * 60 * 24 * 30 }, JWT_SECRET)
 }
 
-/**
- * Verify a JWT. Returns the `{ email }` claim or null on failure
- * (bad signature, expired, malformed).
- */
-async function verifyJwt(token: string): Promise<{ email: string } | null> {
-  const parts = token.split('.')
-  if (parts.length !== 3) {
+/** Verify a token and return the email claim, or null. */
+async function readSession(token: string): Promise<string | null> {
+  const payload = await verifyJwt(token, JWT_SECRET)
+  if (!payload || typeof payload['email'] !== 'string') {
     return null
   }
-  const [head, body, sig] = parts as [string, string, string]
-  const key = await hmacKey()
-  const ok = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    b64urlDecode(sig),
-    new TextEncoder().encode(`${head}.${body}`),
-  )
-  if (!ok) {
-    return null
-  }
-  try {
-    const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(body)))
-    if (typeof payload.exp !== 'number' || payload.exp < Date.now() / 1000) {
-      return null
-    }
-    if (typeof payload.email !== 'string') {
-      return null
-    }
-    return { email: payload.email }
-  } catch {
-    return null
-  }
+  return payload['email']
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,26 +131,6 @@ async function ensureDb() {
   dbInitialized = true
 }
 
-async function hashCode(code: string, email: string): Promise<string> {
-  /* Hash the code + email together so a leaked code_hash column
-   * can't be used to crack other users. Salt = email. */
-  const bytes = new TextEncoder().encode(`${email}:${code}`)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return b64urlEncode(new Uint8Array(digest))
-}
-
-function sixDigitCode(): string {
-  const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000
-  return n.toString().padStart(6, '0')
-}
-
-function emailDomainAllowed(email: string): boolean {
-  const at = email.indexOf('@')
-  if (at < 0) return false
-  const domain = email.slice(at + 1).toLowerCase()
-  return ALLOWED_EMAIL_DOMAINS.includes(domain)
-}
-
 /**
  * Send the magic code via Val Town's std/email. Falls back to
  * logging the code to stdout when the provider call fails (dev
@@ -312,8 +164,7 @@ async function currentUser(c: Context): Promise<string | null> {
   if (!m) {
     return null
   }
-  const claim = await verifyJwt(m[1]!)
-  return claim?.email ?? null
+  return readSession(m[1]!)
 }
 
 function authRequired(
@@ -331,7 +182,7 @@ function authRequired(
       status: 403,
     }
   }
-  if (!emailDomainAllowed(email)) {
+  if (!emailDomainAllowed(email, ALLOWED_EMAIL_DOMAINS)) {
     return { error: 'email domain not allowed', status: 403 }
   }
   return null
@@ -361,7 +212,7 @@ app.post('/api/auth/request', async c => {
       403,
     )
   }
-  if (!emailDomainAllowed(email)) {
+  if (!emailDomainAllowed(email, ALLOWED_EMAIL_DOMAINS)) {
     return c.json({ error: 'email domain not allowed' }, 403)
   }
   const code = sixDigitCode()
@@ -428,7 +279,7 @@ app.post('/api/auth/verify', async c => {
     sql: 'DELETE FROM magic_codes WHERE email = :email',
     args: { email },
   })
-  const token = await signJwt(email)
+  const token = await mintSession(email)
   return c.json({ token, email })
 })
 
@@ -449,10 +300,6 @@ app.get('/api/auth/me', async c => {
 /* ------------------------------------------------------------------ */
 
 app.get('/meander.css', async c => serveBlobText(c, 'meander.css', 'text/css'))
-/* Legacy alias — old clients still fetch /walkthrough.css. */
-app.get('/walkthrough.css', async c =>
-  serveBlobText(c, 'meander.css', 'text/css'),
-)
 
 /* ------------------------------------------------------------------ */
 /*  Root — list available walkthroughs                                 */
@@ -507,9 +354,7 @@ app.get('/:slug/documents', async c => {
 app.get('/:slug/part/:id', async c => {
   const slug = c.req.param('slug')
   const id = c.req.param('id')
-  return serveEncryptedHtml(c, `${slug}/part-${id}.html`, [
-    `${slug}/walkthrough-part-${id}.html`,
-  ])
+  return serveEncryptedHtml(c, `${slug}/part-${id}.html`)
 })
 
 /* ------------------------------------------------------------------ */
@@ -741,47 +586,23 @@ async function serveBlobText(c: Context, key: string, contentType: string) {
       'Content-Type': `${contentType}; charset=utf-8`,
     })
   } catch {
-    /* Mid-migration fallback: try the legacy prefix. */
-    try {
-      const data = await blob.get(`${LEGACY_OUT_DIR}/${key}`)
-      const text = await data.text()
-      return c.text(text, 200, {
-        'Content-Type': `${contentType}; charset=utf-8`,
-      })
-    } catch {
-      return c.text('Not found', 404)
-    }
+    return c.text('Not found', 404)
   }
 }
 
-async function serveEncryptedHtml(
-  c: Context,
-  relativeKey: string,
-  legacyAlternatives: readonly string[] = [],
-) {
+async function serveEncryptedHtml(c: Context, relativeKey: string) {
   if (!cryptoKeyPromise) {
     return c.text('server missing MEANDER_ENCRYPTION_KEY', 500)
   }
   const cryptoKey = await cryptoKeyPromise
-  const attempts = [
-    `${OUT_DIR}/${relativeKey}`,
-    `${LEGACY_OUT_DIR}/${relativeKey}`,
-    ...legacyAlternatives.flatMap(alt => [
-      `${OUT_DIR}/${alt}`,
-      `${LEGACY_OUT_DIR}/${alt}`,
-    ]),
-  ]
-  for (const key of attempts) {
-    try {
-      const data = await blob.get(key)
-      const encrypted = await data.text()
-      const html = await decrypt(encrypted, cryptoKey)
-      return c.html(html)
-    } catch {
-      /* Keep trying fallback keys. */
-    }
+  try {
+    const data = await blob.get(`${OUT_DIR}/${relativeKey}`)
+    const encrypted = await data.text()
+    const html = await decrypt(encrypted, cryptoKey)
+    return c.html(html)
+  } catch {
+    return c.text('Not found', 404)
   }
-  return c.text('Not found', 404)
 }
 
 /* ------------------------------------------------------------------ */

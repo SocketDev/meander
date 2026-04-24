@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -12,6 +11,33 @@ const API_BASE = 'https://api.val.town'
 function getValSourcePath(): string {
   const thisFile = fileURLToPath(import.meta.url)
   return path.join(path.dirname(thisFile), '..', 'assets', 'val', 'index.ts')
+}
+
+/**
+ * Bundle the val's `index.ts` + its `lib/*.ts` helpers into a
+ * single Deno-compatible source string. The Val Town upload
+ * API takes one file per path; bundling sidesteps uploading
+ * the whole `lib/` tree.
+ *
+ * External: `npm:*`, `https://esm.town/*` — Deno resolves those
+ * at runtime.
+ */
+async function bundleValSource(entryPath: string): Promise<string> {
+  const esbuild = await import('esbuild')
+  const result = await esbuild.build({
+    entryPoints: [entryPath],
+    bundle: true,
+    write: false,
+    platform: 'neutral',
+    format: 'esm',
+    target: 'deno2',
+    external: ['npm:*', 'https://*', 'jsr:*'],
+  })
+  const file = result.outputFiles?.[0]
+  if (!file) {
+    throw new Error('esbuild produced no output for the val bundle')
+  }
+  return file.text
 }
 
 export type DeployValOptions = {
@@ -79,7 +105,7 @@ export async function deployVal(
   }
 
   const client = new ValTown({ bearerToken: token })
-  const valSource = readFileSync(getValSourcePath(), 'utf-8')
+  const valSource = await bundleValSource(getValSourcePath())
 
   const profile = await client.me.profile.retrieve()
   const username = profile.username ?? ''

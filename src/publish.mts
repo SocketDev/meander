@@ -83,10 +83,7 @@ export async function publish(
    * keys use. Default "pages"; consumer can override via
    * meander.config.json. Must match what deploy-val set as the
    * val's MEANDER_OUT_DIR env var — otherwise the val looks in
-   * the wrong prefix and serves 404s. The val has a backward-
-   * compat read that falls back to "walkthrough/" when the
-   * new prefix misses, so a consumer mid-rename doesn't go
-   * dark. */
+   * the wrong prefix and serves 404s. */
   const outDirName =
     typeof config.outDir === 'string' &&
     /^[a-z0-9][a-z0-9-]*$/.test(config.outDir)

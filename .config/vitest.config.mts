@@ -33,7 +33,7 @@ if (isCoverageEnabled) {
 }
 
 export default defineConfig({
-  cacheDir: './.cache/vitest',
+  cacheDir: './node_modules/.cache/vitest',
   test: {
     deps: {
       interopDefault: false,

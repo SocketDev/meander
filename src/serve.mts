@@ -120,13 +120,8 @@ export async function readWalkthroughMeta(outDir: string): Promise<{
   // Fallback: scan part-N.html files
   const entries = await fs.readdir(outDir)
   const partIds = new Set<number>()
-  /* Accept both the new `part-<n>.html` filename and the legacy
-   * `walkthrough-part-<n>.html` so a consumer regenerating over
-   * an older output dir (or serving a mid-migration deploy)
-   * still picks up the parts list. The new name is preferred;
-   * regex is anchored to one-or-the-other. */
   for (const e of entries) {
-    const m = e.match(/^(?:walkthrough-)?part-(\d+)\.html$/)
+    const m = e.match(/^part-(\d+)\.html$/)
     if (m) {
       partIds.add(Number(m[1]))
     }
@@ -173,17 +168,7 @@ export async function serve(
   } catch {
     /* fallback to default */
   }
-  /* Backward-compat: if the configured outDir doesn't exist but
-   * the legacy "walkthrough" dir does, serve from there. Lets a
-   * mid-migration consumer keep serving while they regenerate
-   * under the new name. */
-  let outDir = path.join(rootDir, outDirName)
-  if (!existsSync(outDir)) {
-    const legacyDir = path.join(rootDir, 'walkthrough')
-    if (existsSync(legacyDir)) {
-      outDir = legacyDir
-    }
-  }
+  const outDir = path.join(rootDir, outDirName)
   if (!existsSync(outDir)) {
     console.error(
       `No emit dir found at ${outDir}.\n` +
@@ -262,7 +247,7 @@ export async function serve(
         typeof addr === 'object' && addr && 'port' in addr ? addr.port : port
       const url = `http://127.0.0.1:${boundPort}${basePath}/`
       console.log(`meander serving ${outDir} at ${url}`)
-      /* v8 ignore next 3 -- slug-aware hint log; slug is empty only for legacy fallback without manifest. */
+      /* v8 ignore next 3 -- slug is empty only when the manifest.json fallback-scan path runs without a slug. */
       if (slug) {
         console.log(`  try: ${url}${slug}/part/${[...partIds][0] ?? 1}`)
       }
