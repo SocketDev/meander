@@ -1,14 +1,14 @@
 (function () {
   "use strict";
 
-  /* Symbol table: window[Symbol.for("meander:symbols")] maps
+  /* Symbol table: window[Symbol.for("meander:syms")] maps
    * each exported name to an array of locations. The array
    * shape lets us preserve overloads (same name, different
    * lines in one file) and cross-file duplicates (e.g. a
    * `parse` function in several ecosystem-specific files)
    * instead of silently dropping them like the old singleton
    * shape did. */
-  var symbols = window[Symbol.for("meander:symbols")];
+  var symbols = window[Symbol.for("meander:syms")];
   if (!symbols || typeof symbols !== "object") return;
 
   var slug = document.body.getAttribute("data-slug");

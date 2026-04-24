@@ -122,9 +122,9 @@
     if (!activePane) return;
 
     var docFile = activePane.getAttribute("data-doc-file");
-    if (!docFile || !window.__docHeadings) return;
+    if (!docFile || !window[Symbol.for("meander:toc")]) return;
 
-    var docData = window.__docHeadings.find(function (d) { return d.file === docFile; });
+    var docData = window[Symbol.for("meander:toc")].find(function (d) { return d.file === docFile; });
     if (!docData) return;
 
     var list = dropdown.querySelector(".doc-toc-list");
@@ -201,9 +201,9 @@
 
   function activeDocHasHeadings() {
     var activePane = document.querySelector(".doc-tab-pane.active");
-    if (!activePane || !window.__docHeadings) return false;
+    if (!activePane || !window[Symbol.for("meander:toc")]) return false;
     var docFile = activePane.getAttribute("data-doc-file");
-    var docData = window.__docHeadings.find(function (d) { return d.file === docFile; });
+    var docData = window[Symbol.for("meander:toc")].find(function (d) { return d.file === docFile; });
     return !!(docData && docData.headings.length > 0);
   }
 

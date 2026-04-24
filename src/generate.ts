@@ -466,7 +466,7 @@ type SymbolLocation = {
  * singleton shape did.
  *
  * Published to the page as
- * `window[Symbol.for("meander:symbols")]` so it doesn't
+ * `window[Symbol.for("meander:syms")]` so it doesn't
  * pollute the plain-property namespace.
  */
 type SymbolTable = Record<string, SymbolLocation[]>;
@@ -735,7 +735,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
       hljs.highlightElement(block);
     }
   </script>
-  <script>window[Symbol.for("meander:symbols")] = ${JSON.stringify(symbols)};</script>
+  <script>window[Symbol.for("meander:syms")] = ${JSON.stringify(symbols)};</script>
   <script>${inlineJs}</script>
 </body>
 </html>`;
@@ -849,7 +849,7 @@ function renderDocumentsHtml(
     }
   </script>
   <script>
-    window[Symbol.for("meander:doc-headings")] = ${JSON.stringify(
+    window[Symbol.for("meander:toc")] = ${JSON.stringify(
       renderedDocs.map((d) => ({ file: d.filePath, headings: d.headings }))
     )};
   </script>
