@@ -1914,3 +1914,49 @@ pre.mdr-repo-tree code {
 .mdr-jsdoc-block-desc .mdr-jsdoc-body {
   padding-left: 0;
 }
+
+/* ── Size-tier badges ────────────────────────────────────────── */
+
+.mdr-size-tier {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg-tint);
+  border: 1px solid var(--border);
+}
+
+.mdr-size-tier-x-small {
+  color: #059669;
+  background: color-mix(in srgb, #059669 10%, transparent);
+  border-color: color-mix(in srgb, #059669 30%, transparent);
+}
+
+.mdr-size-tier-small {
+  color: #0891b2;
+  background: color-mix(in srgb, #0891b2 10%, transparent);
+  border-color: color-mix(in srgb, #0891b2 30%, transparent);
+}
+
+.mdr-size-tier-medium {
+  color: #2563eb;
+  background: color-mix(in srgb, #2563eb 10%, transparent);
+  border-color: color-mix(in srgb, #2563eb 30%, transparent);
+}
+
+.mdr-size-tier-large {
+  color: #c2410c;
+  background: color-mix(in srgb, #c2410c 10%, transparent);
+  border-color: color-mix(in srgb, #c2410c 30%, transparent);
+}
+
+.mdr-size-tier-x-large {
+  color: #b91c1c;
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+  border-color: color-mix(in srgb, #b91c1c 30%, transparent);
+}

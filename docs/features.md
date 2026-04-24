@@ -198,6 +198,33 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Size-tier badges on the index
+
+**Opt-in.** When enabled, each part on the index page gets a
+t-shirt-size badge (`x-small` / `small` / `medium` / `large` /
+`x-large`) based on its total code-line count across every
+section:
+
+| Badge   | Total code lines |
+| ------- | ---------------- |
+| x-small | ≤ 100            |
+| small   | ≤ 400            |
+| medium  | ≤ 1000           |
+| large   | ≤ 2500           |
+| x-large | > 2500           |
+
+### Enabling
+
+```json
+{
+  "sizeTiers": true
+}
+```
+
+Each badge gets both a generic `.mdr-size-tier` class and a
+tier-specific `.mdr-size-tier-<tier>` class so consumers can
+re-theme them.
+
 ## Clean part URLs via `filename`
 
 **Opt-in, per-part.** Adding a `filename` field to a part

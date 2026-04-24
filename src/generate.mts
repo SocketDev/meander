@@ -105,6 +105,19 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Emit size-tier badges on the index TOC so readers can see
+   * at a glance which parts are large vs. small. Tiers are
+   * derived from total section-code lines per part:
+   *     ≤100   x-small
+   *     ≤400   small
+   *     ≤1000  medium
+   *     ≤2500  large
+   *     >2500  x-large
+   *
+   * Default: false (index renders without badges).
+   */
+  sizeTiers: Type.Optional(Type.Boolean()),
+  /**
    * Emit llms.txt (index with title + URLs + summaries) and
    * llms-full.txt (index + full markdown bodies of every doc)
    * for LLM agents following the llmstxt.org convention.
@@ -1071,6 +1084,8 @@ function renderIndexHtml(
   basePath: string,
   cssHref: string,
   headExtra: string,
+  partLineCounts: Map<number, number>,
+  sizeTiersEnabled: boolean,
 ): string {
   const docsItem = hasDocuments
     ? `<li><a href="${basePath}/${slug}/documents">Documents</a></li>\n`
@@ -1078,7 +1093,13 @@ function renderIndexHtml(
   const items = parts
     .map((part) => {
       const count = partCounts.get(part.id) ?? 0;
-      return `<li><a href="${partUrl(slug, part, basePath)}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span></li>`;
+      const tier = sizeTiersEnabled
+        ? sizeTier(partLineCounts.get(part.id) ?? 0)
+        : null;
+      const badge = tier
+        ? ` <span class="mdr-size-tier mdr-size-tier-${tier}">${tier}</span>`
+        : "";
+      return `<li><a href="${partUrl(slug, part, basePath)}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span>${badge}</li>`;
     })
     .join("\n");
 
@@ -1554,6 +1575,30 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
  * The numeric-id form is kept for back-compat so existing
  * consumers see no change.
  */
+/**
+ * Classify a line count into a t-shirt size. Tiers are skewed
+ * low to make very-small parts stand out — most tour parts
+ * land in "medium" or "small", "x-large" is reserved for the
+ * rare sweeping part.
+ */
+function sizeTier(
+  lines: number,
+): "x-small" | "small" | "medium" | "large" | "x-large" {
+  if (lines <= 100) {
+    return "x-small";
+  }
+  if (lines <= 400) {
+    return "small";
+  }
+  if (lines <= 1000) {
+    return "medium";
+  }
+  if (lines <= 2500) {
+    return "large";
+  }
+  return "x-large";
+}
+
 function partUrl(slug: string, part: { id: number; filename?: string }, basePath: string): string {
   const suffix = part.filename
     ? `${slug}/parts/${part.filename}`
@@ -1755,6 +1800,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
 
   const hasDocuments = !!(documents && documents.length > 0);
   const counts = new Map<number, number>();
+  const lineCounts = new Map<number, number>();
 
   /* Copy CSS to output dir — under `assetDir` if configured,
    * else at output root. `bundledAssetsDir` (declared above) is
@@ -1889,6 +1935,15 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
+    /* Total code lines across every section in this part — the
+     * signal sizeTier() consumes. Counts code lines, not
+     * annotation lines, since the reading effort scales with
+     * code volume more than prose. */
+    let lineTotal = 0;
+    for (const s of partSections) {
+      lineTotal += s.code.split("\n").length;
+    }
+    lineCounts.set(part.id, lineTotal);
     const html = renderPartHtml(
       slug,
       parts,
@@ -1915,6 +1970,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     basePath,
     assetHref("walkthrough.css"),
     headExtra,
+    lineCounts,
+    !!config.sizeTiers,
   );
   writeFileSync(path.join(outDir, "index.html"), await finalizeHtml(indexHtml));
 
