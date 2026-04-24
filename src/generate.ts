@@ -1297,5 +1297,22 @@ export async function generate(
   };
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(summary, null, 2) + "\n");
 
+  /* file-anchors.json — file-path → first-section anchor-id
+   * map, for consumers wiring Cmd-click-to-source links (a
+   * source file referenced from another file's prose or code
+   * jumps to its walkthrough location). One file may have many
+   * sections; the first one's id is the "entry point" anchor,
+   * same as what downstream consumers typically pick. */
+  const fileAnchors: Record<string, string> = {};
+  for (const section of sections) {
+    if (!(section.file in fileAnchors)) {
+      fileAnchors[section.file] = section.id;
+    }
+  }
+  writeFileSync(
+    join(outDir, "file-anchors.json"),
+    JSON.stringify(fileAnchors, null, 2) + "\n",
+  );
+
   console.log(`Generated ${parts.length} part files + index + manifest in ${outDir}`);
 }
