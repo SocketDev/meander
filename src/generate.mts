@@ -105,6 +105,21 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Optional hero panel content for the index page. Renders
+   * above the parts TOC.
+   *   - subtitle: a tagline shown beneath the site title.
+   *   - description: a paragraph of intro copy (supports inline
+   *     markdown — bold, italic, code, links).
+   *
+   * Default: no hero (index renders with title + plain TOC).
+   */
+  hero: Type.Optional(
+    Type.Object({
+      subtitle: Type.Optional(Type.String({ minLength: 1 })),
+      description: Type.Optional(Type.String({ minLength: 1 })),
+    }),
+  ),
+  /**
    * Emit size-tier badges on the index TOC so readers can see
    * at a glance which parts are large vs. small. Tiers are
    * derived from total section-code lines per part:
@@ -1086,22 +1101,53 @@ function renderIndexHtml(
   headExtra: string,
   partLineCounts: Map<number, number>,
   sizeTiersEnabled: boolean,
+  hero: { subtitle?: string; description?: string } | undefined,
 ): string {
-  const docsItem = hasDocuments
-    ? `<li><a href="${basePath}/${slug}/documents">Documents</a></li>\n`
-    : "";
-  const items = parts
+  /* Parts render as a card grid. Each card shows number + title,
+   * the part's own objective as the card description, section
+   * count, and an optional size-tier badge. Plain <ul> fallback
+   * goes away — the card layout collapses gracefully on mobile
+   * via CSS grid auto-fit, so no separate mobile branch. */
+  const partCards = parts
     .map((part) => {
       const count = partCounts.get(part.id) ?? 0;
       const tier = sizeTiersEnabled
         ? sizeTier(partLineCounts.get(part.id) ?? 0)
         : null;
       const badge = tier
-        ? ` <span class="mdr-size-tier mdr-size-tier-${tier}">${tier}</span>`
+        ? `<span class="mdr-size-tier mdr-size-tier-${tier}">${tier}</span>`
         : "";
-      return `<li><a href="${partUrl(slug, part, basePath)}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span>${badge}</li>`;
+      return `<a class="mdr-toc-card" href="${partUrl(slug, part, basePath)}">
+          <span class="mdr-toc-card-header">
+            <span class="mdr-toc-card-num">Part ${part.id}</span>
+            ${badge}
+          </span>
+          <span class="mdr-toc-card-title">${escapeHtml(part.title)}</span>
+          <span class="mdr-toc-card-desc">${escapeHtml(part.objective)}</span>
+          <span class="mdr-toc-card-meta">${count} section${count === 1 ? "" : "s"}</span>
+        </a>`;
     })
     .join("\n");
+
+  const docsCard = hasDocuments
+    ? `<a class="mdr-toc-card mdr-toc-card-docs" href="${basePath}/${slug}/documents">
+          <span class="mdr-toc-card-header">
+            <span class="mdr-toc-card-num">Docs</span>
+          </span>
+          <span class="mdr-toc-card-title">Reference documents</span>
+          <span class="mdr-toc-card-desc">Companion markdown docs for this walkthrough.</span>
+        </a>`
+    : "";
+
+  /* Hero is optional; consumer provides subtitle + description.
+   * Inline markdown (bold, italic, code, links) is supported in
+   * description via marked.parseInline. Subtitle is plain text. */
+  const heroHtml = hero
+    ? `<section class="mdr-hero">
+    ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ""}
+    ${hero.description ? `<p class="mdr-hero-desc">${marked.parseInline(hero.description) as string}</p>` : ""}
+  </section>`
+    : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -1115,15 +1161,16 @@ function renderIndexHtml(
 <body>
   <header class="topbar">
     <h1>${escapeHtml(title)}</h1>
-    <p>Generated from multiline source comments in Part Plan order.</p>
   </header>
-  <main style="padding: 16px; max-width: 900px;">
-    <div class="annotation-card">
-      <h3>Parts</h3>
-      <ul>
-        ${docsItem}${items}
-      </ul>
-    </div>
+  <main class="mdr-index">
+    ${heroHtml}
+    <section class="mdr-toc">
+      <h2>Parts</h2>
+      <div class="mdr-toc-grid">
+        ${partCards}
+        ${docsCard}
+      </div>
+    </section>
   </main>
 </body>
 </html>`;
@@ -1972,6 +2019,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     headExtra,
     lineCounts,
     !!config.sizeTiers,
+    config.hero,
   );
   writeFileSync(path.join(outDir, "index.html"), await finalizeHtml(indexHtml));
 

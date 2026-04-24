@@ -198,6 +198,43 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Index page — hero panel + TOC card grid
+
+The index page now renders as a card grid of parts rather than
+a plain `<ul>`. Each card shows:
+
+- Part number + optional size-tier badge on the top row.
+- Part title.
+- The part's `objective` field as the card description.
+- Section count at the bottom.
+
+Docs (when present) get their own card at the end of the grid.
+
+### Optional hero panel
+
+```json
+{
+  "hero": {
+    "subtitle": "A walkthrough of the package-url/purl-spec implementation",
+    "description": "Inline **markdown** is supported, including `code` and [links](https://example.com)."
+  }
+}
+```
+
+- `subtitle`: short tagline shown beneath the title. Plain
+  text.
+- `description`: one-paragraph intro. Renders inline markdown
+  (bold, italic, code, links).
+
+Both are optional; omit the whole `hero` key to skip the panel.
+
+### Layout
+
+The grid uses `grid-template-columns: repeat(auto-fill,
+minmax(280px, 1fr))`, so cards reflow from multi-column on
+wide viewports to single-column on mobile without a separate
+media-query branch.
+
 ## Size-tier badges on the index
 
 **Opt-in.** When enabled, each part on the index page gets a
