@@ -198,6 +198,30 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Footer
+
+**On by default.** Every page renders a small attribution
+footer at the bottom ("Built with meander" → upstream repo).
+
+### Opt out
+
+```json
+{
+  "footer": false
+}
+```
+
+### Customize
+
+```json
+{
+  "footer": {
+    "text": "© 2026 My Company",
+    "href": "https://example.com"
+  }
+}
+```
+
 ## Index page — hero panel + TOC card grid
 
 The index page now renders as a card grid of parts rather than

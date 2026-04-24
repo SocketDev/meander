@@ -105,6 +105,22 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Footer control. Defaults to `true` — meander emits a small
+   * attribution footer on every page. Set `false` to omit.
+   *
+   * Pass an object to customize text / link:
+   *   { footer: { text: "Built with meander", href: "https://..." } }
+   */
+  footer: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        text: Type.Optional(Type.String({ minLength: 1 })),
+        href: Type.Optional(Type.String({ minLength: 1 })),
+      }),
+    ]),
+  ),
+  /**
    * Optional hero panel content for the index page. Renders
    * above the parts TOC.
    *   - subtitle: a tagline shown beneath the site title.
@@ -929,6 +945,7 @@ function renderPartHtml(
   basePath: string,
   cssHref: string,
   headExtra: string,
+  footerHtml: string,
 ): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
@@ -1077,6 +1094,7 @@ ${sectionRows}
   <main class="files-stack">
     ${fileBlocks || '<div class="empty">No walkthrough sections matched this part.</div>'}
   </main>
+  ${footerHtml}
 
   ${HLJS_SCRIPT_JS}
   <script>
@@ -1102,6 +1120,7 @@ function renderIndexHtml(
   partLineCounts: Map<number, number>,
   sizeTiersEnabled: boolean,
   hero: { subtitle?: string; description?: string } | undefined,
+  footerHtml: string,
 ): string {
   /* Parts render as a card grid. Each card shows number + title,
    * the part's own objective as the card description, section
@@ -1172,6 +1191,7 @@ function renderIndexHtml(
       </div>
     </section>
   </main>
+  ${footerHtml}
 </body>
 </html>`;
 }
@@ -1191,6 +1211,7 @@ function renderDocumentsHtml(
   basePath: string,
   cssHref: string,
   headExtra: string,
+  footerHtml: string,
 ): string {
   // Build tab bar
   const tabButtons = renderedDocs
@@ -1242,6 +1263,7 @@ function renderDocumentsHtml(
   <main class="doc-container">
     ${tabPanes}
   </main>
+  ${footerHtml}
 
   ${HLJS_SCRIPT_JS}
   <script>
@@ -1623,6 +1645,27 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
  * consumers see no change.
  */
 /**
+ * Build the standard footer HTML for a page. Renders meander's
+ * attribution by default; consumers can override the text and
+ * link or disable entirely via config.footer.
+ */
+function renderFooter(
+  footer: boolean | { text?: string; href?: string } | undefined,
+): string {
+  if (footer === false) {
+    return "";
+  }
+  const defaultText = "Built with meander";
+  const defaultHref = "https://github.com/divmain/meander";
+  const cfg = typeof footer === "object" ? footer : {};
+  const text = cfg.text ?? defaultText;
+  const href = cfg.href ?? defaultHref;
+  return `<footer class="mdr-footer">
+    <a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>
+  </footer>`;
+}
+
+/**
  * Classify a line count into a t-shirt size. Tiers are skewed
  * low to make very-small parts stand out — most tour parts
  * land in "medium" or "small", "x-large" is reserved for the
@@ -1946,6 +1989,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * light theme on dark-preferring systems. */
   const headJsTag = `<script>${headJs}</script>`;
   const headExtra = [faviconTags, themeColorTags, headJsTag].filter(Boolean).join("\n  ");
+  const footerHtml = renderFooter(config.footer);
 
   /* Post-render security pass. CSP runs first because it hashes
    * inline <script>/<style> bodies — running SRI first would
@@ -2002,6 +2046,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       basePath,
       assetHref("walkthrough.css"),
       headExtra,
+      footerHtml,
     );
     const partOut = path.join(outDir, partOutputFilename(part));
     mkdirSync(path.dirname(partOut), { recursive: true });
@@ -2020,6 +2065,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     lineCounts,
     !!config.sizeTiers,
     config.hero,
+    footerHtml,
   );
   writeFileSync(path.join(outDir, "index.html"), await finalizeHtml(indexHtml));
 
@@ -2072,6 +2118,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       basePath,
       assetHref("walkthrough.css"),
       headExtra,
+      footerHtml,
     );
     writeFileSync(path.join(outDir, "documents.html"), await finalizeHtml(documentsHtml));
     console.log(`Generated documents.html with ${documents.length} documents`);
