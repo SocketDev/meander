@@ -83,10 +83,30 @@ const FaviconSchema = Type.Union([
   }),
 ]);
 
+/**
+ * Doc entry. Shorthand `"path/to/file.md"` is equivalent to
+ * `{ source: "path/to/file.md" }`. Full object form supports
+ * optional `filename` (enables /slug/docs/<filename> URLs
+ * in llms.txt), `title` (override for link labels; defaults
+ * to the markdown file's h1 or basename), and `summary`
+ * (shown in llms.txt alongside the link).
+ */
+const DocEntrySchema = Type.Union([
+  Type.String({ minLength: 1 }),
+  Type.Object({
+    source: Type.String({ minLength: 1 }),
+    filename: Type.Optional(
+      Type.String({ pattern: "^[a-z0-9][a-z0-9-]*$", minLength: 1 }),
+    ),
+    title: Type.Optional(Type.String({ minLength: 1 })),
+    summary: Type.Optional(Type.String({ minLength: 1 })),
+  }),
+]);
+
 const WalkthroughConfigSchema = Type.Object({
   slug: Type.String({ minLength: 1, pattern: "^[a-z0-9][a-z0-9-]*$" }),
   title: Type.String({ minLength: 1 }),
-  documents: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
+  documents: Type.Optional(Type.Array(DocEntrySchema, { minItems: 1 })),
   parts: Type.Array(WalkthroughPartSchema, { minItems: 1 }),
   /**
    * Opt out of the inlined comment-client bundle when the
@@ -1212,7 +1232,7 @@ type RenderedDocData = {
 function renderDocumentsHtml(
   slug: string,
   parts: readonly WalkthroughPart[],
-  documents: string[],
+  documents: readonly NormalizedDocEntry[],
   renderedDocs: RenderedDocData[],
   inlineJs: string,
   basePath: string,
@@ -1623,11 +1643,13 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
     throw new Error(`Invalid walkthrough config at ${resolved}:\n${messages}`);
   }
 
-  /* Filename uniqueness — the regex at the schema level enforces
-   * the shape ([a-z0-9][a-z0-9-]*), but the "no two parts share
-   * a filename" check has to be cross-part. Same for docs if we
-   * later add filename to docs. */
-  const seenFilenames = new Map<string, number>();
+  /* Filename uniqueness — the schema regex enforces the shape
+   * ([a-z0-9][a-z0-9-]*), but "no two sources share a filename"
+   * has to be cross-checked here. Parts + docs share the same
+   * namespace (both emit to /<slug>/parts/<name> vs
+   * /<slug>/docs/<name> — different subdirs, but a shared
+   * filename would still be confusing, so forbid it). */
+  const seenFilenames = new Map<string, string>();
   for (const part of raw.parts) {
     const fn = part.filename;
     if (!fn) {
@@ -1636,10 +1658,28 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
     const prev = seenFilenames.get(fn);
     if (prev !== undefined) {
       throw new Error(
-        `${resolved}: parts ${prev} and ${part.id} both have filename "${fn}". Filenames must be unique.`,
+        `${resolved}: filename "${fn}" is used by both ${prev} and part ${part.id}. Filenames must be unique across parts and docs.`,
       );
     }
-    seenFilenames.set(fn, part.id);
+    seenFilenames.set(fn, `part ${part.id}`);
+  }
+  if (raw.documents) {
+    for (const d of raw.documents) {
+      if (typeof d === "string") {
+        continue;
+      }
+      const fn = d.filename;
+      if (!fn) {
+        continue;
+      }
+      const prev = seenFilenames.get(fn);
+      if (prev !== undefined) {
+        throw new Error(
+          `${resolved}: filename "${fn}" is used by both ${prev} and doc "${d.source}". Filenames must be unique across parts and docs.`,
+        );
+      }
+      seenFilenames.set(fn, `doc "${d.source}"`);
+    }
   }
 
   return raw;
@@ -1670,6 +1710,38 @@ function renderFooter(
   return `<footer class="mdr-footer">
     <a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>
   </footer>`;
+}
+
+/**
+ * Normalized doc entry shape. Consumers pass strings or full
+ * objects; the generator walks this shape everywhere.
+ */
+type NormalizedDocEntry = {
+  source: string;
+  filename: string | undefined;
+  title: string | undefined;
+  summary: string | undefined;
+};
+
+function normalizeDocs(
+  docs:
+    | ReadonlyArray<string | { source: string; filename?: string; title?: string; summary?: string }>
+    | undefined,
+): NormalizedDocEntry[] {
+  if (!docs) {
+    return [];
+  }
+  return docs.map((d): NormalizedDocEntry => {
+    if (typeof d === "string") {
+      return { source: d, filename: undefined, title: undefined, summary: undefined };
+    }
+    return {
+      source: d.source,
+      filename: d.filename,
+      title: d.title,
+      summary: d.summary,
+    };
+  });
 }
 
 /**
@@ -1806,7 +1878,13 @@ export async function generate(
   options: GenerateOptions = { __proto__: null } as GenerateOptions,
 ): Promise<void> {
   const config = loadAndValidateConfig(configPath);
-  const { slug, title, parts, documents } = config;
+  const { slug, title, parts } = config;
+  /* Normalize doc entries: the schema accepts string shorthand
+   * ("path/to/file.md") and full objects ({ source, filename?,
+   * title?, summary? }). Everything downstream works against the
+   * normalized shape. Call sites that just need the source path
+   * can read `.source`. */
+  const documents = normalizeDocs(config.documents);
   const basePath = normaliseBasePath(options.basePath);
   const assetDir = normaliseAssetDir(options.assetDir);
   /* URL prefix for asset <href>/<src>: `{basePath}/{assetDir}/`.
@@ -1824,27 +1902,21 @@ export async function generate(
   const rootDir = path.resolve(configPath, "..");
 
   // Validate documents if present
-  if (documents && documents.length > 0) {
-    // Check for duplicates
+  if (documents.length > 0) {
     const seen = new Set<string>();
-    for (const docPath of documents) {
-      if (seen.has(docPath)) {
-        throw new Error(`Duplicate document path: ${docPath}`);
+    for (const d of documents) {
+      if (seen.has(d.source)) {
+        throw new Error(`Duplicate document path: ${d.source}`);
       }
-      seen.add(docPath);
-    }
-
-    // Validate each path ends with .md and exists
-    for (const docPath of documents) {
-      if (!docPath.endsWith(".md")) {
-        throw new Error(`Document path must end with .md: ${docPath}`);
+      seen.add(d.source);
+      if (!d.source.endsWith(".md")) {
+        throw new Error(`Document path must end with .md: ${d.source}`);
       }
-      const fullPath = path.join(rootDir, docPath);
+      const fullPath = path.join(rootDir, d.source);
       if (!existsSync(fullPath)) {
-        throw new Error(`Document file not found: ${docPath}`);
+        throw new Error(`Document file not found: ${d.source}`);
       }
     }
-
     console.log(`Documents: ${documents.length} files`);
   }
   const outDir = path.join(rootDir, "walkthrough");
@@ -2134,17 +2206,18 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       typeof config.mermaid === "object" ? config.mermaid.theme : undefined
     ) ?? "default";
     const renderedDocs: RenderedDocData[] = [];
-    for (const [index, docPath] of documents.entries()) {
-      const fullPath = path.join(rootDir, docPath);
+    const docPaths = documents.map((d) => d.source);
+    for (const [index, d] of documents.entries()) {
+      const fullPath = path.join(rootDir, d.source);
       const rendered = await renderMarkdownDocument(
         fullPath,
         index,
-        documents,
+        docPaths,
         mermaidRenderer ?? undefined,
         mermaidTheme,
       );
       renderedDocs.push({
-        filePath: docPath,
+        filePath: d.source,
         html: rendered.html,
         headings: rendered.headings,
       });
@@ -2172,7 +2245,11 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     slug,
     title,
     hasDocuments: hasDocuments,
-    documents: documents ?? [],
+    /* manifest.documents keeps the legacy string[] shape (paths
+     * only) so consumers parsing the manifest aren't broken by
+     * the schema expansion. Extended metadata is available via
+     * the richer walkthrough.json they already have. */
+    documents: documents.map((d) => d.source),
     parts: parts.map((part) => {
       const partSections = sectionsByPart.get(part.id) ?? [];
       return {
@@ -2212,10 +2289,16 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       const url = abs(partUrl(slug, part, basePath));
       return `- [Part ${part.id}: ${part.title}](${url}): ${part.objective}`;
     });
-    const docLines = (documents ?? []).map((docPath) => {
-      const url = abs(`${basePath}/${slug}/documents#${encodeURIComponent(docPath)}`);
-      const name = docPath.split("/").pop() ?? docPath;
-      return `- [${name}](${url})`;
+    const docLines = documents.map((d) => {
+      /* Prefer the clean /slug/docs/<filename> URL when the
+       * consumer set a filename; fall back to the legacy
+       * #anchor form on the combined documents page. */
+      const url = d.filename
+        ? abs(`${basePath}/${slug}/docs/${d.filename}`)
+        : abs(`${basePath}/${slug}/documents#${encodeURIComponent(d.source)}`);
+      const name = d.title ?? d.source.split("/").pop() ?? d.source;
+      const summary = d.summary ? ` — ${d.summary}` : "";
+      return `- [${name}](${url})${summary}`;
     });
     const lines: string[] = [
       `# ${title}`,
@@ -2235,13 +2318,13 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
      * annotations (no standalone markdown), so they're
      * surfaced by URL reference only. */
     const fullChunks: string[] = [llmsTxt];
-    for (const docPath of documents ?? []) {
-      const fullDocPath = path.join(rootDir, docPath);
+    for (const d of documents) {
+      const fullDocPath = path.join(rootDir, d.source);
       if (!existsSync(fullDocPath)) {
         continue;
       }
       const body = readFileSync(fullDocPath, "utf-8");
-      fullChunks.push("\n\n---\n\n", `# ${docPath}\n\n`, body);
+      fullChunks.push("\n\n---\n\n", `# ${d.source}\n\n`, body);
     }
     writeFileSync(path.join(outDir, "llms-full.txt"), fullChunks.join(""));
   }

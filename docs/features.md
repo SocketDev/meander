@@ -361,6 +361,41 @@ Each badge gets both a generic `.mdr-size-tier` class and a
 tier-specific `.mdr-size-tier-<tier>` class so consumers can
 re-theme them.
 
+## Doc entries — rich form with `filename`, `title`, `summary`
+
+Docs can be either a plain path string (shorthand) or an object
+with extra metadata:
+
+```json
+{
+  "documents": [
+    "docs/api.md",
+    {
+      "source": "docs/README.md",
+      "filename": "readme",
+      "title": "Overview",
+      "summary": "Start here"
+    }
+  ]
+}
+```
+
+Fields:
+- `source` (required): path to the markdown file, relative to
+  `walkthrough.json`.
+- `filename` (optional): URL-friendly slug. When set, links in
+  `llms.txt` point at `/slug/docs/<filename>` instead of the
+  legacy `#anchor` form on the combined documents page. Must be
+  `[a-z0-9][a-z0-9-]*` and unique across all parts + docs.
+- `title` (optional): overrides the default doc title (which
+  otherwise falls back to the filename). Used by `llms.txt` and
+  future nav surfaces.
+- `summary` (optional): one-line description shown in
+  `llms.txt` next to the link.
+
+String shorthand (`"docs/foo.md"`) remains supported and
+equivalent to `{ source: "docs/foo.md" }`.
+
 ## Clean part URLs via `filename`
 
 **Opt-in, per-part.** Adding a `filename` field to a part
