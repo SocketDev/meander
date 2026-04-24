@@ -48,4 +48,40 @@
       run();
     }
   };
+
+  /* Run `fn` once hljs has tokenized the first `.line-code code`
+   * block. hljs splits text nodes when it runs, so any module
+   * that walks the tokenized tree (hotlinks, inline-tokenizer)
+   * has to wait or its <a>/<span> wraps get blown away. 1.5s cap
+   * + once-guard so a slow CDN can't stall work, and the observer
+   * + timeout can't both fire. Resolves immediately if there are
+   * no code blocks or hljs already ran. */
+  ns.onHljsReady = (fn) => {
+    ns.onReady(() => {
+      const codes = document.querySelectorAll(".line-code code");
+      let fired = false;
+      const once = () => {
+        if (fired) {
+          return;
+        }
+        fired = true;
+        safe("onHljsReady", fn);
+      };
+      if (codes.length === 0 || codes[0].classList.contains("hljs")) {
+        once();
+        return;
+      }
+      const obs = new MutationObserver(() => {
+        if (codes[0].classList.contains("hljs")) {
+          obs.disconnect();
+          once();
+        }
+      });
+      obs.observe(codes[0], { attributes: true, attributeFilter: ["class"] });
+      setTimeout(() => {
+        obs.disconnect();
+        once();
+      }, 1500);
+    });
+  };
 })();

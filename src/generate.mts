@@ -863,6 +863,14 @@ ${fileEntries
     })
     .join("\n");
 
+  /* hotlinks.js reads this to resolve `./foo.js` quoted paths
+   * inside code back to a .file-block anchor on this page.
+   * Tuple form keeps the JSON small when a part has many
+   * files. */
+  const fileAnchorData = JSON.stringify(
+    fileEntries.map((f) => [f.path, f.anchor]),
+  );
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -873,7 +881,7 @@ ${fileEntries
   <link rel="stylesheet" href="${cssHref}" />
   ${HLJS_LINK_CSS}
 </head>
-<body data-slug="${escapeHtml(slug)}" data-part="${part.id}">
+<body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'>
   <header class="topbar">
     <h1>Part ${part.id}: ${escapeHtml(part.title)}</h1>
     <p>${escapeHtml(part.objective)}</p>
@@ -1469,6 +1477,7 @@ export async function generate(
   const themeJs = readFileSync(path.join(bundledAssetsDir, "theme.js"), "utf-8");
   const splitterJs = readFileSync(path.join(bundledAssetsDir, "splitter.js"), "utf-8");
   const filesMenuJs = readFileSync(path.join(bundledAssetsDir, "files-menu.js"), "utf-8");
+  const hotlinksJs = readFileSync(path.join(bundledAssetsDir, "hotlinks.js"), "utf-8");
   const headJs = [bootJs, themeJs].join("\n");
   /* Comment-client bundle — only inlined when comments are
    * enabled. Consumers shipping their own system (e.g. encrypted
@@ -1485,8 +1494,8 @@ export async function generate(
     ? readFileSync(path.join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
-    ? [splitterJs, filesMenuJs, lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
-    : [splitterJs, filesMenuJs, lineSelectJs, srefJs].join("\n");
+    ? [splitterJs, filesMenuJs, hotlinksJs, lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
+    : [splitterJs, filesMenuJs, hotlinksJs, lineSelectJs, srefJs].join("\n");
   const documentsInlineJs = commentsEnabled
     ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
     : [blockSelectJs, docTabsJs, docTocJs].join("\n");

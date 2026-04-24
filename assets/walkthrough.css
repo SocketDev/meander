@@ -1660,6 +1660,30 @@ h4:hover .wt-heading-anchor,
   text-decoration: none;
 }
 
+/* hotlinks.js — Cmd/Ctrl-click URLs/paths inside code cells.
+ * Invisible at rest (inherit color, no underline, no pointer)
+ * so the code cell reads as plain text. body.wt-mod-pressed
+ * is flipped on when the user holds the modifier key and
+ * flips back off on keyup/blur — that's the visible state. */
+.wt-src-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: text;
+}
+
+body.wt-mod-pressed .wt-src-link {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+
+body.wt-mod-pressed .wt-src-link:hover {
+  text-decoration-color: var(--accent);
+  color: var(--accent);
+}
+
 /* enhanceRepoTrees — ASCII directory trees (├── └── │).
  * Dim the drawing glyphs so the filename + annotation columns
  * read as the signal. `nohighlight` on the inner <code> tells
