@@ -36,7 +36,7 @@ async function main() {
           options.assetDir = arg.slice("--asset-dir=".length);
         }
       }
-      const { generate } = await import("./generate.mjs");
+      const { generate } = await import("./generate.mts");
       await generate(configPath, options);
       break;
     }
@@ -47,14 +47,48 @@ async function main() {
         process.exitCode = 1;
         return;
       }
-      const { publish } = await import("./publish.mjs");
+      const { publish } = await import("./publish.mts");
       await publish(configPath);
       break;
     }
     case "deploy-val": {
       const valName = process.argv[3] || "walkthrough";
-      const { deployVal } = await import("./deploy-val.mjs");
+      const { deployVal } = await import("./deploy-val.mts");
       await deployVal(valName);
+      break;
+    }
+    case "serve": {
+      /* Local preview server. Generate first, then serve so
+       * the output reflects the latest source. Port defaults
+       * to 8080; --port N and --base-path /prefix supported. */
+      const args = process.argv.slice(3);
+      const configPath = args.find((a) => !a.startsWith("--"));
+      if (!configPath) {
+        console.error("Usage: meander serve <walkthrough.json> [--port N] [--base-path <path>]");
+        process.exitCode = 1;
+        return;
+      }
+      const options: {
+        port?: number | undefined;
+        basePath?: string | undefined;
+        __proto__: null;
+      } = { __proto__: null };
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i]!;
+        if (arg === "--port") {
+          options.port = Number(args[++i]);
+        } else if (arg.startsWith("--port=")) {
+          options.port = Number(arg.slice("--port=".length));
+        } else if (arg === "--base-path") {
+          options.basePath = args[++i];
+        } else if (arg.startsWith("--base-path=")) {
+          options.basePath = arg.slice("--base-path=".length);
+        }
+      }
+      const { generate } = await import("./generate.mts");
+      await generate(configPath, { basePath: options.basePath });
+      const { serve } = await import("./serve.mts");
+      await serve(configPath, options);
       break;
     }
     default: {
@@ -62,6 +96,7 @@ async function main() {
 
 Commands:
   meander generate <walkthrough.json>   Generate walkthrough HTML
+  meander serve <walkthrough.json>      Generate + start local preview
   meander publish <walkthrough.json>    Publish HTML to Val Town blob storage
   meander deploy-val [val-name]         Deploy or update the Val Town val
 

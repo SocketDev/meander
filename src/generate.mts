@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { copyFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { extname, join, resolve, dirname } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { marked, Marked, Renderer, type Tokens } from "marked";
 
@@ -11,7 +11,7 @@ import {
   isScopedPackage,
   isUrl,
   _PURL_RE,
-} from "./classifiers.mjs";
+} from "./classifiers.mts";
 
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
@@ -141,7 +141,7 @@ const FILE_LANG: Record<string, string> = {
 function getAssetsDir(): string {
   const thisFile = fileURLToPath(import.meta.url);
   // In dist/generate.js → assets is at ../assets
-  return join(dirname(thisFile), "..", "assets");
+  return path.join(path.dirname(thisFile), "..", "assets");
 }
 
 /* ------------------------------------------------------------------ */
@@ -211,7 +211,7 @@ function scoreForPart(part: WalkthroughPart, file: string, blockText: string): n
 }
 
 function getLanguageClass(file: string): string {
-  return FILE_LANG[extname(file)] ?? "plaintext";
+  return FILE_LANG[path.extname(file)] ?? "plaintext";
 }
 
 function stripMultilineCommentsPreserveLines(code: string): string {
@@ -596,11 +596,11 @@ function uniqueFiles(parts: readonly WalkthroughPart[]): string[] {
 function loadSources(rootDir: string, files: readonly string[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const file of files) {
-    const path = join(rootDir, file);
-    if (!existsSync(path)) {
+    const fullPath = path.join(rootDir, file);
+    if (!existsSync(fullPath)) {
       throw new Error(`Missing file from part plan: ${file}`);
     }
-    map.set(file, readFileSync(path, "utf-8"));
+    map.set(file, readFileSync(fullPath, "utf-8"));
   }
   return map;
 }
@@ -984,7 +984,7 @@ function resolveDocRef(
   // Resolve the target path relative to the current document's directory.
   // This handles ./, ../, and plain filenames uniformly.
   // All doc paths use forward slashes (they come from the config JSON).
-  const currentDir = dirname(currentDocPath).replace(/\\/g, "/");
+  const currentDir = path.dirname(currentDocPath).replace(/\\/g, "/");
   const base = currentDir === "." ? targetPath : `${currentDir}/${targetPath}`;
   // Normalize away any ../ or ./ segments, keeping forward slashes
   const resolvedTarget = base
@@ -1217,7 +1217,7 @@ function renderMarkdownDocument(
 /* ------------------------------------------------------------------ */
 
 function loadAndValidateConfig(filePath: string): WalkthroughConfig {
-  const resolved = resolve(filePath);
+  const resolved = path.resolve(filePath);
   const raw: unknown = JSON.parse(readFileSync(resolved, "utf-8"));
 
   if (!Value.Check(WalkthroughConfigSchema, raw)) {
@@ -1299,7 +1299,10 @@ export async function generate(
     return "/" + segments.join("/");
   };
 
-  const rootDir = process.cwd();
+  /* Resolve paths against the directory containing
+   * walkthrough.json, not the caller's cwd. Lets `meander
+   * generate /any/path/walkthrough.json` work from any cwd. */
+  const rootDir = path.resolve(configPath, "..");
 
   // Validate documents if present
   if (documents && documents.length > 0) {
@@ -1317,7 +1320,7 @@ export async function generate(
       if (!docPath.endsWith(".md")) {
         throw new Error(`Document path must end with .md: ${docPath}`);
       }
-      const fullPath = join(rootDir, docPath);
+      const fullPath = path.join(rootDir, docPath);
       if (!existsSync(fullPath)) {
         throw new Error(`Document file not found: ${docPath}`);
       }
@@ -1325,7 +1328,7 @@ export async function generate(
 
     console.log(`Documents: ${documents.length} files`);
   }
-  const outDir = join(rootDir, "walkthrough");
+  const outDir = path.join(rootDir, "walkthrough");
   mkdirSync(outDir, { recursive: true });
 
   const files = uniqueFiles(parts);
@@ -1337,24 +1340,24 @@ export async function generate(
   /* Non-comment scripts — always inlined (line-select is nav-ish
    * UX, sref is the symbol-reference link feature, doc-tabs/doc-toc
    * power the documents page layout). */
-  const lineSelectJs = readFileSync(join(bundledAssetsDir, "line-select.js"), "utf-8");
-  const srefJs = readFileSync(join(bundledAssetsDir, "sref.js"), "utf-8");
-  const docTabsJs = readFileSync(join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
-  const blockSelectJs = readFileSync(join(bundledAssetsDir, "block-select.js"), "utf-8");
-  const docTocJs = readFileSync(join(bundledAssetsDir, "doc-toc.js"), "utf-8");
+  const lineSelectJs = readFileSync(path.join(bundledAssetsDir, "line-select.js"), "utf-8");
+  const srefJs = readFileSync(path.join(bundledAssetsDir, "sref.js"), "utf-8");
+  const docTabsJs = readFileSync(path.join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
+  const blockSelectJs = readFileSync(path.join(bundledAssetsDir, "block-select.js"), "utf-8");
+  const docTocJs = readFileSync(path.join(bundledAssetsDir, "doc-toc.js"), "utf-8");
   /* Comment-client bundle — only inlined when comments are
    * enabled. Consumers shipping their own system (e.g. encrypted
    * or SSO-gated) can set `comments: false` in walkthrough.json
    * to drop the default client + its API-endpoint assumptions. */
   const commentsEnabled = config.comments !== false;
   const commentClientJs = commentsEnabled
-    ? readFileSync(join(bundledAssetsDir, "comment-client.js"), "utf-8")
+    ? readFileSync(path.join(bundledAssetsDir, "comment-client.js"), "utf-8")
     : "";
   const unresolvedJs = commentsEnabled
-    ? readFileSync(join(bundledAssetsDir, "unresolved-comments.js"), "utf-8")
+    ? readFileSync(path.join(bundledAssetsDir, "unresolved-comments.js"), "utf-8")
     : "";
   const exportJs = commentsEnabled
-    ? readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8")
+    ? readFileSync(path.join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
     ? [lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
@@ -1381,10 +1384,10 @@ export async function generate(
    * the npm-package-bundled asset *source* path; `assetDir` is
    * the user-chosen emit subdir. Must land before renders so
    * the cssHref in emitted HTML resolves correctly. */
-  const css = readFileSync(join(bundledAssetsDir, "walkthrough.css"), "utf-8");
-  const cssOutDir = assetDir ? join(outDir, assetDir) : outDir;
+  const css = readFileSync(path.join(bundledAssetsDir, "walkthrough.css"), "utf-8");
+  const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir;
   mkdirSync(cssOutDir, { recursive: true });
-  writeFileSync(join(cssOutDir, "walkthrough.css"), css);
+  writeFileSync(path.join(cssOutDir, "walkthrough.css"), css);
 
   /* Copy favicon assets. Default: meander ships a bezel-derived
    * set (svg + ico + sized pngs + apple-touch-icon). Consumer
@@ -1404,7 +1407,7 @@ export async function generate(
   };
   const faviconAssets: FaviconAssets = {};
   if (faviconEnabled) {
-    const bundledFavDir = join(bundledAssetsDir, "favicon");
+    const bundledFavDir = path.join(bundledAssetsDir, "favicon");
     const override = (faviconOpt && typeof faviconOpt === "object")
       ? faviconOpt
       : null;
@@ -1414,7 +1417,7 @@ export async function generate(
      * provided or doesn't exist. */
     const resolveOverride = (p?: string): string | undefined => {
       if (!p) return undefined;
-      const full = resolve(rootDir, p);
+      const full = path.resolve(rootDir, p);
       return existsSync(full) ? full : undefined;
     };
     const slots: Array<[keyof FaviconAssets, string, string | undefined]> = [
@@ -1427,9 +1430,9 @@ export async function generate(
     ];
     for (const [slot, outName, overridePath] of slots) {
       const src = resolveOverride(overridePath)
-        ?? join(bundledFavDir, outName);
+        ?? path.join(bundledFavDir, outName);
       if (!existsSync(src)) continue;
-      copyFileSync(src, join(outDir, outName));
+      copyFileSync(src, path.join(outDir, outName));
       faviconAssets[slot] = outName;
     }
   }
@@ -1471,15 +1474,15 @@ export async function generate(
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
     const html = renderPartHtml(slug, parts, part, partSections, inlineJs, symbols, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
-    writeFileSync(join(outDir, `walkthrough-part-${part.id}.html`), html);
+    writeFileSync(path.join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
   const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
-  writeFileSync(join(outDir, "index.html"), indexHtml);
+  writeFileSync(path.join(outDir, "index.html"), indexHtml);
 
   if (documents && documents.length > 0) {
     const renderedDocs: RenderedDocData[] = documents.map((docPath, index) => {
-      const fullPath = join(rootDir, docPath);
+      const fullPath = path.join(rootDir, docPath);
       const rendered = renderMarkdownDocument(fullPath, index, documents);
       return {
         filePath: docPath,
@@ -1488,7 +1491,7 @@ export async function generate(
       };
     });
     const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs, basePath, assetHref("walkthrough.css"), headExtra);
-    writeFileSync(join(outDir, "documents.html"), documentsHtml);
+    writeFileSync(path.join(outDir, "documents.html"), documentsHtml);
     console.log(`Generated documents.html with ${documents.length} documents`);
   }
 
@@ -1519,7 +1522,7 @@ export async function generate(
       };
     }),
   };
-  writeFileSync(join(outDir, "manifest.json"), JSON.stringify(summary, null, 2) + "\n");
+  writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(summary, null, 2) + "\n");
 
   /* file-anchors.json — file-path → first-section anchor-id
    * map, for consumers wiring Cmd-click-to-source links (a
@@ -1534,7 +1537,7 @@ export async function generate(
     }
   }
   writeFileSync(
-    join(outDir, "file-anchors.json"),
+    path.join(outDir, "file-anchors.json"),
     JSON.stringify(fileAnchors, null, 2) + "\n",
   );
 

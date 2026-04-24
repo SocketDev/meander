@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { deriveKey, encrypt } from "./crypto.mjs";
+import path from "node:path";
+import { deriveKey, encrypt } from "./crypto.mts";
 
 const API_BASE = "https://api.val.town";
 
@@ -34,36 +34,36 @@ export async function publish(configPath: string): Promise<void> {
   }
 
   const key = deriveKey(password);
-  const resolved = resolve(configPath);
+  const resolved = path.resolve(configPath);
   const config = JSON.parse(readFileSync(resolved, "utf-8"));
   const slug: string = config.slug;
   if (!slug) {
     throw new Error("walkthrough.json must have a 'slug' field");
   }
 
-  const configDir = join(resolved, "..");
-  const walkthroughDir = join(configDir, "walkthrough");
+  const configDir = path.join(resolved, "..");
+  const walkthroughDir = path.join(configDir, "walkthrough");
   const parts: Array<{ id: number }> = config.parts;
 
   console.log(`Publishing walkthrough "${slug}" (${parts.length} parts)...`);
 
   // Upload shared CSS
-  const css = readFileSync(join(walkthroughDir, "walkthrough.css"), "utf-8");
+  const css = readFileSync(path.join(walkthroughDir, "walkthrough.css"), "utf-8");
   await uploadBlob(token, "walkthrough/walkthrough.css", css);
 
   // Upload index.html (encrypted)
-  const indexHtml = readFileSync(join(walkthroughDir, "index.html"), "utf-8");
+  const indexHtml = readFileSync(path.join(walkthroughDir, "index.html"), "utf-8");
   await uploadBlob(token, `walkthrough/${slug}/index.html`, encryptHtml(indexHtml, key));
 
   // Upload part HTML files (encrypted)
   for (const part of parts) {
     const filename = `walkthrough-part-${part.id}.html`;
-    const html = readFileSync(join(walkthroughDir, filename), "utf-8");
+    const html = readFileSync(path.join(walkthroughDir, filename), "utf-8");
     await uploadBlob(token, `walkthrough/${slug}/${filename}`, encryptHtml(html, key));
   }
 
   // Upload documents.html if present (encrypted)
-  const documentsPath = join(walkthroughDir, "documents.html");
+  const documentsPath = path.join(walkthroughDir, "documents.html");
   let hasDocuments = false;
   if (existsSync(documentsPath)) {
     const documentsHtml = readFileSync(documentsPath, "utf-8");
@@ -72,7 +72,7 @@ export async function publish(configPath: string): Promise<void> {
   }
 
   // Upload manifest
-  const manifest = readFileSync(join(walkthroughDir, "manifest.json"), "utf-8");
+  const manifest = readFileSync(path.join(walkthroughDir, "manifest.json"), "utf-8");
   await uploadBlob(token, `walkthrough/${slug}/manifest.json`, manifest);
 
   const fileCount = parts.length + 2 + (hasDocuments ? 1 : 0);

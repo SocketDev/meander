@@ -1,13 +1,13 @@
 import ValTown from "@valtown/sdk";
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const API_BASE = "https://api.val.town";
 
 function getValSourcePath(): string {
   const thisFile = fileURLToPath(import.meta.url);
-  return join(dirname(thisFile), "..", "assets", "val", "index.ts");
+  return path.join(path.dirname(thisFile), "..", "assets", "val", "index.ts");
 }
 
 export async function deployVal(valName: string): Promise<void> {

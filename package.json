@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "node --experimental-strip-types --no-warnings src/cli.mts",
+    "dev": "node --experimental-strip-types --no-warnings scripts/dev.mts",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {

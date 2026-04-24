@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .janus
+
+# Dev-generated preview output from `pnpm dev` / `meander serve`
+# against the local fixture. Always regenerated from the source.
+test-walkthrough-docs/walkthrough/
