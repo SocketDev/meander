@@ -15,4 +15,9 @@ function run(cmd: string, args: string[], label: string): void {
 
 run("pnpm", ["exec", "oxlint", "src", "scripts"], "lint");
 run("pnpm", ["exec", "tsc", "--noEmit"], "type-check");
+run(
+  "node",
+  ["scripts/validate-tools.mts"],
+  "validate external-tools.json",
+);
 console.log("✓ all checks passed");

@@ -18,13 +18,13 @@
   ],
   "scripts": {
     "build": "tsc",
-    "check": "node --experimental-strip-types --no-warnings scripts/check.mts",
-    "clean": "node --experimental-strip-types --no-warnings scripts/clean.mts",
-    "dev": "node --experimental-strip-types --no-warnings scripts/dev.mts",
-    "fix": "node --experimental-strip-types --no-warnings scripts/fix.mts",
-    "lint": "node --experimental-strip-types --no-warnings scripts/lint.mts",
-    "optimize-svgs": "node --experimental-strip-types --no-warnings scripts/optimize-svgs.mts",
-    "update": "node --experimental-strip-types --no-warnings scripts/update.mts",
+    "check": "node scripts/check.mts",
+    "clean": "node scripts/clean.mts",
+    "dev": "node scripts/dev.mts",
+    "fix": "node scripts/fix.mts",
+    "lint": "node scripts/lint.mts",
+    "optimize-svgs": "node scripts/optimize-svgs.mts",
+    "update": "node scripts/update.mts",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
@@ -36,6 +36,7 @@
   "devDependencies": {
     "@types/node": "24.9.2",
     "@typescript/native-preview": "7.0.0-dev.20260415.1",
+    "ecc-agentshield": "1.4.0",
     "esbuild": "0.25.11",
     "fast-glob": "3.3.3",
     "oxfmt": "0.37.0",
