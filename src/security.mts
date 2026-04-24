@@ -185,7 +185,13 @@ export async function injectSriIntegrity(
     }
   }
 
-  await Promise.all(
+  /* allSettled: a single fetch failure (CDN hiccup on a remote
+   * ref, missing local file, etc.) shouldn't abort SRI for the
+   * other tags. Failures are logged inside resolveIntegrity;
+   * the integrityByRef map just won't have a hash for the
+   * failing ref, and the later write loop skips tags with
+   * no hash. */
+  await Promise.allSettled(
     candidates.map((el) => {
       const ref = getRef(el);
       if (!ref) {

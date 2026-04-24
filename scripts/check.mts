@@ -1,23 +1,44 @@
 /**
- * Check: lint + type-check gate. `pnpm check` is what CI runs
- * to block merges; it's also the pre-commit sanity command.
+ * Check: lint + type-check + schema-validation gate. Runs in
+ * CI to block merges; also the pre-commit sanity command.
+ *
+ * Uses @socketsecurity/lib/spawn for async process management.
+ * Inherited stdio keeps live output identical to a direct
+ * `node <script>` invocation. On any step's non-zero exit we
+ * set process.exitCode + return — letting Node flush pending
+ * writes before the process terminates (which process.exit()
+ * can cut short).
  */
-import { spawnSync } from "node:child_process";
+import { spawn } from "@socketsecurity/lib/spawn";
 
-function run(cmd: string, args: string[], label: string): void {
+async function run(cmd: string, args: string[], label: string): Promise<boolean> {
   console.log(`→ ${label}`);
-  const result = spawnSync(cmd, args, { stdio: "inherit" });
-  if ((result.status ?? 1) !== 0) {
+  try {
+    await spawn(cmd, args, { stdio: "inherit" });
+    return true;
+  } catch (e) {
     console.error(`✗ ${label} failed`);
-    process.exit(result.status ?? 1);
+    process.exitCode = (e as { code?: number }).code ?? 1;
+    return false;
   }
 }
 
-run("pnpm", ["exec", "oxlint", "src", "scripts"], "lint");
-run("pnpm", ["exec", "tsc", "--noEmit"], "type-check");
-run(
-  "node",
-  ["scripts/validate-tools.mts"],
-  "validate external-tools.json",
-);
-console.log("✓ all checks passed");
+const steps: Array<[string, string[], string]> = [
+  ["pnpm", ["exec", "oxlint", "src", "scripts"], "lint"],
+  ["pnpm", ["exec", "tsc", "--noEmit"], "type-check"],
+  ["node", ["scripts/validate-tools.mts"], "validate external-tools.json"],
+];
+
+for (const [cmd, args, label] of steps) {
+  if (!(await run(cmd, args, label))) {
+    /* Stop on first failure — downstream steps often depend on
+     * earlier ones (validate-tools runs node, which depends on
+     * a clean install; a lint failure usually flags something
+     * that would break the typecheck anyway). */
+    break;
+  }
+}
+
+if (!process.exitCode) {
+  console.log("✓ all checks passed");
+}

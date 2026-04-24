@@ -285,7 +285,22 @@ export async function preRenderMermaidBlocks(
       }),
     );
   }
-  await Promise.all(pending);
+  /* allSettled: a single failed diagram shouldn't abort the
+   * whole batch. The renderer logs per-diagram failures; we
+   * still emit placeholders for the diagrams that failed (the
+   * token stays in the HTML and the SVG map just won't have
+   * an entry for it — `inlineMermaidSvgs` leaves such tokens
+   * as-is). */
+  const results = await Promise.allSettled(pending);
+  for (const [i, result] of results.entries()) {
+    if (result.status === "rejected") {
+      const token = tokens[i]?.token ?? "?";
+      console.error(
+        `[mermaid] ${token} render failed:`,
+        result.reason instanceof Error ? result.reason.message : result.reason,
+      );
+    }
+  }
   let out = markdown;
   for (const { match, token } of tokens) {
     out = out.replace(match, `<div class="mdr-mermaid">${token}</div>`);

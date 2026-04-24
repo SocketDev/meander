@@ -95,7 +95,10 @@ async function startWatcher(): Promise<void> {
   };
 
   console.log("→ watch: fixture sources + walkthrough.json + assets/");
-  await Promise.all([
+  /* Watchers are long-running loops; if one throws we still
+   * want the other polling, so settle rather than all. Errors
+   * are already logged inside watchOne. */
+  await Promise.allSettled([
     watchOne(fixtureDir, "fixture"),
     watchOne(assetsDir, "assets"),
   ]);

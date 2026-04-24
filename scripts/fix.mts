@@ -5,14 +5,23 @@
  * Fmt first, then lint-fix: formatter normalises layout, and
  * some lint fixes need well-formatted input to apply cleanly.
  */
-import { spawnSync } from "node:child_process";
+import { spawn } from "@socketsecurity/lib/spawn";
 
-function run(cmd: string, args: string[]): void {
-  const result = spawnSync(cmd, args, { stdio: "inherit" });
-  if ((result.status ?? 1) !== 0) {
-    process.exit(result.status ?? 1);
+async function run(cmd: string, args: string[]): Promise<boolean> {
+  try {
+    await spawn(cmd, args, { stdio: "inherit" });
+    return true;
+  } catch (e) {
+    process.exitCode = (e as { code?: number }).code ?? 1;
+    return false;
   }
 }
 
-run("pnpm", ["exec", "oxfmt", "src", "scripts"]);
-run("pnpm", ["exec", "oxlint", "--fix", "src", "scripts"]);
+for (const [cmd, args] of [
+  ["pnpm", ["exec", "oxfmt", "src", "scripts"]],
+  ["pnpm", ["exec", "oxlint", "--fix", "src", "scripts"]],
+] as const) {
+  if (!(await run(cmd, [...args]))) {
+    break;
+  }
+}
