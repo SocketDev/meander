@@ -1,13 +1,14 @@
 (function () {
   "use strict";
 
-  /* Symbol table: window[Symbol.for("meander:syms")] maps
-   * each exported name to an array of locations. The array
-   * shape lets us preserve overloads (same name, different
-   * lines in one file) and cross-file duplicates (e.g. a
-   * `parse` function in several ecosystem-specific files)
-   * instead of silently dropping them like the old singleton
-   * shape did. */
+  /* Symbol table: window[Symbol.for("meander:syms")] maps each
+   * exported name to an array of locations. Each location is a
+   * 3-tuple [file, line, part] — fields are positional (index
+   * 0/1/2) so the inlined JSON stays compact. The array shape
+   * lets us preserve overloads (same name, different lines in
+   * one file) and cross-file duplicates (e.g. a `parse` func
+   * in several ecosystem-specific files) instead of silently
+   * dropping them like the old singleton shape did. */
   var symbols = window[Symbol.for("meander:syms")];
   if (!symbols || typeof symbols !== "object") return;
 
@@ -25,10 +26,14 @@
   });
   var pattern = new RegExp("\\b(" + escaped.join("|") + ")\\b", "g");
 
+  // Tuple field accessors — one place to change if the shape evolves.
+  function locFile(loc) { return loc[0]; }
+  function locLine(loc) { return loc[1]; }
+  function locPart(loc) { return loc[2]; }
+
   // Process all highlighted code elements — runs after highlight.js
   function processCodeElements() {
     var codeEls = document.querySelectorAll(".line-code code");
-
     for (var i = 0; i < codeEls.length; i++) {
       processNode(codeEls[i]);
     }
@@ -53,7 +58,7 @@
     if (!lineCell) return false;
     var currentLine = parseInt(lineCell.textContent, 10);
     for (var i = 0; i < locs.length; i++) {
-      if (locs[i].file === currentFile && locs[i].line === currentLine) {
+      if (locFile(locs[i]) === currentFile && locLine(locs[i]) === currentLine) {
         return true;
       }
     }
@@ -61,7 +66,6 @@
   }
 
   function processNode(node) {
-    // Walk text nodes within the already-highlighted code
     var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
     var textNodes = [];
     var current;
@@ -74,7 +78,6 @@
       var text = textNode.textContent;
       if (!text) continue;
 
-      // Skip text inside existing def-ref spans
       if (textNode.parentElement && textNode.parentElement.classList.contains("def-ref")) continue;
 
       var parts = [];
@@ -88,24 +91,22 @@
         if (!locs || locs.length === 0) continue;
         if (isSelfReference(textNode, locs)) continue;
 
-        // Add text before match
         if (match.index > lastIndex) {
           parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
         }
 
-        /* Stash the full locs array on the span via a JSON
-         * attribute so click + tooltip handlers can route
-         * single vs. multi-location cases without re-reading
-         * `symbols`. Single-location keeps the original flat
-         * data-* attrs for backwards style selectors. */
+        /* Stash locs on the span. Single-location uses flat
+         * data-* attrs (cheaper to read than JSON.parse). Multi-
+         * location packs into one JSON attr so click + tooltip
+         * handlers can route without re-reading `symbols`. */
         var span = document.createElement("span");
         span.className = "def-ref";
         span.setAttribute("data-def-name", name);
         if (locs.length === 1) {
           var only = locs[0];
-          span.setAttribute("data-def-file", only.file);
-          span.setAttribute("data-def-line", only.line);
-          span.setAttribute("data-def-part", only.part);
+          span.setAttribute("data-def-file", locFile(only));
+          span.setAttribute("data-def-line", locLine(only));
+          span.setAttribute("data-def-part", locPart(only));
         } else {
           span.setAttribute("data-def-count", locs.length);
           span.setAttribute("data-def-locs", JSON.stringify(locs));
@@ -118,12 +119,10 @@
 
       if (parts.length === 0) continue;
 
-      // Add remaining text
       if (lastIndex < text.length) {
         parts.push(document.createTextNode(text.slice(lastIndex)));
       }
 
-      // Replace the text node with the parts
       var parent = textNode.parentNode;
       for (var j = 0; j < parts.length; j++) {
         parent.insertBefore(parts[j], textNode);
@@ -155,7 +154,7 @@
     var line = span.getAttribute("data-def-line");
     var part = span.getAttribute("data-def-part");
     if (!file) return [];
-    return [{ file: file, line: parseInt(line, 10), part: parseInt(part, 10) }];
+    return [[file, parseInt(line, 10), parseInt(part, 10)]];
   }
 
   function showTooltip(span) {
@@ -168,11 +167,11 @@
       var loc = locs[0];
       tooltip.innerHTML =
         header +
-        '<div class="def-tooltip-location">' + loc.file + ':' + loc.line + ' (Part ' + loc.part + ')</div>' +
+        '<div class="def-tooltip-location">' + locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')</div>' +
         '<div class="def-tooltip-hint">Click symbol to go to definition</div>';
     } else {
       var items = locs.map(function (loc) {
-        return '<div class="def-tooltip-location">' + loc.file + ':' + loc.line + ' (Part ' + loc.part + ')</div>';
+        return '<div class="def-tooltip-location">' + locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')</div>';
       }).join("");
       tooltip.innerHTML =
         header + items +
@@ -194,12 +193,12 @@
   /* ------------------------------------------------------------------ */
 
   function navigateTo(loc) {
-    var hash = "#" + encodeURIComponent(loc.file) + ":L" + loc.line;
+    var hash = "#" + encodeURIComponent(locFile(loc)) + ":L" + locLine(loc);
     var currentPart = document.body.getAttribute("data-part");
-    if (String(loc.part) === currentPart) {
+    if (String(locPart(loc)) === currentPart) {
       window.location.hash = hash;
     } else {
-      window.location.href = "/" + slug + "/part/" + loc.part + hash;
+      window.location.href = "/" + slug + "/part/" + locPart(loc) + hash;
     }
   }
 
@@ -211,7 +210,7 @@
     if (locs.length === 1) return locs[0];
     var lines = ["Choose a definition:"];
     for (var i = 0; i < locs.length; i++) {
-      lines.push((i + 1) + ". " + locs[i].file + ":" + locs[i].line + " (Part " + locs[i].part + ")");
+      lines.push((i + 1) + ". " + locFile(locs[i]) + ":" + locLine(locs[i]) + " (Part " + locPart(locs[i]) + ")");
     }
     var answer = window.prompt(lines.join("\n"), "1");
     if (!answer) return null;
@@ -240,10 +239,8 @@
     navigateTo(loc);
   });
 
-  // Run after highlight.js has processed the code
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
-      // Small delay to ensure highlight.js has run
       setTimeout(processCodeElements, 100);
     });
   } else {

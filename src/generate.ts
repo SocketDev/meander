@@ -446,11 +446,14 @@ function renderAnnotationMarkdown(markdown: string): string {
 /*  Symbol table (go-to-definition)                                    */
 /* ------------------------------------------------------------------ */
 
-type SymbolLocation = {
-  file: string;
-  line: number;
-  part: number;
-};
+/**
+ * Compact tuple form: [file, line, part]. Fields positional by
+ * convention so the inlined JSON stays small (no repeated
+ * `"file":`/`"line":`/`"part":` keys across every entry). Order
+ * mirrors how a debugger prints a location — file, then line,
+ * then part (analogous to column in a stack frame).
+ */
+type SymbolLocation = readonly [file: string, line: number, part: number];
 
 /**
  * Symbol table: exported-name → array of source locations.
@@ -460,14 +463,14 @@ type SymbolLocation = {
  * places (length > 1, e.g. a `parse` function exported from
  * several ecosystem-specific files, or TypeScript overload
  * signatures on consecutive lines). The consumer
- * (assets/sref.js) picks a single target for the trivial
- * case and shows a disambiguator for the multi-target case —
- * rather than silently dropping ambiguous names like the old
+ * (assets/sref.js) picks a single target for the trivial case
+ * and shows a disambiguator for the multi-target case — rather
+ * than silently dropping ambiguous names like the old
  * singleton shape did.
  *
  * Published to the page as
- * `window[Symbol.for("meander:syms")]` so it doesn't
- * pollute the plain-property namespace.
+ * `window[Symbol.for("meander:syms")]` so it doesn't pollute
+ * the plain-property namespace.
  */
 type SymbolTable = Record<string, SymbolLocation[]>;
 
@@ -497,7 +500,7 @@ function buildSymbols(
       const source = sources.get(file);
       if (!source) continue;
       for (const sym of extractSymbols(source)) {
-        const loc: SymbolLocation = { file, line: sym.line, part: part.id };
+        const loc: SymbolLocation = [file, sym.line, part.id];
         const existing = byName.get(sym.name);
         if (existing) {
           existing.push(loc);
