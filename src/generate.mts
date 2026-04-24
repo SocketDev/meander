@@ -1834,7 +1834,8 @@ export async function generate(
   const jsdocWrapJs = readFileSync(path.join(bundledAssetsDir, "jsdoc-wrap.js"), "utf-8");
   const jsdocGroupJs = readFileSync(path.join(bundledAssetsDir, "jsdoc-group.js"), "utf-8");
   const annotationReadyJs = readFileSync(path.join(bundledAssetsDir, "annotation-ready.js"), "utf-8");
-  const jsdocJs = [jsdocWrapJs, jsdocGroupJs, annotationReadyJs].join("\n");
+  const inlineTokenizersJs = readFileSync(path.join(bundledAssetsDir, "inline-tokenizers.js"), "utf-8");
+  const jsdocJs = [jsdocWrapJs, jsdocGroupJs, annotationReadyJs, inlineTokenizersJs].join("\n");
 
   /* Service worker — emit sw.js with the consumer's version
    * token replacing __MEANDER_CACHE_VERSION__, plus an inline

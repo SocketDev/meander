@@ -198,6 +198,64 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Pluggable inline-code tokenizer
+
+Consumers can register custom classifier + tokenizer pairs
+for inline `<code>` spans in prose. First matcher wins;
+unmatched spans fall through to `hljs.highlight(text, {
+language: "typescript" })` as the default fallback.
+
+### Registering a tokenizer
+
+Push entries into the array at
+`window[Symbol.for("meander:inline-tokenizers")]` from any
+script on the page (before or after meander's bundle — the
+array is a stable symbol-keyed handle either way):
+
+```js
+const reg = (window[Symbol.for("meander:inline-tokenizers")] ??= []);
+reg.push({
+  name: "purl",
+  classify: (text) => /^pkg:[a-z]+\//.test(text),
+  tokenize: (text) => {
+    /* return escaped HTML; meander sets it via innerHTML */
+    return `<span class="hljs-keyword">${text.slice(0, 3)}</span>` +
+           escape(text.slice(3));
+  },
+});
+```
+
+Each entry:
+
+- `name` (optional): debug label; shows up in
+  `data-mdr-tokenized` on the processed element.
+- `classify(text)`: returns truthy if this tokenizer owns the
+  span.
+- `tokenize(text)`: returns HTML string. Assigned via
+  `innerHTML` — escape untrusted content yourself.
+
+### Scope
+
+The pass runs against every inline `<code>` inside
+`.annotation-md`, `.doc-content`, or `.mdr-hero-desc` that
+isn't already inside a `<pre>`. Block code (fenced code) is
+left alone — hljs already highlights those at the block
+level.
+
+### Idempotency
+
+After processing, each `<code>` gets a `data-mdr-tokenized`
+attribute whose value is the winning tokenizer's `name` (or
+`"hljs"` for the fallback). Subsequent passes skip tagged
+elements.
+
+### Runs after hljs
+
+The tokenizer pass is gated on `onHljsReady`, so tokenizers
+that delegate to `hljs.highlight()` get the grammar they
+need. On pages without any `.line-code` blocks, `onHljsReady`
+resolves immediately.
+
 ## Footer
 
 **On by default.** Every page renders a small attribution
