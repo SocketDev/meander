@@ -12,6 +12,22 @@
 (() => {
   const ns = (window[Symbol.for("meander:pages")] ??= {});
 
+  /* Desktop + iOS Safari emit "…Safari/…" in their UA string
+   * without any Chromium-family marker. Flagging them via
+   * html[data-ua="safari"] lets CSS gate features that have
+   * known Safari quirks — e.g. content-visibility: auto still
+   * has :target + find-in-page glitches in Safari 18+. No-op
+   * on every other browser. */
+  const ua = navigator.userAgent;
+  if (
+    ua.includes("Safari/") &&
+    !ua.includes("Chrome/") &&
+    !ua.includes("Chromium/") &&
+    !ua.includes("Edg/")
+  ) {
+    document.documentElement.setAttribute("data-ua", "safari");
+  }
+
   ns.storageGet = (key) => {
     try {
       return localStorage.getItem(key);
