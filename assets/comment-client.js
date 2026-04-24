@@ -7,7 +7,15 @@
   var isDocumentsPage = pageType === "documents";
   if (!slug || isNaN(partId)) return;
 
-  var apiBase = "/" + slug + "/api/comments";
+  /* When meander emits data-comment-backend on <body>, the HTML
+   * is hosted off-origin (GH Pages, Cloudflare Pages, etc.) and
+   * the comment API lives on a Val Town val at the given URL.
+   * Without the attribute we assume same-origin (Val Town
+   * serving both HTML + API) and hit /<slug>/api/comments. */
+  var backendBase = (document.body.getAttribute("data-comment-backend") || "").replace(/\/+$/, "");
+  var apiBase = backendBase
+    ? backendBase + "/" + slug + "/api/comments"
+    : "/" + slug + "/api/comments";
   var comments = [];
   var addBtn = null;
   var expandedGroups = {}; // group keys that should render expanded

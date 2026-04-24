@@ -117,6 +117,19 @@ const WalkthroughConfigSchema = Type.Object({
    */
   comments: Type.Optional(Type.Boolean()),
   /**
+   * Absolute URL of the comment backend (the deployed Val Town
+   * val). Set this when hosting the static HTML on a different
+   * origin (GitHub Pages, Cloudflare Pages, a CDN) so the
+   * comment client knows where to send thread reads + writes.
+   *
+   * Omit when hosting on Val Town itself — comments then route
+   * same-origin to /<slug>/api/comments, which the val serves
+   * alongside the HTML.
+   *
+   * Example: "https://username-walkthrough.web.val.run"
+   */
+  commentBackend: Type.Optional(Type.String({ minLength: 1 })),
+  /**
    * Favicon override. Default: meander ships its own
    * bezel-derived favicon set (svg + ico + sized pngs). Set
    * `false` to skip emitting any favicon link tags, or
@@ -996,6 +1009,7 @@ function renderPartHtml(
   cssHref: string,
   headExtra: string,
   footerHtml: string,
+  commentBackendAttr: string,
 ): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
@@ -1132,7 +1146,7 @@ ${sectionRows}
   <link rel="stylesheet" href="${cssHref}" />
   ${HLJS_LINK_CSS}
 </head>
-<body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'>
+<body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'${commentBackendAttr}>
   <header class="topbar">
     <h1>Part ${part.id}: ${escapeHtml(part.title)}</h1>
     <p>${escapeHtml(part.objective)}</p>
@@ -1266,6 +1280,7 @@ function renderDocumentsHtml(
   cssHref: string,
   headExtra: string,
   footerHtml: string,
+  commentBackendAttr: string,
 ): string {
   // Build tab bar
   const tabButtons = renderedDocs
@@ -1301,7 +1316,7 @@ function renderDocumentsHtml(
   <link rel="stylesheet" href="${cssHref}" />
   ${HLJS_LINK_CSS}
 </head>
-<body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents">
+<body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents"${commentBackendAttr}>
   <header class="topbar">
     <h1>Documents</h1>
     <p>${escapeHtml(objective)}</p>
@@ -2156,6 +2171,17 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   const headExtra = [faviconTags, themeColorTags, headJsTag].filter(Boolean).join("\n  ");
   const footerHtml = renderFooter(config.footer);
 
+  /* When hosting the HTML off-origin (GH Pages, etc.), the
+   * comment client needs the absolute Val Town URL to reach the
+   * comment backend. The attribute is emitted onto every page's
+   * <body>; comment-client.js reads it (if present) and
+   * prefixes its fetch URLs. Omit when same-origin hosting
+   * (Val Town itself) is in play — comments route to
+   * /<slug>/api/comments alongside the HTML. */
+  const commentBackendAttr = config.commentBackend
+    ? ` data-comment-backend="${escapeHtml(config.commentBackend.replace(/\/+$/, ""))}"`
+    : "";
+
   /* Post-render pipeline. Order matters:
    *   1. minify — shrinks inline <script>/<svg>. Must run first
    *      because CSP hashes inline-script bodies; hashing
@@ -2245,6 +2271,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       assetHref("walkthrough.css"),
       headExtra,
       footerHtml,
+      commentBackendAttr,
     );
     const partOut = path.join(outDir, partOutputFilename(part));
     mkdirSync(path.dirname(partOut), { recursive: true });
@@ -2318,6 +2345,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       assetHref("walkthrough.css"),
       headExtra,
       footerHtml,
+      commentBackendAttr,
     );
     writeFileSync(path.join(outDir, "documents.html"), await finalizeHtml(documentsHtml));
     console.log(`Generated documents.html with ${documents.length} documents`);
