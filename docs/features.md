@@ -198,6 +198,96 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Subresource Integrity (SRI)
+
+**Opt-in.** When enabled, every emitted `<script src>` and
+`<link rel=stylesheet|preload|modulepreload>` gets an
+`integrity="sha512-..."` attribute so browsers reject tampered
+responses.
+
+### Enabling
+
+```json
+{
+  "sri": true
+}
+```
+
+Or customize:
+
+```json
+{
+  "sri": {
+    "cacheDir": ".cache/sri"
+  }
+}
+```
+
+- `cacheDir`: where to disk-cache hashes of remote URLs.
+  Default: `.cache/sri`.
+
+### How it works
+
+- Remote URLs (currently `unpkg.com`, `cdn.jsdelivr.net`) are
+  fetched, hashed, and cached on disk. Subsequent builds reuse
+  the cache.
+- Same-origin refs (`/walkthrough.css`, etc.) are read from the
+  output dir and hashed from bytes.
+- Remote tags also get `crossorigin="anonymous"` (required for
+  SRI to run on cross-origin responses).
+
+Tags that already carry an `integrity=` attribute are left
+alone, so hand-authored SRI entries (like the hljs CDN link)
+don't double-hash.
+
+## Content-Security-Policy meta
+
+**Opt-in.** When enabled, meander emits a
+`<meta http-equiv="Content-Security-Policy">` tag in `<head>`
+with per-inline-script/style sha256 hashes so pages load under
+strict CSP without `'unsafe-inline'`.
+
+### Enabling
+
+```json
+{
+  "csp": true
+}
+```
+
+Or customize:
+
+```json
+{
+  "csp": {
+    "connectSrc": ["https://api.example.com"],
+    "cdnHosts": ["https://unpkg.com", "https://cdn.jsdelivr.net"]
+  }
+}
+```
+
+- `connectSrc`: origins your client-side code fetches from
+  (beyond the page's own origin). Default: `[]`.
+- `cdnHosts`: origins serving `<script src>` / `<link href>`
+  CDN URLs. Default: `["https://unpkg.com"]`.
+
+### Directives emitted
+
+```
+default-src 'self'
+script-src 'self' + cdnHosts + inline-script sha256 hashes
+style-src 'self' + cdnHosts + inline-style sha256 hashes + 'unsafe-hashes'
+connect-src 'self' + connectSrc
+img-src 'self' data:
+font-src 'self'
+worker-src 'self'
+base-uri 'self'
+form-action 'self'
+frame-ancestors 'none'
+```
+
+A page that already has a CSP meta tag is left unchanged.
+
 ## Namespace
 
 All client-side modules attach to `window[Symbol.for("meander:pages")]`

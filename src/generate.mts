@@ -95,6 +95,44 @@ const WalkthroughConfigSchema = Type.Object({
    */
   favicon: Type.Optional(FaviconSchema),
   /**
+   * Inject Subresource Integrity (SRI) hashes on <script src>
+   * and <link rel=stylesheet|preload|modulepreload>, so
+   * tampered CDN or origin responses are rejected by the
+   * browser.
+   *
+   * Default: false (no injection beyond what's in the
+   * hand-authored HLJS_LINK_CSS / HLJS_SCRIPT_JS tags, which
+   * are already pinned).
+   */
+  sri: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        cacheDir: Type.Optional(Type.String({ minLength: 1 })),
+      }),
+    ]),
+  ),
+  /**
+   * Emit a Content-Security-Policy <meta> tag with per-inline-
+   * script + per-inline-style hashes so the page loads under a
+   * tight CSP without 'unsafe-inline'.
+   *
+   * Default: false.
+   *
+   * Pass `true` for defaults, or an object with `connectSrc` to
+   * whitelist additional origins your page fetches from:
+   *   { csp: { connectSrc: ["https://api.example.com"] } }
+   */
+  csp: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        connectSrc: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+        cdnHosts: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+      }),
+    ]),
+  ),
+  /**
    * Pre-render ```mermaid fenced code blocks in docs to SVG at
    * build time so pages ship with finished diagrams and no
    * client-side mermaid bundle.
@@ -1705,6 +1743,38 @@ export async function generate(
   const headJsTag = `<script>${headJs}</script>`;
   const headExtra = [faviconTags, themeColorTags, headJsTag].filter(Boolean).join("\n  ");
 
+  /* Post-render security pass. CSP runs first because it hashes
+   * inline <script>/<style> bodies — running SRI first would
+   * change nothing for inline tags, but run-order documents
+   * the dependency for future maintainers. */
+  const cspEnabled = !!config.csp;
+  const sriEnabled = !!config.sri;
+  const cspOpts = typeof config.csp === "object" ? config.csp : undefined;
+  const sriOpts = typeof config.sri === "object" ? config.sri : undefined;
+  let securityMod: typeof import("./security.mts") | null = null;
+  if (cspEnabled || sriEnabled) {
+    securityMod = await import("./security.mts");
+  }
+  const finalizeHtml = async (html: string): Promise<string> => {
+    let out = html;
+    if (securityMod && cspEnabled) {
+      out = securityMod.injectCspMeta(out, {
+        connectSrc: cspOpts?.connectSrc,
+        cdnHosts: cspOpts?.cdnHosts,
+      });
+    }
+    if (securityMod && sriEnabled) {
+      out = await securityMod.injectSriIntegrity(out, {
+        localDir: outDir,
+        basePath,
+        cacheDir: sriOpts?.cacheDir
+          ? path.resolve(rootDir, sriOpts.cacheDir)
+          : path.join(rootDir, ".cache", "sri"),
+      });
+    }
+    return out;
+  };
+
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
@@ -1720,7 +1790,7 @@ export async function generate(
       assetHref("walkthrough.css"),
       headExtra,
     );
-    writeFileSync(path.join(outDir, `walkthrough-part-${part.id}.html`), html);
+    writeFileSync(path.join(outDir, `walkthrough-part-${part.id}.html`), await finalizeHtml(html));
   }
 
   const indexHtml = renderIndexHtml(
@@ -1733,7 +1803,7 @@ export async function generate(
     assetHref("walkthrough.css"),
     headExtra,
   );
-  writeFileSync(path.join(outDir, "index.html"), indexHtml);
+  writeFileSync(path.join(outDir, "index.html"), await finalizeHtml(indexHtml));
 
   if (documents && documents.length > 0) {
     /* Optional mermaid renderer. Created once per build and
@@ -1785,7 +1855,7 @@ export async function generate(
       assetHref("walkthrough.css"),
       headExtra,
     );
-    writeFileSync(path.join(outDir, "documents.html"), documentsHtml);
+    writeFileSync(path.join(outDir, "documents.html"), await finalizeHtml(documentsHtml));
     console.log(`Generated documents.html with ${documents.length} documents`);
   }
 
