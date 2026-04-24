@@ -8,9 +8,26 @@ through the one-time setup and the publish loop.
 
 - A Val Town account.
 - A Val Town API token — create one at
-  [val.town/settings/api](https://val.town/settings/api). The
-  token needs blob read/write scope (for HTML upload) and val
-  manage scope (for `meander deploy-val`).
+  [val.town/settings/api](https://val.town/settings/api).
+
+### Token scopes
+
+Meander uses the token in two places, with different scope
+needs:
+
+| Command             | Scope needed                         |
+| ------------------- | ------------------------------------ |
+| `meander deploy-val` | `val:write` (create / update vals)   |
+| `meander publish`    | `blob:write` (upload encrypted HTML) |
+
+For CI deploys of the comment backend (via
+`.github/workflows/valtown.yml`), scope the token to
+**`val:write` only** — nothing broader. No blob, no user. The
+publish workflow needs `blob:write` separately.
+
+Rotate by minting a new token and deleting the old one in Val
+Town → Settings → API Tokens. Update the GitHub secret under
+`Settings → Secrets and variables → Actions`.
 
 ## Environment variables
 

@@ -17,7 +17,7 @@
     "assets"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.mts",
     "check": "node scripts/check.mts",
     "clean": "node scripts/clean.mts",
     "cover": "node scripts/cover.mts",

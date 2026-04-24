@@ -186,12 +186,20 @@ meander publish meander.config.json    # upload encrypted HTML
 See [docs/publishing.md](docs/publishing.md) for the full setup
 (env vars, CI integration, graceful skip for fork PRs).
 
+## Examples
+
+- [`example/minimal/`](example/minimal/) — the smallest runnable
+  meander project. Start here.
+- [`example/consumer-build/`](example/consumer-build/) —
+  integrating meander as a step in your own build pipeline (CLI,
+  programmatic, GH Pages workflow).
+
 ## Further reading
 
 - [Features + configuration](docs/features.md) — every opt-in and
   opt-out knob, with examples.
-- [Publishing](docs/publishing.md) — Val Town setup, env vars,
-  CI.
+- [Publishing](docs/publishing.md) — Val Town setup, token scopes,
+  CI integration.
 - [Comment API](docs/comment-api.md) — the REST endpoints the
   browser client hits.
 - [Encryption at rest](docs/encryption.md) — what's encrypted,

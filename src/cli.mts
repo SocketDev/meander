@@ -1,9 +1,10 @@
-#!/usr/bin/env node
+import { parseArgs } from 'node:util'
 
 const command = process.argv[2]
+const commandArgs = process.argv.slice(3)
 
 /**
- * Parse the two flags shared by `publish` + `deploy-val`:
+ * The Val Town flags shared by `publish` + `deploy-val`:
  *   --token-env <NAME>  env var meander reads for the Val Town bearer token
  *                       (default: $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
  *   --graceful          missing token / creds warn + exit 0 instead of
@@ -11,87 +12,93 @@ const command = process.argv[2]
  *                       the secret isn't provisioned (fork PRs, demo setups).
  */
 function parseValTownFlags(args: readonly string[]): {
-  tokenEnv?: string | undefined
-  graceful?: boolean | undefined
-  __proto__: null
+  tokenEnv: string | undefined
+  graceful: boolean
 } {
-  const out: {
-    tokenEnv?: string | undefined
-    graceful?: boolean | undefined
-    __proto__: null
-  } = { __proto__: null }
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!
-    if (arg === '--token-env') {
-      out.tokenEnv = args[++i]
-    } else if (arg.startsWith('--token-env=')) {
-      out.tokenEnv = arg.slice('--token-env='.length)
-    } else if (arg === '--graceful') {
-      out.graceful = true
-    }
+  const { values } = parseArgs({
+    args: args as string[],
+    options: {
+      'token-env': { type: 'string' },
+      graceful: { type: 'boolean', default: false },
+    },
+    strict: false,
+    allowPositionals: true,
+  })
+  return {
+    tokenEnv: values['token-env'] as string | undefined,
+    graceful: values['graceful'] === true,
   }
-  return out
+}
+
+function firstPositional(args: readonly string[]): string | undefined {
+  const { positionals } = parseArgs({
+    args: args as string[],
+    strict: false,
+    allowPositionals: true,
+  })
+  return positionals[0]
+}
+
+function usage(cmd: 'generate' | 'publish' | 'serve'): string {
+  const form = '<meander.config.json>'
+  switch (cmd) {
+    case 'generate':
+      return `Usage: meander generate ${form} [--base-path <path>] [--asset-dir <dir>]`
+    case 'publish':
+      return `Usage: meander publish ${form} [--token-env <name>] [--graceful]`
+    case 'serve':
+      return `Usage: meander serve ${form} [--port N] [--base-path <path>]`
+  }
 }
 
 async function main() {
   switch (command) {
     case 'generate': {
-      const args = process.argv.slice(3)
-      const configPath = args.find(a => !a.startsWith('--'))
+      const { values, positionals } = parseArgs({
+        args: commandArgs,
+        options: {
+          'base-path': { type: 'string' },
+          'asset-dir': { type: 'string' },
+        },
+        strict: false,
+        allowPositionals: true,
+      })
+      const configPath = positionals[0]
       if (!configPath) {
-        console.error(
-          'Usage: meander generate <meander.config.json> [--base-path <path>] [--asset-dir <dir>]',
-        )
+        console.error(usage('generate'))
         process.exitCode = 1
         return
       }
-      /* Flags:
-       *   --base-path <path>  URL path prefix (Next.js semantics;
-       *                       it's a path, not a URL)
-       *   --asset-dir <dir>   Subdir under output for CSS/JS
-       *                       assets; default is flat emission */
       const options: {
         basePath?: string | undefined
         assetDir?: string | undefined
         __proto__: null
       } = { __proto__: null }
-      for (let i = 0; i < args.length; i++) {
-        const arg = args[i]!
-        if (arg === '--base-path') {
-          options.basePath = args[++i]
-        } else if (arg.startsWith('--base-path=')) {
-          options.basePath = arg.slice('--base-path='.length)
-        } else if (arg === '--asset-dir') {
-          options.assetDir = args[++i]
-        } else if (arg.startsWith('--asset-dir=')) {
-          options.assetDir = arg.slice('--asset-dir='.length)
-        }
+      if (typeof values['base-path'] === 'string') {
+        options.basePath = values['base-path']
+      }
+      if (typeof values['asset-dir'] === 'string') {
+        options.assetDir = values['asset-dir']
       }
       const { generate } = await import('./generate.mts')
       await generate(configPath, options)
       break
     }
     case 'publish': {
-      const args = process.argv.slice(3)
-      const configPath = args.find(a => !a.startsWith('--'))
+      const configPath = firstPositional(commandArgs)
       if (!configPath) {
-        console.error(
-          'Usage: meander publish <meander.config.json> [--token-env <name>] [--graceful]',
-        )
+        console.error(usage('publish'))
         process.exitCode = 1
         return
       }
-      const options = parseValTownFlags(args)
       const { publish } = await import('./publish.mts')
-      await publish(configPath, options)
+      await publish(configPath, parseValTownFlags(commandArgs))
       break
     }
     case 'deploy-val': {
-      const args = process.argv.slice(3)
-      const valName = args.find(a => !a.startsWith('--')) ?? 'walkthrough'
-      const options = parseValTownFlags(args)
+      const valName = firstPositional(commandArgs) ?? 'walkthrough'
       const { deployVal } = await import('./deploy-val.mts')
-      await deployVal(valName, options)
+      await deployVal(valName, parseValTownFlags(commandArgs))
       break
     }
     case 'doctor': {
@@ -100,15 +107,21 @@ async function main() {
       break
     }
     case 'serve': {
-      /* Local preview server. Generate first, then serve so
-       * the output reflects the latest source. Port defaults
-       * to 8080; --port N and --base-path /prefix supported. */
-      const args = process.argv.slice(3)
-      const configPath = args.find(a => !a.startsWith('--'))
+      /* Local preview server. Generates first so the output
+       * reflects the latest source, then serves. --port 0 picks
+       * a free port; --base-path matches the generator's. */
+      const { values, positionals } = parseArgs({
+        args: commandArgs,
+        options: {
+          port: { type: 'string' },
+          'base-path': { type: 'string' },
+        },
+        strict: false,
+        allowPositionals: true,
+      })
+      const configPath = positionals[0]
       if (!configPath) {
-        console.error(
-          'Usage: meander serve <meander.config.json> [--port N] [--base-path <path>]',
-        )
+        console.error(usage('serve'))
         process.exitCode = 1
         return
       }
@@ -117,17 +130,11 @@ async function main() {
         basePath?: string | undefined
         __proto__: null
       } = { __proto__: null }
-      for (let i = 0; i < args.length; i++) {
-        const arg = args[i]!
-        if (arg === '--port') {
-          options.port = Number(args[++i])
-        } else if (arg.startsWith('--port=')) {
-          options.port = Number(arg.slice('--port='.length))
-        } else if (arg === '--base-path') {
-          options.basePath = args[++i]
-        } else if (arg.startsWith('--base-path=')) {
-          options.basePath = arg.slice('--base-path='.length)
-        }
+      if (typeof values['port'] === 'string') {
+        options.port = Number(values['port'])
+      }
+      if (typeof values['base-path'] === 'string') {
+        options.basePath = values['base-path']
       }
       const { generate } = await import('./generate.mts')
       await generate(configPath, { basePath: options.basePath })
@@ -142,8 +149,8 @@ Commands:
   meander generate <meander.config.json>   Generate walkthrough HTML
   meander serve <meander.config.json>      Generate + start local preview
   meander publish <meander.config.json>    Publish HTML to Val Town blob storage
-  meander deploy-val [val-name]         Deploy or update the Val Town val
-  meander doctor                        Report system + peer-dep status
+  meander deploy-val [val-name]            Deploy or update the Val Town val
+  meander doctor                           Report system + peer-dep status
 
 Flags (publish, deploy-val):
   --token-env <NAME>    Env var to read for the bearer token (default:
@@ -154,15 +161,15 @@ Flags (publish, deploy-val):
 
 Environment variables:
   VALTOWN_TOKEN              Val Town API bearer token (default env name).
-                             Scopes needed: see .github/workflows/valtown.yml.
+                             See docs/publishing.md for scopes.
   MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
                              token from. Set to e.g. "MY_VT_TOKEN" if your
                              GitHub secret has a different name.
   WALKTHROUGH_USER           Basic-auth username (deploy-val, publish).
   WALKTHROUGH_PASS           Basic-auth password (deploy-val, publish).
-                             Also used as the at-rest encryption key for
-                             publish — rotating means re-publishing every
-                             encrypted HTML file.`)
+                             Also derives the at-rest encryption key —
+                             rotating means re-publishing every encrypted
+                             HTML file.`)
       if (command) {
         console.error(`\nUnknown command: ${command}`)
       }
@@ -171,9 +178,7 @@ Environment variables:
   }
 }
 
-main().catch(error => {
-  console.error(
-    error instanceof Error ? (error.stack ?? error.message) : String(error),
-  )
+main().catch(e => {
+  console.error(e instanceof Error ? (e.stack ?? e.message) : String(e))
   process.exitCode = 1
 })
