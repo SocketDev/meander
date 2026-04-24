@@ -23,6 +23,7 @@
     "dev": "node --experimental-strip-types --no-warnings scripts/dev.mts",
     "fix": "node --experimental-strip-types --no-warnings scripts/fix.mts",
     "lint": "node --experimental-strip-types --no-warnings scripts/lint.mts",
+    "optimize-svgs": "node --experimental-strip-types --no-warnings scripts/optimize-svgs.mts",
     "update": "node --experimental-strip-types --no-warnings scripts/update.mts",
     "prepublishOnly": "pnpm run build"
   },
