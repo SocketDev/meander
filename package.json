@@ -20,10 +20,12 @@
     "build": "tsc",
     "check": "node scripts/check.mts",
     "clean": "node scripts/clean.mts",
+    "cover": "node scripts/cover.mts",
     "dev": "node scripts/dev.mts",
     "fix": "node scripts/fix.mts",
     "lint": "node scripts/lint.mts",
-    "optimize-svgs": "node scripts/optimize-svgs.mts",
+    "test": "node scripts/test.mts",
+    "type": "tsc --noEmit",
     "update": "node scripts/update.mts",
     "prepublishOnly": "pnpm run build"
   },
@@ -31,40 +33,36 @@
     "@sinclair/typebox": "0.34.48",
     "@valtown/sdk": "1.0.0",
     "marked": "18.0.0",
-    "node-html-parser": "7.1.0"
+    "node-html-parser": "7.1.0",
+    "svgo": "4.0.1"
   },
   "devDependencies": {
     "@socketsecurity/lib": "5.24.0",
     "@types/node": "24.9.2",
     "@typescript/native-preview": "7.0.0-dev.20260415.1",
+    "@vitest/coverage-v8": "4.0.3",
     "ecc-agentshield": "1.4.0",
     "esbuild": "0.25.11",
     "fast-glob": "3.3.3",
+    "mermaid": "11.14.0",
     "oxfmt": "0.37.0",
     "oxlint": "1.52.0",
-    "svgo": "4.0.1",
+    "puppeteer": "24.42.0",
     "taze": "19.9.2",
+    "type-coverage": "2.29.7",
     "typescript": "5.9.2",
+    "vitest": "4.0.3",
     "yoctocolors-cjs": "2.1.3"
   },
-  "peerDependencies": {
-    "esbuild": ">=0.25",
-    "mermaid": ">=11",
-    "puppeteer": ">=23",
-    "svgo": ">=4"
-  },
-  "peerDependenciesMeta": {
-    "esbuild": {
-      "optional": true
-    },
-    "mermaid": {
-      "optional": true
-    },
-    "puppeteer": {
-      "optional": true
-    },
-    "svgo": {
-      "optional": true
-    }
+  "typeCoverage": {
+    "atLeast": 99,
+    "cache": true,
+    "detail": true,
+    "ignoreAsAssertion": true,
+    "ignoreCatch": true,
+    "ignoreNonNullAssertion": true,
+    "ignoreUnreadAnys": true,
+    "is": 99,
+    "strict": true
   }
 }

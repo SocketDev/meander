@@ -20,23 +20,25 @@
 
 export type TokenResolution = {
   /** Name of the env var that was read (for error messages). */
-  envName: string;
+  envName: string
   /** The token value, or null if unset / empty. */
-  token: string | null;
-};
+  token: string | null
+}
 
-export function resolveValTownToken(envName?: string | undefined): TokenResolution {
+export function resolveValTownToken(
+  envName?: string | undefined,
+): TokenResolution {
   /* If caller didn't pass an explicit name, consult the
    * meta-var. Fall back to `VALTOWN_TOKEN` — matches the
    * convention used by the Val Town CLI and every fleet repo
    * before meander gained configurability. */
   const resolvedName =
-    envName ?? process.env["MEANDER_VALTOWN_TOKEN_ENV"] ?? "VALTOWN_TOKEN";
-  const token = process.env[resolvedName] ?? null;
+    envName ?? process.env['MEANDER_VALTOWN_TOKEN_ENV'] ?? 'VALTOWN_TOKEN'
+  const token = process.env[resolvedName] ?? null
   return {
     envName: resolvedName,
     token: token && token.length > 0 ? token : null,
-  };
+  }
 }
 
 /**
@@ -53,6 +55,6 @@ export function missingTokenMessage(envName: string): string {
     `To change the env-var name meander reads from:`,
     `  • set MEANDER_VALTOWN_TOKEN_ENV=<your-name> in the env, or`,
     `  • pass --token-env <your-name> to the CLI command.`,
-  ];
-  return lines.join("\n  ");
+  ]
+  return lines.join('\n  ')
 }

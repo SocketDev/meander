@@ -9,25 +9,29 @@
  * writes before the process terminates (which process.exit()
  * can cut short).
  */
-import { spawn } from "@socketsecurity/lib/spawn";
+import { spawn } from '@socketsecurity/lib/spawn'
 
-async function run(cmd: string, args: string[], label: string): Promise<boolean> {
-  console.log(`→ ${label}`);
+async function run(
+  cmd: string,
+  args: string[],
+  label: string,
+): Promise<boolean> {
+  console.log(`→ ${label}`)
   try {
-    await spawn(cmd, args, { stdio: "inherit" });
-    return true;
+    await spawn(cmd, args, { stdio: 'inherit' })
+    return true
   } catch (e) {
-    console.error(`✗ ${label} failed`);
-    process.exitCode = (e as { code?: number }).code ?? 1;
-    return false;
+    console.error(`✗ ${label} failed`)
+    process.exitCode = (e as { code?: number }).code ?? 1
+    return false
   }
 }
 
 const steps: Array<[string, string[], string]> = [
-  ["pnpm", ["exec", "oxlint", "src", "scripts"], "lint"],
-  ["pnpm", ["exec", "tsc", "--noEmit"], "type-check"],
-  ["node", ["scripts/validate-tools.mts"], "validate external-tools.json"],
-];
+  ['pnpm', ['exec', 'oxlint', 'src', 'scripts'], 'lint'],
+  ['pnpm', ['exec', 'tsc', '--noEmit'], 'type-check'],
+  ['node', ['scripts/validate-tools.mts'], 'validate external-tools.json'],
+]
 
 for (const [cmd, args, label] of steps) {
   if (!(await run(cmd, args, label))) {
@@ -35,10 +39,10 @@ for (const [cmd, args, label] of steps) {
      * earlier ones (validate-tools runs node, which depends on
      * a clean install; a lint failure usually flags something
      * that would break the typecheck anyway). */
-    break;
+    break
   }
 }
 
 if (!process.exitCode) {
-  console.log("✓ all checks passed");
+  console.log('✓ all checks passed')
 }

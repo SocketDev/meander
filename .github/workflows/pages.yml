@@ -5,7 +5,7 @@ name: 📘 Demo site (GH Pages)
 #
 # Consumers can copy this workflow into their own repo — replace
 # --base-path with your repo name, point at your own
-# walkthrough.json, and set up GH Pages in repo settings.
+# meander.config.json, and set up GH Pages in repo settings.
 
 on:
   push:
@@ -13,7 +13,7 @@ on:
     paths:
       - 'src/**'
       - 'assets/**'
-      - 'test-walkthrough-docs/**'
+      - 'test/fixtures/test-docs/**'
       - '.github/workflows/pages.yml'
       - '.github/actions/**'
       - 'external-tools.json'
@@ -55,16 +55,17 @@ jobs:
         run: |
           node --input-type=module -e "
             import { generate } from './src/generate.mts';
-            await generate('./test-walkthrough-docs/walkthrough.json', { basePath: '/meander', __proto__: null });
+            await generate('./test/fixtures/test-docs/meander.config.json', { basePath: '/meander', __proto__: null });
           "
           # GH Pages ignores files/dirs starting with _ unless we
-          # create a .nojekyll marker.
-          touch test-walkthrough-docs/walkthrough/.nojekyll
+          # create a .nojekyll marker. The emit dir is "pages" by
+          # default (see meander.config.json's `outDir`).
+          touch test/fixtures/test-docs/pages/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: test-walkthrough-docs/walkthrough
+          path: test/fixtures/test-docs/pages
 
   deploy:
     name: Deploy to Pages

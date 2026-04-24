@@ -17,12 +17,12 @@
  * (optional) — consumers who want inline-SVG shrinking install
  * it alongside their mermaid + puppeteer peers.
  */
-import { HTMLElement, parse as parseHtml } from "node-html-parser";
+import { HTMLElement, parse as parseHtml } from 'node-html-parser'
 
 export type MinifyHtmlOptions = {
-  js?: boolean | undefined;
-  svg?: boolean | undefined;
-};
+  js?: boolean | undefined
+  svg?: boolean | undefined
+}
 
 /**
  * SVGO config — preset-default with two overrides off:
@@ -36,7 +36,7 @@ const svgoConfig = {
   multipass: true,
   plugins: [
     {
-      name: "preset-default",
+      name: 'preset-default',
       params: {
         overrides: {
           cleanupIds: false,
@@ -45,7 +45,7 @@ const svgoConfig = {
       },
     },
   ],
-};
+}
 
 export async function minifyEmittedHtml(
   html: string,
@@ -54,92 +54,96 @@ export async function minifyEmittedHtml(
   const { js = true, svg = true } = {
     __proto__: null,
     ...options,
-  } as MinifyHtmlOptions;
+  } as MinifyHtmlOptions
   if (!js && !svg) {
-    return html;
+    return html
   }
 
-  const root = parseHtml(html);
-  let changed = false;
+  const root = parseHtml(html)
+  let changed = false
 
   if (js) {
-    const { transform } = await import("esbuild");
-    const scripts = root.querySelectorAll("script");
+    const { transform } = await import('esbuild')
+    const scripts = root.querySelectorAll('script')
     /* Inline <script> only — tags with a `src` attribute fetch
      * their body over the network and are minified (if at all)
      * at the file-emission step, not inside the HTML. */
-    const inlineScripts: HTMLElement[] = [];
+    const inlineScripts: HTMLElement[] = []
     for (const s of scripts) {
-      if (s.getAttribute("src")) {
-        continue;
+      if (s.getAttribute('src')) {
+        continue
       }
       if (!s.text) {
-        continue;
+        continue
       }
-      inlineScripts.push(s);
+      inlineScripts.push(s)
     }
     const results = await Promise.allSettled(
-      inlineScripts.map((s) =>
+      inlineScripts.map(s =>
         transform(s.text, {
-          loader: "js",
+          loader: 'js',
           minify: true,
-          target: "es2022",
-          legalComments: "none",
+          target: 'es2022',
+          legalComments: 'none',
         }),
       ),
-    );
+    )
     for (const [i, r] of results.entries()) {
-      if (r.status !== "fulfilled") {
+      if (r.status !== 'fulfilled') {
         console.error(
-          "[minify] inline <script> failed:",
+          '[minify] inline <script> failed:',
           (r.reason as Error)?.message ?? r.reason,
-        );
-        continue;
+        )
+        continue
       }
-      const el = inlineScripts[i]!;
+      const el = inlineScripts[i]!
       /* Replace the text node inside the <script>. node-html-
        * parser exposes `set_content` for this exact case — a
        * direct textContent assignment would HTML-escape the JS. */
-      el.set_content(r.value.code);
-      changed = true;
+      el.set_content(r.value.code)
+      changed = true
     }
   }
 
   if (svg) {
-    let svgoMod: typeof import("svgo") | null = null;
+    let svgoMod: typeof import('svgo') | null = null
     try {
-      svgoMod = await import("svgo");
+      svgoMod = await import('svgo')
+      /* v8 ignore start -- optional-dep absence; svgo is a direct dep here so this branch never fires in tests. */
     } catch {
       /* svgo isn't installed — skip the SVG pass rather than
        * erroring. Consumers who want it install it as a peer. */
     }
+    /* v8 ignore stop */
     if (svgoMod) {
-      const svgs = root.querySelectorAll("svg");
+      const svgs = root.querySelectorAll('svg')
       for (const el of svgs) {
-        const before = el.toString();
-        let after: string;
+        const before = el.toString()
+        let after: string
         try {
           after = svgoMod.optimize(
             before,
             svgoConfig as Parameters<typeof svgoMod.optimize>[1],
-          ).data;
+          ).data
+          /* v8 ignore start -- SVGO error path; third-party failure isn't our test surface. */
         } catch {
-          continue;
+          continue
         }
+        /* v8 ignore stop */
         if (after && after !== before) {
-          el.replaceWith(after);
-          changed = true;
+          el.replaceWith(after)
+          changed = true
         }
       }
     }
   }
 
-  return changed ? root.toString() : html;
+  return changed ? root.toString() : html
 }
 
 export type MinifyAssetOptions = {
-  kind: "js" | "css";
-};
+  kind: 'js' | 'css'
+}
 
 /**
  * Minify a standalone JS or CSS source string via esbuild.
@@ -151,21 +155,18 @@ export async function minifyAsset(
   code: string,
   options: MinifyAssetOptions,
 ): Promise<string> {
-  const { kind } = { __proto__: null, ...options } as MinifyAssetOptions;
+  const { kind } = { __proto__: null, ...options } as MinifyAssetOptions
   try {
-    const { transform } = await import("esbuild");
+    const { transform } = await import('esbuild')
     const out = await transform(code, {
       loader: kind,
       minify: true,
-      target: "es2022",
-      legalComments: "none",
-    });
-    return out.code;
+      target: 'es2022',
+      legalComments: 'none',
+    })
+    return out.code
   } catch (e) {
-    console.error(
-      `[minify] ${kind} minify failed:`,
-      (e as Error)?.message ?? e,
-    );
-    return code;
+    console.error(`[minify] ${kind} minify failed:`, (e as Error)?.message ?? e)
+    return code
   }
 }

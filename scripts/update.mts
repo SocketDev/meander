@@ -23,52 +23,52 @@
  *
  * Review the diff before committing.
  */
-import { spawn } from "@socketsecurity/lib/spawn";
+import { spawn } from '@socketsecurity/lib/spawn'
 
 async function run(cmd: string, args: string[]): Promise<boolean> {
   try {
-    await spawn(cmd, args, { stdio: "inherit" });
-    return true;
+    await spawn(cmd, args, { stdio: 'inherit' })
+    return true
   } catch (e) {
-    process.exitCode = (e as { code?: number }).code ?? 1;
-    return false;
+    process.exitCode = (e as { code?: number }).code ?? 1
+    return false
   }
 }
 
 /* Socket-owned scopes — kept in lockstep with the exclude list
  * in .config/taze.config.mts. */
 const SOCKET_SCOPES = [
-  "@socketregistry/*",
-  "@socketsecurity/*",
-  "@socketdev/*",
-  "socket-*",
-  "ecc-agentshield",
-  "sfw",
-];
+  '@socketregistry/*',
+  '@socketsecurity/*',
+  '@socketdev/*',
+  'socket-*',
+  'ecc-agentshield',
+  'sfw',
+]
 
 const steps: Array<[string, string[]]> = [
   /* Pass 1 — everything except Socket packages, with cooldown. */
-  ["pnpm", ["exec", "taze"]],
+  ['pnpm', ['exec', 'taze']],
   /* Pass 2 — Socket packages only, no cooldown. taze's
    * --include filter is comma-separated. */
   [
-    "pnpm",
+    'pnpm',
     [
-      "exec",
-      "taze",
-      "--include",
-      SOCKET_SCOPES.join(","),
-      "--maturity-period",
-      "0",
-      "--write",
+      'exec',
+      'taze',
+      '--include',
+      SOCKET_SCOPES.join(','),
+      '--maturity-period',
+      '0',
+      '--write',
     ],
   ],
   /* Pass 3 — resync lockfile against updated package.json. */
-  ["pnpm", ["install"]],
-];
+  ['pnpm', ['install']],
+]
 
 for (const [cmd, args] of steps) {
   if (!(await run(cmd, args))) {
-    break;
+    break
   }
 }

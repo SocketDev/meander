@@ -20,18 +20,17 @@ npm run build          # Compile TypeScript (runs `tsc`)
 npx tsc --noEmit       # Type-check without emitting (useful for verification)
 ```
 
-- **No linter or formatter is configured.** There are no eslint, prettier, or biome configs.
-  Follow the style conventions documented below.
-- **No test framework is configured.** There are no automated tests.
-  `test-walkthrough-docs/` and `test-walkthrough-no-docs/` are manual fixture directories.
-- **No CI/CD.** There are no GitHub Actions or other pipeline configs.
+- **Linter + formatter**: oxlint + oxfmt. `pnpm lint`, `pnpm fix`.
+- **Tests**: vitest, `test/**/*.test.mts`. `pnpm test`. Coverage via `pnpm cover`.
+- **Fixtures**: `test/fixtures/test-docs/` is the reference fixture used by `pnpm dev`, the CI smoke test, and the GH Pages demo workflow.
+- **CI**: `.github/workflows/ci.yml` (lint + type + smoke test), `.github/workflows/pages.yml` (demo site).
 
 ### Running Locally
 
 ```bash
 npm run build
-node dist/cli.js generate <path-to-walkthrough.json>
-node dist/cli.js publish <path-to-walkthrough.json>    # requires VALTOWN_TOKEN
+node dist/cli.js generate <path-to-meander.config.json>
+node dist/cli.js publish <path-to-meander.config.json>    # requires VALTOWN_TOKEN
 node dist/cli.js deploy-val [val-name]                  # requires VALTOWN_TOKEN, WALKTHROUGH_USER, WALKTHROUGH_PASS
 ```
 

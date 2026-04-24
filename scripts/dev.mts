@@ -7,30 +7,30 @@
  * across three scopes:
  *
  *   - the fixture dir (source files referenced by parts + docs)
- *   - walkthrough.json itself (config changes)
+ *   - meander.config.json itself (config changes)
  *   - assets/ (CSS + client-side JS bundled into the emit)
  *
  * Events are debounced so a multi-file save (IDE formatters,
  * git checkouts) triggers a single regen, not one per file.
  */
-import path from "node:path";
-import { watch as fsWatch } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import path from 'node:path'
+import { watch as fsWatch } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
-import { generate } from "../src/generate.mts";
-import { serve } from "../src/serve.mts";
+import { generate } from '../src/generate.mts'
+import { serve } from '../src/serve.mts'
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..");
-const fixtureDir = path.join(repoRoot, "test-walkthrough-docs");
-const assetsDir = path.join(repoRoot, "assets");
-const configPath = path.join(fixtureDir, "walkthrough.json");
+const here = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(here, '..')
+const fixtureDir = path.join(repoRoot, 'test', 'fixtures', 'test-docs')
+const assetsDir = path.join(repoRoot, 'assets')
+const configPath = path.join(fixtureDir, 'meander.config.json')
 
-const portArg = process.argv.find((a) => a.startsWith("--port="));
-const port = portArg ? Number(portArg.slice("--port=".length)) : 8080;
-const watchMode = process.argv.includes("--watch");
+const portArg = process.argv.find(a => a.startsWith('--port='))
+const port = portArg ? Number(portArg.slice('--port='.length)) : 8080
+const watchMode = process.argv.includes('--watch')
 
-await generate(configPath, { __proto__: null } as { __proto__: null });
+await generate(configPath, { __proto__: null } as { __proto__: null })
 
 if (watchMode) {
   /* Fire-and-forget watcher — the serve() call below blocks
@@ -38,68 +38,73 @@ if (watchMode) {
    * long-running sidecar. Any error escaping regenerate() is
    * logged + swallowed so a single bad save doesn't kill the
    * dev loop. */
-  void startWatcher();
+  void startWatcher()
 }
 
-await serve(configPath, { port, __proto__: null } as { port: number; __proto__: null });
+await serve(configPath, { port, __proto__: null } as {
+  port: number
+  __proto__: null
+})
 
 async function startWatcher(): Promise<void> {
   /* Debounce window. Save-on-format triggers a burst of events
    * within ~50ms; 150ms catches them all while still feeling
    * live. Tune up if you see duplicate regens. */
-  const DEBOUNCE_MS = 150;
-  let pending = false;
-  let timer: NodeJS.Timeout | null = null;
+  const DEBOUNCE_MS = 150
+  let pending = false
+  let timer: NodeJS.Timeout | null = null
   const kick = (reason: string): void => {
     if (timer) {
-      clearTimeout(timer);
+      clearTimeout(timer)
     }
-    pending = true;
+    pending = true
     timer = setTimeout(() => {
       if (!pending) {
-        return;
+        return
       }
-      pending = false;
-      timer = null;
-      const started = Date.now();
+      pending = false
+      timer = null
+      const started = Date.now()
       generate(configPath, { __proto__: null } as { __proto__: null })
         .then(() => {
-          console.log(
-            `✓ regen (${reason}) in ${Date.now() - started}ms`,
-          );
+          console.log(`✓ regen (${reason}) in ${Date.now() - started}ms`)
         })
         .catch((e: unknown) => {
-          console.error(`✗ regen failed (${reason}):`, e);
-        });
-    }, DEBOUNCE_MS);
-  };
+          console.error(`✗ regen failed (${reason}):`, e)
+        })
+    }, DEBOUNCE_MS)
+  }
 
   /* Three independent watchers, each on its own scope. We
-   * ignore the emit dir (walkthrough/) explicitly by checking
-   * path prefixes — writes from our own generate() would
-   * otherwise trigger an infinite regen loop. */
-  const outDirName = "walkthrough";
+   * ignore both the new "pages/" emit dir and the legacy
+   * "walkthrough/" dir explicitly by checking path prefixes —
+   * writes from our own generate() would otherwise trigger an
+   * infinite regen loop. Using both names handles the case
+   * where the fixture still has a stale walkthrough/ sitting
+   * around from before the outDir rename. */
+  const ignoredOutDirs = new Set(['pages', 'walkthrough'])
   const watchOne = async (dir: string, reason: string): Promise<void> => {
     try {
-      const watcher = fsWatch(dir, { recursive: true });
+      const watcher = fsWatch(dir, { recursive: true })
       for await (const event of watcher) {
-        const name = event.filename ?? "";
-        if (name.startsWith(outDirName + path.sep) || name === outDirName) {
-          continue;
+        const name = event.filename ?? ''
+        const firstSeg = name.split(path.sep, 1)[0] ?? ''
+        if (ignoredOutDirs.has(firstSeg)) {
+          continue
         }
-        kick(`${reason}: ${name || "?"}`);
+        kick(`${reason}: ${name || '?'}`)
       }
     } catch (e) {
-      console.error(`watcher ${reason} stopped:`, e);
+      console.error(`watcher ${reason} stopped:`, e)
     }
-  };
+  }
 
-  console.log("→ watch: fixture sources + walkthrough.json + assets/");
+  console.log('→ watch: fixture sources + meander.config.json + assets/')
   /* Watchers are long-running loops; if one throws we still
    * want the other polling, so settle rather than all. Errors
    * are already logged inside watchOne. */
   await Promise.allSettled([
-    watchOne(fixtureDir, "fixture"),
-    watchOne(assetsDir, "assets"),
-  ]);
+    watchOne(fixtureDir, 'fixture'),
+    watchOne(assetsDir, 'assets'),
+  ])
 }

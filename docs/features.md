@@ -3,7 +3,7 @@
 Each generated walkthrough part page ships a set of reading
 affordances, all framework-free (no runtime deps beyond
 highlight.js). Consumers opt in or out through
-`walkthrough.json`; most features are on by default.
+`meander.config.json`; most features are on by default.
 
 ## Column splitter
 
@@ -162,7 +162,7 @@ client-side mermaid bundle.
 
 ### Enabling
 
-Add to `walkthrough.json`:
+Add to `meander.config.json`:
 
 ```json
 {
@@ -183,7 +183,7 @@ Or customize:
 
 - `theme`: `"default" | "dark" | "neutral" | "forest"` —
   mermaid's built-in themes. Default: `"default"`.
-- `cacheDir`: path (relative to `walkthrough.json`'s dir) where
+- `cacheDir`: path (relative to `meander.config.json`'s dir) where
   rendered SVGs are cached. Default: `.cache/mermaid`.
 
 ### Peer dependencies
@@ -279,7 +279,7 @@ resolves immediately.
 file watcher that re-runs `generate()` on change. Scoped to:
 
 - the fixture dir (source files referenced by parts + docs)
-- `walkthrough.json` itself
+- `meander.config.json` itself
 - `assets/` (CSS + client-side JS bundled into emitted pages)
 
 Events are debounced (150ms) so multi-file saves trigger a
@@ -399,7 +399,7 @@ with extra metadata:
 
 Fields:
 - `source` (required): path to the markdown file, relative to
-  `walkthrough.json`.
+  `meander.config.json`.
 - `filename` (optional): URL-friendly slug. When set, links in
   `llms.txt` point at `/slug/docs/<filename>` instead of the
   legacy `#anchor` form on the combined documents page. Must be

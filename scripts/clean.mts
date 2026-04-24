@@ -3,16 +3,24 @@
  * clean` is non-destructive (no source edits), safe to run
  * anytime.
  */
-import { rmSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..");
+import { safeDelete } from '@socketsecurity/lib/fs'
 
-const targets = ["dist", "test-walkthrough-docs/walkthrough"];
+const here = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(here, '..')
+
+const targets = [
+  'dist',
+  'coverage',
+  '.cache',
+  'test/fixtures/test-docs/pages',
+  'test/fixtures/test-docs/walkthrough',
+]
 for (const t of targets) {
-  const full = path.join(repoRoot, t);
-  rmSync(full, { recursive: true, force: true });
-  console.log(`✓ cleaned ${t}`);
+  const full = path.join(repoRoot, t)
+  // eslint-disable-next-line no-await-in-loop -- serial cleanup is intentional; small list
+  await safeDelete(full, { recursive: true, force: true })
+  console.log(`✓ cleaned ${t}`)
 }

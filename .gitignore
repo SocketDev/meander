@@ -21,6 +21,7 @@ Thumbs.db
 # Build artifacts
 /dist
 /coverage
+/.type-coverage
 *.log
 *.pid
 *.seed
@@ -42,4 +43,5 @@ Thumbs.db
 
 # Dev-generated preview output from `pnpm dev` / `meander serve`
 # against the local fixture. Always regenerated from the source.
-test-walkthrough-docs/walkthrough/
+/test/fixtures/*/pages/
+/test/fixtures/*/walkthrough/

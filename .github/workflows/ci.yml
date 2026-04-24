@@ -56,5 +56,26 @@ jobs:
         run: |
           node --input-type=module -e "
             import { generate } from './src/generate.mts';
-            await generate('./test-walkthrough-docs/walkthrough.json', { __proto__: null });
+            await generate('./test/fixtures/test-docs/meander.config.json', { __proto__: null });
           "
+
+  test:
+    name: Test + coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/setup-and-install
+
+      - name: Run tests
+        run: pnpm run test
+
+      - name: Coverage
+        run: pnpm run cover --summary

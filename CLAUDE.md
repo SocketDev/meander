@@ -113,17 +113,19 @@ Walkthrough generator + live comment system. Scans source files for multiline `/
 - `src/deploy-val.mts` — one-shot Val Town val deploy
 - `assets/` — client-side JS (classic scripts, `"use strict"` at top of IIFE), logos, favicon, meander.css
 - `assets/val/` — the Hono HTTP handler deployed to Val Town
-- `scripts/` — development automation (lint, fix, check, update, clean, dev, optimize-svgs)
+- `scripts/` — development automation (lint, fix, check, update, clean, dev, test, cover)
+- `test/` — vitest tests; `test/fixtures/test-docs/` is the reference fixture used by `pnpm dev` + CI smoke
 
 ### Commands
 
-- **Dev preview**: `pnpm dev` — generates `test-walkthrough-docs/walkthrough/` and serves it at http://127.0.0.1:8080/
+- **Dev preview**: `pnpm dev` — generates `test/fixtures/test-docs/pages/` and serves it at http://127.0.0.1:8080/
 - **Build**: `pnpm build` (tsc; emits `.mjs` + `.d.mts` to `dist/`)
+- **Test**: `pnpm test` (vitest against `test/**/*.test.mts`)
+- **Coverage**: `pnpm cover` (vitest --coverage + type-coverage)
 - **Lint**: `pnpm lint` (oxlint)
 - **Fix**: `pnpm fix` (oxfmt + oxlint --fix — mutates in place)
 - **Check-all**: `pnpm check` (lint + type-check; what CI runs)
-- **Clean**: `pnpm clean` (rm `dist/` + `test-walkthrough-docs/walkthrough/`)
-- **Optimize SVGs**: `pnpm optimize-svgs` (svgo on bundled logos + favicon)
+- **Clean**: `pnpm clean` (safeDelete of `dist/`, `coverage/`, fixture emit dirs)
 - **Update deps**: `pnpm update` (taze with 7-day maturity period + reinstall)
 
 ### Configuration files
@@ -153,7 +155,7 @@ Walkthrough generator + live comment system. Scans source files for multiline `/
 
 ### Consumer contract
 
-Meander is published to npm as `@divmain/meander`. Consumers place `walkthrough.json` at the root of their project and call `meander generate`. The config schema is defined via TypeBox in `src/generate.mts` (`WalkthroughConfigSchema` + `FaviconSchema`). **Breaking config-schema changes need a major version bump** and a migration note in the release.
+Meander is published to npm as `@divmain/meander`. Consumers place `meander.config.json` at the root of their project and call `meander generate`. The config schema is defined via TypeBox in `src/config.mts` (`MeanderConfigSchema` + sub-schemas for parts, docs, favicon, comments, theme, styles). **Breaking config-schema changes need a major version bump** and a migration note in the release.
 
 - `slug`, `title`, `parts[]` — required
 - `documents[]` — optional tabbed Markdown reference docs

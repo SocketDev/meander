@@ -11,6 +11,12 @@
   Annotated code walkthrough pages with a live comment system, hosted on <a href="https://val.town">Val Town</a>.
 </p>
 
+<p align="center">
+  <a href="https://socket.dev/npm/package/@divmain/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@divmain/meander"></a>
+  <a href="https://github.com/divmain/meander/actions/workflows/ci.yml"><img alt="CI - @divmain/meander" src="https://github.com/divmain/meander/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Coverage" src="https://img.shields.io/badge/coverage-99%25-brightgreen">
+</p>
+
 ---
 
 
@@ -38,7 +44,7 @@ npm install -g @divmain/meander
 Or use it without installing:
 
 ```bash
-npx @divmain/meander generate walkthrough.json
+npx @divmain/meander generate meander.config.json
 ```
 
 ## Quick Start
@@ -62,9 +68,9 @@ export function loadConfig(): Config {
 
 Annotations support full Markdown (rendered client-side via `marked`).
 
-### 2. Create `walkthrough.json`
+### 2. Create `meander.config.json`
 
-Place `walkthrough.json` at the root of your project:
+Place `meander.config.json` at the root of your project:
 
 ```json
 {
@@ -92,13 +98,13 @@ Place `walkthrough.json` at the root of your project:
 ### 3. Generate the HTML
 
 ```bash
-meander generate walkthrough.json
+meander generate meander.config.json
 ```
 
-This writes the following files into a `walkthrough/` directory next to your config:
+This writes the following files into a `pages/` directory next to your config:
 
 ```
-pages/                  # default emit dir; override via walkthrough.json's outDir
+pages/                  # default emit dir; override via meander.config.json's outDir
   index.html            # Part listing
   part-1.html           # One file per part (when part has no `filename`)
   part-2.html
@@ -111,7 +117,7 @@ Open any HTML file directly in a browser to preview locally. (The comment system
 
 ## Configuration Reference
 
-### `walkthrough.json` fields
+### `meander.config.json` fields
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -128,7 +134,7 @@ Open any HTML file directly in a browser to preview locally. (The comment system
 | `title` | `string` | Yes | Short part title shown in the nav bar. |
 | `objective` | `string` | Yes | One-sentence description of what the reader will learn. |
 | `keywords` | `string[]` | Yes | Words used to assign comments to this part when a file appears in multiple parts. |
-| `files` | `string[]` | Yes | Source files for this part, relative to the directory containing `walkthrough.json`. |
+| `files` | `string[]` | Yes | Source files for this part, relative to the directory containing `meander.config.json`. |
 
 ### Section assignment
 
@@ -194,8 +200,8 @@ This creates (or updates) a Val Town HTTP val running the Hono server, and sets 
 ### Publish HTML
 
 ```bash
-meander generate walkthrough.json
-meander publish walkthrough.json
+meander generate meander.config.json
+meander publish meander.config.json
 ```
 
 `publish` encrypts the generated HTML files with AES-256-GCM and uploads them to Val Town blob storage under keys like `walkthrough/<slug>/walkthrough-part-1.html`. The shared CSS file is uploaded unencrypted (since browsers must read it directly). After publishing, your walkthrough is live at:

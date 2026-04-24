@@ -15,7 +15,7 @@
  * Safe to call multiple times; each is idempotent (second call is
  * a no-op on already-transformed content).
  */
-import { HTMLElement, parse as parseHtml } from "node-html-parser";
+import { HTMLElement, parse as parseHtml } from 'node-html-parser'
 
 /**
  * Highlight numeric tokens in prose so counts + version numbers
@@ -27,60 +27,60 @@ import { HTMLElement, parse as parseHtml } from "node-html-parser";
  * inside HTML numeric entities and bold list markers like `**1.**`.
  */
 export function highlightProseNumbers(html: string): string {
-  const root = parseHtml(html);
+  const root = parseHtml(html)
   const allowed = new Set([
-    "P",
-    "LI",
-    "TD",
-    "TH",
-    "BLOCKQUOTE",
-    "DD",
-    "DT",
-    "H1",
-    "H2",
-    "H3",
-    "H4",
-  ]);
-  const skip = new Set(["CODE", "PRE", "A", "KBD", "SAMP"]);
+    'P',
+    'LI',
+    'TD',
+    'TH',
+    'BLOCKQUOTE',
+    'DD',
+    'DT',
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+  ])
+  const skip = new Set(['CODE', 'PRE', 'A', 'KBD', 'SAMP'])
   const pattern =
-    /(?<!&#)(?<!&#x)(?<![\w.-])([≥≤~]?\s?\d+(?:\.\d+)+(?:-[a-z]+(?:\.\d+)*)?[+%]?|[≥≤~]?\s?\d+[+%]?)(?![\w-])(?!\.\s|\.\d)/gi;
+    /(?<!&#)(?<!&#x)(?<![\w.-])([≥≤~]?\s?\d+(?:\.\d+)+(?:-[a-z]+(?:\.\d+)*)?[+%]?|[≥≤~]?\s?\d+[+%]?)(?![\w-])(?!\.\s|\.\d)/gi
   const walk = (node: HTMLElement): void => {
     if (skip.has(node.tagName)) {
-      return;
+      return
     }
-    const tag = node.tagName;
+    const tag = node.tagName
     /* Inside <strong> at the start of an <li>, the number is a
      * manually-bolded list marker ("**1.** Branch"). Don't
      * re-colorize. */
-    const parent = node.parentNode as HTMLElement | null;
+    const parent = node.parentNode as HTMLElement | null
     const isLiStartMarker =
-      tag === "STRONG" &&
-      parent?.tagName === "LI" &&
+      tag === 'STRONG' &&
+      parent?.tagName === 'LI' &&
       parent.firstElementChild === node &&
-      /^\d+\./.test(node.text.trim());
+      /^\d+\./.test(node.text.trim())
     if (isLiStartMarker) {
-      return;
+      return
     }
-    const children = [...node.childNodes];
+    const children = [...node.childNodes]
     for (const child of children) {
-      const any = child as unknown as { nodeType: number; rawText?: string };
+      const any = child as unknown as { nodeType: number; rawText?: string }
       if (any.nodeType === 3) {
         if (!allowed.has(tag)) {
-          continue;
+          continue
         }
-        const text: string = any.rawText ?? "";
+        const text: string = any.rawText ?? ''
         if (!pattern.test(text)) {
-          continue;
+          continue
         }
-        pattern.lastIndex = 0;
-        any.rawText = text.replace(pattern, '<span class="mdr-num">$1</span>');
+        pattern.lastIndex = 0
+        any.rawText = text.replace(pattern, '<span class="mdr-num">$1</span>')
       } else if (any.nodeType === 1) {
-        walk(child as HTMLElement);
+        walk(child as HTMLElement)
       }
     }
-  };
-  walk(root as unknown as HTMLElement);
-  return root.toString();
+  }
+  walk(root as unknown as HTMLElement)
+  return root.toString()
 }
 
 /**
@@ -93,43 +93,43 @@ export function highlightProseNumbers(html: string): string {
  * so nested or complex expressions fall through untouched.
  */
 export function italicizeParentheticals(html: string): string {
-  const root = parseHtml(html);
-  const allowed = new Set(["P", "LI", "TD", "TH", "BLOCKQUOTE", "DD", "DT"]);
+  const root = parseHtml(html)
+  const allowed = new Set(['P', 'LI', 'TD', 'TH', 'BLOCKQUOTE', 'DD', 'DT'])
   const walk = (node: HTMLElement): void => {
-    const tag = node.tagName;
+    const tag = node.tagName
     if (
-      tag === "CODE" ||
-      tag === "PRE" ||
-      tag === "KBD" ||
-      tag === "SAMP" ||
-      tag === "A"
+      tag === 'CODE' ||
+      tag === 'PRE' ||
+      tag === 'KBD' ||
+      tag === 'SAMP' ||
+      tag === 'A'
     ) {
-      return;
+      return
     }
     for (const child of node.childNodes) {
-      const any = child as unknown as { nodeType: number; rawText?: string };
+      const any = child as unknown as { nodeType: number; rawText?: string }
       if (any.nodeType === 3) {
         if (!allowed.has(tag)) {
-          continue;
+          continue
         }
-        const text: string = any.rawText ?? "";
+        const text: string = any.rawText ?? ''
         if (!/\([^()<>"'`]{2,}\)/.test(text)) {
-          continue;
+          continue
         }
         const rewritten = text.replace(
           /\(([^()<>"'`]{2,})\)/g,
           (_, inner) => `(<em>${inner}</em>)`,
-        );
+        )
         if (rewritten !== text) {
-          any.rawText = rewritten;
+          any.rawText = rewritten
         }
       } else if (any.nodeType === 1) {
-        walk(child as HTMLElement);
+        walk(child as HTMLElement)
       }
     }
-  };
-  walk(root as unknown as HTMLElement);
-  return root.toString();
+  }
+  walk(root as unknown as HTMLElement)
+  return root.toString()
 }
 
 /**
@@ -142,46 +142,46 @@ export function italicizeParentheticals(html: string): string {
  * collapse whitespace to `-`. Collisions get `-2`, `-3`, …
  */
 export function anchorifyHeadings(html: string): string {
-  const root = parseHtml(html);
-  const used = new Set<string>();
-  const headings = root.querySelectorAll("h2, h3, h4");
+  const root = parseHtml(html)
+  const used = new Set<string>()
+  const headings = root.querySelectorAll('h2, h3, h4')
   for (const h of headings) {
     /* Idempotency: skip if a permalink anchor was already
      * inserted (double-polishing a page shouldn't produce two
      * `#` links per heading). */
-    if (h.querySelector(".mdr-heading-anchor")) {
-      continue;
+    if (h.querySelector('.mdr-heading-anchor')) {
+      continue
     }
-    const existingId = h.getAttribute("id");
-    let slug = existingId ?? "";
+    const existingId = h.getAttribute('id')
+    let slug = existingId ?? ''
     if (!slug) {
-      const text = h.text.trim();
+      const text = h.text.trim()
       if (!text) {
-        continue;
+        continue
       }
       const baseSlug = text
         .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s-]+/gu, "")
+        .replace(/[^\p{L}\p{N}\s-]+/gu, '')
         .trim()
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-");
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
       if (!baseSlug) {
-        continue;
+        continue
       }
-      slug = baseSlug;
-      let n = 2;
+      slug = baseSlug
+      let n = 2
       while (used.has(slug)) {
-        slug = `${baseSlug}-${n++}`;
+        slug = `${baseSlug}-${n++}`
       }
-      h.setAttribute("id", slug);
+      h.setAttribute('id', slug)
     }
-    used.add(slug);
+    used.add(slug)
     h.insertAdjacentHTML(
-      "beforeend",
+      'beforeend',
       ` <a class="mdr-heading-anchor" href="#${slug}" aria-label="Permalink to this section">#</a>`,
-    );
+    )
   }
-  return root.toString();
+  return root.toString()
 }
 
 /**
@@ -193,21 +193,49 @@ export function anchorifyHeadings(html: string): string {
  * otherwise.
  */
 export function enhanceRepoTrees(html: string): string {
-  const root = parseHtml(html);
-  const preBlocks = root.querySelectorAll("pre");
+  const root = parseHtml(html)
+  const preBlocks = root.querySelectorAll('pre')
   for (const pre of preBlocks) {
-    const text = pre.text;
+    const text = pre.text
     if (!/[├└│]/.test(text)) {
-      continue;
+      continue
     }
-    const existingClass = pre.getAttribute("class") ?? "";
-    pre.setAttribute("class", `${existingClass} mdr-repo-tree`.trim());
-    for (const code of pre.querySelectorAll("code")) {
-      const cc = code.getAttribute("class") ?? "";
-      code.setAttribute("class", `${cc} nohighlight`.trim());
+    const existingClass = pre.getAttribute('class') ?? ''
+    /* Idempotency: don't stack `mdr-repo-tree` if a prior pass
+     * already marked this pre. */
+    if (!/\bmdr-repo-tree\b/.test(existingClass)) {
+      pre.setAttribute('class', `${existingClass} mdr-repo-tree`.trim())
+    }
+    /* node-html-parser doesn't descend into <pre> for
+     * querySelectorAll (they're treated as raw-content), so
+     * rewrite the inner HTML directly to add `nohighlight` on
+     * the first inner <code>. Regex-based because the DOM
+     * walker can't reach it. Idempotent: matches a code tag
+     * that doesn't already carry nohighlight. */
+    const innerHtml = pre.innerHTML
+    const rewritten = innerHtml.replace(
+      /<code(\s[^>]*)?>/,
+      (match, attrs: string | undefined) => {
+        if (attrs && /\bnohighlight\b/.test(attrs)) {
+          return match
+        }
+        const classMatch = (attrs ?? '').match(/\sclass="([^"]*)"/)
+        if (classMatch) {
+          const merged = `${classMatch[1]} nohighlight`.trim()
+          const updatedAttrs = (attrs ?? '').replace(
+            /\sclass="[^"]*"/,
+            ` class="${merged}"`,
+          )
+          return `<code${updatedAttrs}>`
+        }
+        return `<code${attrs ?? ''} class="nohighlight">`
+      },
+    )
+    if (rewritten !== innerHtml) {
+      pre.innerHTML = rewritten
     }
   }
-  return root.toString();
+  return root.toString()
 }
 
 /**
@@ -218,38 +246,40 @@ export function enhanceRepoTrees(html: string): string {
  * variants like "Further Reading" and "Further reading:".
  */
 export function stripFurtherReading(html: string): string {
-  const root = parseHtml(html);
-  const headings = root.querySelectorAll("h2");
+  const root = parseHtml(html)
+  const headings = root.querySelectorAll('h2')
   for (const h of headings) {
     const text = h.text
       .trim()
       .toLowerCase()
-      .replace(/[:.…]+$/, "");
-    if (text !== "further reading") {
-      continue;
+      .replace(/[:.…]+$/, '')
+    if (text !== 'further reading') {
+      continue
     }
-    const parent = h.parentNode as HTMLElement | null;
+    const parent = h.parentNode as HTMLElement | null
+    /* v8 ignore start -- defensive; both guards cover unreachable DOM states. */
     if (!parent) {
-      continue;
+      continue
     }
-    const children = parent.childNodes;
-    const startIdx = children.indexOf(h);
+    const children = parent.childNodes
+    const startIdx = children.indexOf(h)
     if (startIdx < 0) {
-      continue;
+      continue
     }
-    const toRemove: unknown[] = [];
+    /* v8 ignore stop */
+    const toRemove: unknown[] = []
     for (let i = startIdx; i < children.length; i++) {
-      const c = children[i];
-      if (i > startIdx && (c as HTMLElement).tagName === "H2") {
-        break;
+      const c = children[i]
+      if (i > startIdx && (c as HTMLElement).tagName === 'H2') {
+        break
       }
-      toRemove.push(c);
+      toRemove.push(c)
     }
     for (const n of toRemove) {
-      (n as { remove?: () => void }).remove?.();
+      ;(n as { remove?: () => void }).remove?.()
     }
   }
-  return root.toString();
+  return root.toString()
 }
 
 /**
@@ -257,11 +287,11 @@ export function stripFurtherReading(html: string): string {
  * who only want a subset should call the individual functions.
  */
 export function polishProse(html: string): string {
-  let out = html;
-  out = stripFurtherReading(out);
-  out = enhanceRepoTrees(out);
-  out = anchorifyHeadings(out);
-  out = highlightProseNumbers(out);
-  out = italicizeParentheticals(out);
-  return out;
+  let out = html
+  out = stripFurtherReading(out)
+  out = enhanceRepoTrees(out)
+  out = anchorifyHeadings(out)
+  out = highlightProseNumbers(out)
+  out = italicizeParentheticals(out)
+  return out
 }

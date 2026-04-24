@@ -14,33 +14,30 @@
  *
  * Idempotent — running the pass twice is a no-op.
  */
-import { HTMLElement, parse as parseHtml } from "node-html-parser";
+import { HTMLElement, parse as parseHtml } from 'node-html-parser'
 
-export function applyBasePathToHtml(
-  html: string,
-  basePath: string,
-): string {
+export function applyBasePathToHtml(html: string, basePath: string): string {
   if (!basePath) {
-    return html;
+    return html
   }
-  const root = parseHtml(html);
-  let changed = false;
-  const prefix = (el: HTMLElement, attr: "href" | "src"): void => {
-    const value = el.getAttribute(attr);
-    if (!value || !value.startsWith("/")) {
-      return;
+  const root = parseHtml(html)
+  let changed = false
+  const prefix = (el: HTMLElement, attr: 'href' | 'src'): void => {
+    const value = el.getAttribute(attr)
+    if (!value || !value.startsWith('/')) {
+      return
     }
-    if (value.startsWith(basePath + "/") || value === basePath) {
-      return;
+    if (value.startsWith(basePath + '/') || value === basePath) {
+      return
     }
-    el.setAttribute(attr, `${basePath}${value}`);
-    changed = true;
-  };
-  for (const el of root.querySelectorAll("[href]")) {
-    prefix(el, "href");
+    el.setAttribute(attr, `${basePath}${value}`)
+    changed = true
   }
-  for (const el of root.querySelectorAll("[src]")) {
-    prefix(el, "src");
+  for (const el of root.querySelectorAll('[href]')) {
+    prefix(el, 'href')
   }
-  return changed ? root.toString() : html;
+  for (const el of root.querySelectorAll('[src]')) {
+    prefix(el, 'src')
+  }
+  return changed ? root.toString() : html
 }

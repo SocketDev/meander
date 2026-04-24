@@ -22,21 +22,21 @@
  * markdown processing falls back to leaving ```mermaid blocks
  * as inert <pre><code> — consumers see the raw source.
  */
-import { hash as cryptoHash } from "node:crypto";
-import { existsSync, promises as fs } from "node:fs";
-import path from "node:path";
+import { hash as cryptoHash } from 'node:crypto'
+import { existsSync, promises as fs } from 'node:fs'
+import path from 'node:path'
 
-export type MermaidTheme = "default" | "dark" | "neutral" | "forest";
+export type MermaidTheme = 'default' | 'dark' | 'neutral' | 'forest'
 
 export type MermaidRenderer = {
-  render: (source: string, theme: MermaidTheme) => Promise<string>;
-  close: () => Promise<void>;
-};
+  render: (source: string, theme: MermaidTheme) => Promise<string>
+  close: () => Promise<void>
+}
 
 export type MermaidRendererConfig = {
-  repoRoot: string;
-  cacheDir: string;
-};
+  repoRoot: string
+  cacheDir: string
+}
 
 /* SVGO config — preset-default with two overrides disabled:
  *   - cleanupIds: mermaid uses IDs for edge-to-node linking;
@@ -48,7 +48,7 @@ const svgoConfig = {
   multipass: true,
   plugins: [
     {
-      name: "preset-default",
+      name: 'preset-default',
       params: {
         overrides: {
           cleanupIds: false,
@@ -57,7 +57,7 @@ const svgoConfig = {
       },
     },
   ],
-};
+}
 
 /**
  * Create a renderer backed by a shared puppeteer browser. Call
@@ -70,126 +70,127 @@ const svgoConfig = {
 export async function createMermaidRenderer(
   config: MermaidRendererConfig,
 ): Promise<MermaidRenderer> {
-  const { repoRoot, cacheDir } = config;
+  const { repoRoot, cacheDir } = config
 
   const mermaidJsPath = path.join(
     repoRoot,
-    "node_modules",
-    "mermaid",
-    "dist",
-    "mermaid.min.js",
-  );
+    'node_modules',
+    'mermaid',
+    'dist',
+    'mermaid.min.js',
+  )
   if (!existsSync(mermaidJsPath)) {
     throw new Error(
       `mermaid not installed at ${mermaidJsPath}. Install with: pnpm add -D mermaid puppeteer svgo`,
-    );
+    )
   }
-  const mermaidJs = await fs.readFile(mermaidJsPath, "utf8");
+  const mermaidJs = await fs.readFile(mermaidJsPath, 'utf8')
   const mermaidPkgPath = path.join(
     repoRoot,
-    "node_modules",
-    "mermaid",
-    "package.json",
-  );
+    'node_modules',
+    'mermaid',
+    'package.json',
+  )
   const mermaidVersion = existsSync(mermaidPkgPath)
     ? ((
-        JSON.parse(await fs.readFile(mermaidPkgPath, "utf8")) as {
-          version?: string;
+        JSON.parse(await fs.readFile(mermaidPkgPath, 'utf8')) as {
+          version?: string
         }
-      ).version ?? "0")
-    : "0";
+      ).version ?? '0')
+    : '0'
 
   /* Dynamic imports so consumers without mermaid/puppeteer/svgo
    * don't fail to load meander itself — only fail when they
    * actually try to render a diagram. */
-  let puppeteerMod: { launch: typeof import("puppeteer").launch };
+  let puppeteerMod: { launch: typeof import('puppeteer').launch }
   try {
-    puppeteerMod = (await import("puppeteer")) as unknown as {
-      launch: typeof import("puppeteer").launch;
-    };
+    puppeteerMod = (await import('puppeteer')) as unknown as {
+      launch: typeof import('puppeteer').launch
+    }
   } catch {
     throw new Error(
-      "puppeteer not installed. Install with: pnpm add -D puppeteer",
-    );
+      'puppeteer not installed. Install with: pnpm add -D puppeteer',
+    )
   }
-  let svgoMod: typeof import("svgo");
+  let svgoMod: typeof import('svgo')
   try {
-    svgoMod = await import("svgo");
+    svgoMod = await import('svgo')
   } catch {
-    throw new Error("svgo not installed. Install with: pnpm add -D svgo");
+    throw new Error('svgo not installed. Install with: pnpm add -D svgo')
   }
 
-  await fs.mkdir(cacheDir, { recursive: true });
+  await fs.mkdir(cacheDir, { recursive: true })
 
   /* Lazy-launch — pay the Chromium boot cost (~1-2s) only when
    * there's a cache miss. Unchanged diagrams are pure disk reads. */
-  let browser: import("puppeteer").Browser | null = null;
-  const ensureBrowser = async (): Promise<import("puppeteer").Browser> => {
+  let browser: import('puppeteer').Browser | null = null
+  const ensureBrowser = async (): Promise<import('puppeteer').Browser> => {
     if (!browser) {
       browser = await puppeteerMod.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
     }
-    return browser;
-  };
+    return browser
+  }
 
   const render = async (
     source: string,
     theme: MermaidTheme,
   ): Promise<string> => {
     const key = cryptoHash(
-      "sha256",
+      'sha256',
       `${mermaidVersion}\n${theme}\n${source}`,
-      "hex",
-    );
-    const cachePath = path.join(cacheDir, `${key}.svg`);
+      'hex',
+    )
+    const cachePath = path.join(cacheDir, `${key}.svg`)
     if (existsSync(cachePath)) {
-      return fs.readFile(cachePath, "utf8");
+      return fs.readFile(cachePath, 'utf8')
     }
 
-    const activeBrowser = await ensureBrowser();
-    const page = await activeBrowser.newPage();
+    const activeBrowser = await ensureBrowser()
+    const page = await activeBrowser.newPage()
     try {
       await page.setContent(
         `<!doctype html><html><head><meta charset="utf-8"><style>
           body { margin: 0; padding: 20px; font-family: Helvetica, Arial, sans-serif; }
           #out { width: 1200px; }
         </style><script>${mermaidJs}</script></head><body><div id="out"></div></body></html>`,
-      );
-      await page.setViewport({ width: 1400, height: 900 });
+      )
+      await page.setViewport({ width: 1400, height: 900 })
       await page.evaluate(
         async (src: string, themeArg: string) => {
-          const mermaid = (window as unknown as { mermaid: unknown }).mermaid as {
-            initialize: (opts: Record<string, unknown>) => void;
+          const mermaid = (window as unknown as { mermaid: unknown })
+            .mermaid as {
+            initialize: (opts: Record<string, unknown>) => void
             render: (
               id: string,
               src: string,
               container: Element,
-            ) => Promise<{ svg: string }>;
-          };
+            ) => Promise<{ svg: string }>
+          }
           /* Wait for fonts so mermaid measures labels against the
            * font that will actually paint. Without this, mermaid
            * uses fallback metrics and labels overflow their nodes. */
-          await document.fonts.ready;
+          await document.fonts.ready
           await Promise.allSettled(
             [...document.fonts].map((f: FontFace) => f.load()),
-          );
+          )
           /* Real DOM-attached container — getBBox() returns stale
            * or zero metrics on detached nodes. Hidden via max-height
            * + opacity rather than unmounted. */
-          const container = document.createElement("div");
+          const container = document.createElement('div')
           Object.assign(container.style, {
-            maxHeight: "0",
-            opacity: "0",
-            overflow: "hidden",
-          });
-          container.setAttribute("aria-hidden", "true");
-          document.body.append(container);
+            maxHeight: '0',
+            opacity: '0',
+            overflow: 'hidden',
+          })
+          container.setAttribute('aria-hidden', 'true')
+          document.body.append(container)
           mermaid.initialize({
             startOnLoad: false,
             theme: themeArg,
-            securityLevel: "strict",
+            securityLevel: 'strict',
             /* MUST be top-level in mermaid 11.12.3+. Nested
              * flowchart.htmlLabels is deprecated; forces <foreignObject>
              * labels that hit a max-width:200px clipping bug
@@ -197,56 +198,59 @@ export async function createMermaidRenderer(
              * pure SVG <text>. */
             htmlLabels: false,
             flowchart: {
-              curve: "basis",
+              curve: 'basis',
               useMaxWidth: false,
               nodeSpacing: 80,
               rankSpacing: 80,
               padding: 30,
             },
-            fontFamily: "Helvetica, Arial, sans-serif",
+            fontFamily: 'Helvetica, Arial, sans-serif',
             fontSize: 14,
             themeVariables: {
-              fontFamily: "Helvetica, Arial, sans-serif",
-              fontSize: "14px",
+              fontFamily: 'Helvetica, Arial, sans-serif',
+              fontSize: '14px',
             },
-          });
-          const { svg } = await mermaid.render("diagram", src, container);
-          const out = document.getElementById("out");
+          })
+          const { svg } = await mermaid.render('diagram', src, container)
+          const out = document.getElementById('out')
           if (out) {
-            out.innerHTML = svg;
+            out.innerHTML = svg
           }
         },
         source,
         theme,
-      );
+      )
       const rawSvg = (await page.$eval(
-        "#out svg",
-        (el) => el.outerHTML,
-      )) as string;
+        '#out svg',
+        el => el.outerHTML,
+      )) as string
       /* SVGO pass — mermaid occasionally emits constructs SVGO's
        * parser dislikes; raw SVG on failure is visually correct. */
-      let finalSvg: string;
+      let finalSvg: string
       try {
-        const optimized = svgoMod.optimize(rawSvg, svgoConfig as Parameters<typeof svgoMod.optimize>[1]);
-        finalSvg = optimized.data;
+        const optimized = svgoMod.optimize(
+          rawSvg,
+          svgoConfig as Parameters<typeof svgoMod.optimize>[1],
+        )
+        finalSvg = optimized.data
       } catch {
-        finalSvg = rawSvg;
+        finalSvg = rawSvg
       }
-      await fs.writeFile(cachePath, finalSvg);
-      return finalSvg;
+      await fs.writeFile(cachePath, finalSvg)
+      return finalSvg
     } finally {
-      await page.close();
+      await page.close()
     }
-  };
+  }
 
   const close = async (): Promise<void> => {
     if (browser) {
-      await browser.close();
-      browser = null;
+      await browser.close()
+      browser = null
     }
-  };
+  }
 
-  return { render, close };
+  return { render, close }
 }
 
 /**
@@ -260,30 +264,33 @@ export async function createMermaidRenderer(
  * rendering is async.
  */
 export type PreRenderOptions = {
-  theme?: MermaidTheme | undefined;
-};
+  theme?: MermaidTheme | undefined
+}
 
 export async function preRenderMermaidBlocks(
   markdown: string,
   renderer: MermaidRenderer,
   options: PreRenderOptions = { __proto__: null } as PreRenderOptions,
 ): Promise<{ markdown: string; svgByToken: Map<string, string> }> {
-  const { theme = "default" } = { __proto__: null, ...options } as PreRenderOptions;
-  const svgByToken = new Map<string, string>();
-  const fencePattern = /```mermaid\n([\s\S]*?)```/g;
-  let counter = 0;
-  const pending: Array<Promise<void>> = [];
-  const tokens: Array<{ match: string; token: string }> = [];
-  let m;
+  const { theme = 'default' } = {
+    __proto__: null,
+    ...options,
+  } as PreRenderOptions
+  const svgByToken = new Map<string, string>()
+  const fencePattern = /```mermaid\n([\s\S]*?)```/g
+  let counter = 0
+  const pending: Array<Promise<void>> = []
+  const tokens: Array<{ match: string; token: string }> = []
+  let m
   while ((m = fencePattern.exec(markdown)) !== null) {
-    const source = m[1]!;
-    const token = `MDR_MERMAID_TOKEN_${counter++}`;
-    tokens.push({ match: m[0], token });
+    const source = m[1]!
+    const token = `MDR_MERMAID_TOKEN_${counter++}`
+    tokens.push({ match: m[0], token })
     pending.push(
-      renderer.render(source, theme).then((svg) => {
-        svgByToken.set(token, svg);
+      renderer.render(source, theme).then(svg => {
+        svgByToken.set(token, svg)
       }),
-    );
+    )
   }
   /* allSettled: a single failed diagram shouldn't abort the
    * whole batch. The renderer logs per-diagram failures; we
@@ -291,21 +298,21 @@ export async function preRenderMermaidBlocks(
    * token stays in the HTML and the SVG map just won't have
    * an entry for it — `inlineMermaidSvgs` leaves such tokens
    * as-is). */
-  const results = await Promise.allSettled(pending);
+  const results = await Promise.allSettled(pending)
   for (const [i, result] of results.entries()) {
-    if (result.status === "rejected") {
-      const token = tokens[i]?.token ?? "?";
+    if (result.status === 'rejected') {
+      const token = tokens[i]?.token ?? '?'
       console.error(
         `[mermaid] ${token} render failed:`,
         result.reason instanceof Error ? result.reason.message : result.reason,
-      );
+      )
     }
   }
-  let out = markdown;
+  let out = markdown
   for (const { match, token } of tokens) {
-    out = out.replace(match, `<div class="mdr-mermaid">${token}</div>`);
+    out = out.replace(match, `<div class="mdr-mermaid">${token}</div>`)
   }
-  return { markdown: out, svgByToken };
+  return { markdown: out, svgByToken }
 }
 
 /**
@@ -316,9 +323,9 @@ export function inlineMermaidSvgs(
   html: string,
   svgByToken: Map<string, string>,
 ): string {
-  let out = html;
+  let out = html
   for (const [token, svg] of svgByToken) {
-    out = out.replace(token, svg);
+    out = out.replace(token, svg)
   }
-  return out;
+  return out
 }
