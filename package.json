@@ -44,5 +44,17 @@
     "taze": "19.9.2",
     "typescript": "5.9.2",
     "yoctocolors-cjs": "2.1.3"
+  },
+  "peerDependencies": {
+    "mermaid": ">=11",
+    "puppeteer": ">=23"
+  },
+  "peerDependenciesMeta": {
+    "mermaid": {
+      "optional": true
+    },
+    "puppeteer": {
+      "optional": true
+    }
   }
 }

@@ -94,6 +94,33 @@ const WalkthroughConfigSchema = Type.Object({
    * FaviconSchema above for examples.
    */
   favicon: Type.Optional(FaviconSchema),
+  /**
+   * Pre-render ```mermaid fenced code blocks in docs to SVG at
+   * build time so pages ship with finished diagrams and no
+   * client-side mermaid bundle.
+   *
+   * Requires `mermaid`, `puppeteer`, and `svgo` as peer deps
+   * (installed in the consumer's node_modules). Default: false.
+   *
+   * Pass `true` for defaults, or an object to customize:
+   *   { mermaid: { theme: "dark", cacheDir: ".cache/mermaid" } }
+   */
+  mermaid: Type.Optional(
+    Type.Union([
+      Type.Boolean(),
+      Type.Object({
+        theme: Type.Optional(
+          Type.Union([
+            Type.Literal("default"),
+            Type.Literal("dark"),
+            Type.Literal("neutral"),
+            Type.Literal("forest"),
+          ]),
+        ),
+        cacheDir: Type.Optional(Type.String({ minLength: 1 })),
+      }),
+    ]),
+  ),
 });
 
 type WalkthroughPart = Static<typeof WalkthroughPartSchema>;
@@ -1271,12 +1298,27 @@ function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
  * @param allDocPaths - Array of all document paths in the walkthrough
  * @returns Rendered document with HTML, headings, and block count
  */
-function renderMarkdownDocument(
+async function renderMarkdownDocument(
   filePath: string,
   docIndex: number,
   allDocPaths: readonly string[],
-): RenderedDocument {
-  const markdown = readFileSync(filePath, "utf-8");
+  mermaidRenderer?: import("./render-mermaid.mts").MermaidRenderer,
+  mermaidTheme: import("./render-mermaid.mts").MermaidTheme = "default",
+): Promise<RenderedDocument> {
+  let markdown = readFileSync(filePath, "utf-8");
+  /* Pre-pass: swap ```mermaid fences for opaque tokens so marked
+   * doesn't try to highlight them. SVGs are inlined after
+   * marked.parse + polishers so we don't run the HTML transforms
+   * over every diagram's <text>/<path>. */
+  let mermaidSvgs: Map<string, string> | null = null;
+  if (mermaidRenderer) {
+    const { preRenderMermaidBlocks } = await import("./render-mermaid.mts");
+    const pre = await preRenderMermaidBlocks(markdown, mermaidRenderer, {
+      theme: mermaidTheme,
+    });
+    markdown = pre.markdown;
+    mermaidSvgs = pre.svgByToken;
+  }
   const headings: Array<{ id: string; text: string; level: number }> = [];
 
   // Get the relative path for this document (for cross-reference resolution)
@@ -1367,7 +1409,12 @@ function renderMarkdownDocument(
    * Runs before wrapBlocks so block-wrapping logic sees the
    * transformed markup — headings carry their new ids when they
    * become anchor targets, tree blocks carry their classes. */
-  const polishedHtml = polishProse(rawHtml);
+  let polishedHtml = polishProse(rawHtml);
+
+  if (mermaidSvgs && mermaidSvgs.size > 0) {
+    const { inlineMermaidSvgs } = await import("./render-mermaid.mts");
+    polishedHtml = inlineMermaidSvgs(polishedHtml, mermaidSvgs);
+  }
 
   // Wrap blocks
   const { wrapped, blockCount } = wrapBlocks(polishedHtml);
@@ -1689,15 +1736,45 @@ export async function generate(
   writeFileSync(path.join(outDir, "index.html"), indexHtml);
 
   if (documents && documents.length > 0) {
-    const renderedDocs: RenderedDocData[] = documents.map((docPath, index) => {
+    /* Optional mermaid renderer. Created once per build and
+     * shared across every doc's pre-pass so the Chromium boot
+     * cost is paid at most once. `config.mermaid` can be `true`
+     * (defaults), `false` / missing (disabled), or an object
+     * with theme + cacheDir overrides. */
+    type MermaidRenderer = import("./render-mermaid.mts").MermaidRenderer;
+    let mermaidRenderer: MermaidRenderer | null = null;
+    if (config.mermaid) {
+      const { createMermaidRenderer } = await import("./render-mermaid.mts");
+      const mOpts = typeof config.mermaid === "object" ? config.mermaid : {};
+      mermaidRenderer = await createMermaidRenderer({
+        repoRoot: rootDir,
+        cacheDir: mOpts.cacheDir
+          ? path.resolve(rootDir, mOpts.cacheDir)
+          : path.join(rootDir, ".cache", "mermaid"),
+      });
+    }
+    const mermaidTheme: import("./render-mermaid.mts").MermaidTheme = (
+      typeof config.mermaid === "object" ? config.mermaid.theme : undefined
+    ) ?? "default";
+    const renderedDocs: RenderedDocData[] = [];
+    for (const [index, docPath] of documents.entries()) {
       const fullPath = path.join(rootDir, docPath);
-      const rendered = renderMarkdownDocument(fullPath, index, documents);
-      return {
+      const rendered = await renderMarkdownDocument(
+        fullPath,
+        index,
+        documents,
+        mermaidRenderer ?? undefined,
+        mermaidTheme,
+      );
+      renderedDocs.push({
         filePath: docPath,
         html: rendered.html,
         headings: rendered.headings,
-      };
-    });
+      });
+    }
+    if (mermaidRenderer) {
+      await mermaidRenderer.close();
+    }
     const documentsHtml = renderDocumentsHtml(
       slug,
       parts,
