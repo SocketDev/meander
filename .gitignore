@@ -1,6 +1,44 @@
-node_modules/
-dist/
-.janus
+# OS files
+.DS_Store
+._.DS_Store
+Thumbs.db
+
+# Environment & config
+/.claude/*
+!/.claude/agents/
+!/.claude/commands/
+!/.claude/hooks/
+!/.claude/ops/
+!/.claude/skills/
+!/.claude/settings.json
+/.env
+/.env.local
+/.env.*.local
+/.node-version
+/.nvm
+/.pnpmfile.cjs
+
+# Build artifacts
+/dist
+/coverage
+*.log
+*.pid
+*.seed
+*.pid.lock
+/.janus
+
+# Editor files
+/.vscode
+*.swp
+*.swo
+#*#
+.#*
+
+# Cache directories
+**/.cache
+
+# Dependencies
+/node_modules
 
 # Dev-generated preview output from `pnpm dev` / `meander serve`
 # against the local fixture. Always regenerated from the source.

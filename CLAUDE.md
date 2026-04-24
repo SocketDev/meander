@@ -139,7 +139,7 @@ Walkthrough generator + live comment system. Scans source files for multiline `/
 
 ### Node + TypeScript
 
-- Source files are `.mts`. Node 25+ runs them natively via `--experimental-strip-types --no-warnings` (used throughout the `scripts/` runners).
+- Source files are `.mts`. Node 25+ runs them natively — no flag needed (the pinned version lives in `.node-version`). The `scripts/` runners just shell out to `node scripts/foo.mts`.
 - `tsconfig.json` enables `allowImportingTsExtensions` + `rewriteRelativeImportExtensions` — imports say `.mts`, tsc rewrites to `.mjs` at build time so the same source runs under Node (native) OR under the dist'd output.
 - `erasableSyntaxOnly` is enforced: no runtime-only TS syntax (no `enum`, no namespaces, etc.).
 - `noUncheckedIndexedAccess` is enforced: `arr[i]` has type `T | undefined`.
