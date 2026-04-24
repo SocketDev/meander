@@ -1,3 +1,10 @@
+/* Cross-fade on same-origin navigation (View Transitions API).
+ * Non-supporting browsers ignore the rule; no polyfill shipped.
+ * The UA honors prefers-reduced-motion on the transition itself. */
+@view-transition {
+  navigation: auto;
+}
+
 :root,
 html[data-theme="light"] {
   --bg: #ffffff;
@@ -1889,6 +1896,38 @@ pre.mdr-repo-tree code {
 
 .annotation-md.mdr-annotation-md-ready {
   opacity: 1;
+}
+
+/* Resilience fallback: if annotation-ready.js never runs (SRI
+ * failure, CDN outage, thrown exception), reveal the raw
+ * content after 600ms so the page isn't stuck on the opacity:0
+ * placeholder forever. Reader sees one frame of raw @markers
+ * but at least sees the content. */
+@keyframes mdr-annotation-md-fallback {
+  to {
+    visibility: visible;
+  }
+}
+
+.annotation-md:not(.mdr-annotation-md-ready):not(:empty) > * {
+  animation: mdr-annotation-md-fallback 0ms linear 600ms forwards;
+}
+
+/* Neutralize motion when the user opts into reduced-motion.
+ * Covers the neo-kiju bolt-strike + spark sequence and the
+ * annotation-md fade — those are one-shot entrance effects,
+ * so stripping them leaves the final rest state intact. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="neo-kiju"].mdr-theme-toggle-fired .theme-icon-neo-kiju,
+  html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+    .theme-toggle
+    .theme-icon-neo-kiju
+    .mdr-spark {
+    animation: none;
+  }
+  .annotation-md {
+    transition: none;
+  }
 }
 
 /* Tag pill — "[@throws]" etc. Muted chip that reads as a label
