@@ -104,4 +104,24 @@ describe('generate opt-outs', () => {
     )
     expect(index).toContain('meander:pages:theme')
   })
+
+  it('`demoMode: true` stamps data-demo-mode on body', async () => {
+    await generate(writeConfig({ demoMode: true }), { __proto__: null } as {
+      __proto__: null
+    })
+    const index = readFileSync(
+      path.join(tmpDir, 'pages', 'index.html'),
+      'utf-8',
+    )
+    expect(index).toContain('data-demo-mode="true"')
+  })
+
+  it('omits data-demo-mode by default', async () => {
+    await generate(writeConfig({}), { __proto__: null } as { __proto__: null })
+    const index = readFileSync(
+      path.join(tmpDir, 'pages', 'index.html'),
+      'utf-8',
+    )
+    expect(index).not.toContain('data-demo-mode')
+  })
 })

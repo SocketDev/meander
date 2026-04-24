@@ -15,8 +15,8 @@ through the one-time setup and the publish loop.
 Meander uses the token in two places, with different scope
 needs:
 
-| Command             | Scope needed                         |
-| ------------------- | ------------------------------------ |
+| Command              | Scope needed                         |
+| -------------------- | ------------------------------------ |
 | `meander deploy-val` | `val:write` (create / update vals)   |
 | `meander publish`    | `blob:write` (upload encrypted HTML) |
 
@@ -33,34 +33,54 @@ Town → Settings → API Tokens. Update the GitHub secret under
 
 ```bash
 export VALTOWN_TOKEN=vtwn_...
-export WALKTHROUGH_USER=youruser
-export WALKTHROUGH_PASS=yourpassword
+export MEANDER_ENCRYPTION_KEY='a-long-random-string'
 ```
 
 - `VALTOWN_TOKEN` — the API token you just created. If your CI
-  uses a different secret name, set `MEANDER_VALTOWN_TOKEN_ENV=MY_NAME`
-  or pass `--token-env MY_NAME` to the CLI.
-- `WALKTHROUGH_USER` / `WALKTHROUGH_PASS` — the HTTP basic-auth
-  credentials the val will require from readers. `WALKTHROUGH_PASS`
-  also derives the at-rest encryption key
-  (see [encryption.md](./encryption.md)), so rotating the password
-  means re-publishing every walkthrough.
+  uses a different secret name, set
+  `MEANDER_VALTOWN_TOKEN_ENV=MY_NAME` or pass `--token-env MY_NAME`
+  to the CLI.
+- `MEANDER_ENCRYPTION_KEY` — the password that derives the
+  AES-256-GCM key encrypting walkthrough content at rest. See
+  [encryption.md](./encryption.md) for the scheme. **Rotating
+  means re-publishing every walkthrough**; the old ciphertext
+  becomes undecryptable.
 
-> **Heads up:** email magic-code auth is on the roadmap. Basic
-> auth is what's shipping today.
+Meander's val uses **email magic-code auth** for comment writes,
+not HTTP basic auth. Reads are open; writes require a signed-in
+session. The val needs two more env vars, both set by
+`meander deploy-val`:
+
+- `MEANDER_JWT_SECRET` — random string signing session tokens.
+  `deploy-val` generates it on first run and preserves it on
+  subsequent deploys. Rotating it signs every user out.
+- `MEANDER_ALLOWED_EMAIL_DOMAINS` — comma-separated list of
+  domains the val accepts for sign-in. Empty / unset means the
+  val refuses every write — the safe starting posture. Pass
+  `--allowed-domains=gmail.com,example.com` to `deploy-val`.
 
 ## First-time deploy
 
 ```bash
-meander deploy-val
-# or with a custom val name:
-meander deploy-val my-walkthrough-val
+meander deploy-val \
+  --allowed-domains=gmail.com,example.com
 ```
 
-This creates the Val Town val running the Hono server and sets
-`WALKTHROUGH_USER` / `WALKTHROUGH_PASS` as the val's environment
-variables. You only re-run `deploy-val` when the server code
-changes — publishing new walkthrough content is a separate step.
+This creates the Val Town val running the Hono server and pushes
+the env vars the val needs. You only re-run `deploy-val` when
+the server code changes or you want to update config; publishing
+new walkthrough content is a separate step.
+
+### deploy-val flags
+
+- `--allowed-domains=<csv>` — email-domain allowlist for comment
+  writes. Empty → writes refused.
+- `--out-dir=<name>` — blob-key prefix (default `pages`). Must
+  match what `meander publish` uses.
+- `--demo-mode` — deploy with the demo banner + writes returning
+  403. Good for public read-only showcases.
+- `--graceful` — skip + exit 0 instead of erroring when the token
+  isn't provisioned. For CI on fork PRs.
 
 ## Publish loop
 
@@ -81,16 +101,46 @@ https://<username>-<valname>.web.val.run/<slug>/
 
 Re-run `generate` + `publish` whenever the source files or
 annotations change. The val itself only needs `deploy-val` again
-when you want to ship a new server version.
+when you want to ship a new server version or change config.
+
+## How readers sign in
+
+1. The embedded comment client shows a **Sign in to comment**
+   button in the top bar.
+2. Reader enters their email. The val sends a 6-digit code via
+   Val Town's built-in email.
+3. Reader enters the code. The val returns a JWT valid for 30
+   days; the client stores it in `localStorage` and attaches it
+   to every comment write.
+4. Email domains outside `MEANDER_ALLOWED_EMAIL_DOMAINS` are
+   rejected on both `/api/auth/request` and the server-side
+   check before a write commits.
+
+## Demo mode
+
+```bash
+meander deploy-val --demo-mode
+```
+
+Demo-mode deploys:
+
+- Show a dismissible "demo mode — comments aren't saved" banner
+  in the UI.
+- Return 403 on every comment-write endpoint.
+- Still serve every page + render the composer (so visitors see
+  the full experience).
+
+Good for public demos where you want to show off the comment UI
+without collecting real discussions.
 
 ## Graceful CI skip
 
-CI jobs that don't have `VALTOWN_TOKEN` (fork PRs, demo setups)
-can pass `--graceful` to `deploy-val` / `publish`. Meander will
-log a skip message and exit 0 instead of failing the job:
+CI jobs without `VALTOWN_TOKEN` (fork PRs, demo setups) can pass
+`--graceful` to `deploy-val` / `publish`. Meander logs a skip
+message and exits 0 instead of failing the job:
 
 ```yaml
-- run: node dist/cli.js publish meander.config.json --graceful
+- run: node dist/cli.mjs publish meander.config.json --graceful
 ```
 
 ## Blob layout on Val Town
@@ -99,13 +149,13 @@ log a skip message and exit 0 instead of failing the job:
 <outDir>/meander.css              shared, plaintext
 <outDir>/<slug>/index.html        encrypted
 <outDir>/<slug>/part-<id>.html    encrypted (one per part)
-<outDir>/<slug>/documents.html    encrypted (when documents are configured)
+<outDir>/<slug>/documents.html    encrypted (when documents configured)
 <outDir>/<slug>/manifest.json     plaintext build summary
 ```
 
-`<outDir>` defaults to `pages` and can be overridden via
-`meander.config.json`'s `outDir` field. The val reads from the
-same prefix, so both sides need to agree — `deploy-val` passes
-the prefix to the val as a `MEANDER_OUT_DIR` env var. A backward-
-compat read falls back to the legacy `walkthrough/` prefix if the
-new key misses, so mid-rename deployments don't 404.
+`<outDir>` defaults to `pages`. Override via
+`meander.config.json`'s `outDir` field, and pass the same value
+to `deploy-val --out-dir=…` so the val reads from the matching
+prefix. A backward-compat read falls back to the legacy
+`walkthrough/` prefix if the new key misses, so mid-rename
+deployments don't 404.

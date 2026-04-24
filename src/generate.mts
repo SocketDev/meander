@@ -920,6 +920,7 @@ function renderIndexHtml(
   sizeTiersEnabled: boolean,
   hero: { subtitle?: string; description?: string } | undefined,
   footerHtml: string,
+  bodyAttrs: string,
 ): string {
   /* Parts render as a card grid. Each card shows number + title,
    * the part's own objective as the card description, section
@@ -980,7 +981,7 @@ function renderIndexHtml(
   ${headExtra}
   ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
 </head>
-<body>
+<body${bodyAttrs}>
   <header class="topbar">
     <h1>${escapeHtml(title)}</h1>
   </header>
@@ -1963,9 +1964,16 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * prefixes its fetch URLs. Omit when same-origin hosting
    * (Val Town itself) is in play — comments route to
    * /<slug>/api/comments alongside the HTML. */
-  const commentBackendAttr = resolved.comments.backend
-    ? ` data-comment-backend="${escapeHtml(resolved.comments.backend.replace(/\/+$/, ''))}"`
-    : ''
+  /* Body-level attributes emitted on every page. commentBackend
+   * steers the comment client at an off-origin val; demoMode
+   * toggles the read-only banner + composer disable in the
+   * client. Both appear on part pages, documents pages, AND the
+   * index so the banner shows up everywhere the reader lands. */
+  const bodyAttrs =
+    (resolved.comments.backend
+      ? ` data-comment-backend="${escapeHtml(resolved.comments.backend.replace(/\/+$/, ''))}"`
+      : '') + (resolved.demoMode ? ' data-demo-mode="true"' : '')
+  const commentBackendAttr = bodyAttrs
 
   /* Post-render pipeline. Order matters:
    *   1. minify — shrinks inline <script>/<svg>. Must run first
@@ -2076,6 +2084,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     !!config.sizeTiers,
     config.hero,
     footerHtml,
+    bodyAttrs,
   )
   writeFileSync(path.join(outDir, 'index.html'), await finalizeHtml(indexHtml))
 

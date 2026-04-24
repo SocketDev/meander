@@ -21,21 +21,103 @@
   var expandedGroups = {}; // group keys that should render expanded
 
   /* ------------------------------------------------------------------ */
-  /*  Author                                                             */
+  /*  Auth (email magic-code + JWT bearer)                                */
   /* ------------------------------------------------------------------ */
 
-  function getAuthor() {
-    return localStorage.getItem("walkthroughAuthor") || "";
+  /* localStorage keys. Versioned so a schema change can force all
+   * sessions to re-sign-in by bumping the suffix. */
+  var TOKEN_KEY = "meander:auth:v1:token";
+  var EMAIL_KEY = "meander:auth:v1:email";
+  var authBase = backendBase ? backendBase + "/api/auth" : "/api/auth";
+  /* Demo-mode flag is set at runtime from GET /api/auth/me. When
+   * true, writes fail server-side with 403 — we show a banner +
+   * visually dim the composer rather than hiding it. */
+  var demoMode = document.body.getAttribute("data-demo-mode") === "true";
+
+  function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+  function getEmail() { return localStorage.getItem(EMAIL_KEY) || ""; }
+  function setSession(token, email) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(EMAIL_KEY, email);
+  }
+  function clearSession() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(EMAIL_KEY);
   }
 
-  function ensureAuthor() {
-    var author = getAuthor();
-    if (author) return author;
-    author = prompt("Enter your name for walkthrough comments:");
-    if (!author || !author.trim()) return null;
-    author = author.trim();
-    localStorage.setItem("walkthroughAuthor", author);
-    return author;
+  /**
+   * fetch wrapper that attaches Authorization when a token is
+   * stored and auto-clears the session on 401 (expired / rotated).
+   */
+  function authFetch(url, init) {
+    init = init || {};
+    var headers = {};
+    if (init.headers) {
+      for (var k in init.headers) {
+        if (Object.prototype.hasOwnProperty.call(init.headers, k)) {
+          headers[k] = init.headers[k];
+        }
+      }
+    }
+    var token = getToken();
+    if (token) { headers["Authorization"] = "Bearer " + token; }
+    init.headers = headers;
+    return fetch(url, init).then(function (r) {
+      if (r.status === 401 && token) {
+        clearSession();
+      }
+      return r;
+    });
+  }
+
+  function requestMagicCode(email) {
+    return fetch(authBase + "/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email })
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) { throw new Error(data.error || "request failed"); }
+        return data;
+      });
+    });
+  }
+
+  function verifyMagicCode(email, code) {
+    return fetch(authBase + "/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, code: code })
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) { throw new Error(data.error || "verify failed"); }
+        return data;
+      });
+    });
+  }
+
+  function signIn(callback) {
+    var email = prompt("Email address to sign in with:");
+    if (!email || !email.trim()) return;
+    email = email.trim();
+    requestMagicCode(email)
+      .then(function () {
+        var code = prompt("Check your email for a 6-digit code. Enter it here:");
+        if (!code || !code.trim()) return;
+        return verifyMagicCode(email, code.trim())
+          .then(function (data) {
+            setSession(data.token, data.email);
+            if (callback) callback();
+          });
+      })
+      .catch(function (err) {
+        alert("Sign-in failed: " + (err && err.message ? err.message : err));
+      });
+  }
+
+  function ensureSignedIn(callback) {
+    if (getToken()) { callback(); return; }
+    signIn(callback);
   }
 
   /* ------------------------------------------------------------------ */
@@ -43,7 +125,7 @@
   /* ------------------------------------------------------------------ */
 
   function fetchComments() {
-    fetch(apiBase + "?part=" + partId)
+    authFetch(apiBase + "?part=" + partId)
       .then(function (r) { return r.json(); })
       .then(function (data) {
         comments = data;
@@ -53,62 +135,138 @@
   }
 
   function postComment(file, lineFrom, lineTo, body, parentId, callback) {
-    var author = ensureAuthor();
-    if (!author) return;
-
-    var payload = {
-      part: partId,
-      file: file,
-      lineFrom: lineFrom,
-      lineTo: lineTo,
-      author: author,
-      body: body,
-    };
-    if (parentId) payload.parentId = parentId;
-
-    fetch(apiBase, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (comment) {
-        comments.push(comment);
-        // Mark this group as expanded so the new comment is immediately visible
-        expandedGroups[comment.file + ":" + comment.lineFrom] = true;
-        renderAllComments();
-        if (callback) callback();
+    if (demoMode) {
+      alert("This is a demo — comments can be composed but aren't saved.");
+      return;
+    }
+    ensureSignedIn(function () {
+      var payload = {
+        part: partId,
+        file: file,
+        lineFrom: lineFrom,
+        lineTo: lineTo,
+        body: body
+      };
+      if (parentId) payload.parentId = parentId;
+      authFetch(apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       })
-      .catch(function (err) { console.error("Failed to post comment:", err); });
+        .then(function (r) {
+          return r.json().then(function (data) {
+            if (!r.ok) { throw new Error(data.error || "post failed"); }
+            return data;
+          });
+        })
+        .then(function (comment) {
+          comments.push(comment);
+          expandedGroups[comment.file + ":" + comment.lineFrom] = true;
+          renderAllComments();
+          if (callback) callback();
+        })
+        .catch(function (err) {
+          alert("Failed to post: " + (err && err.message ? err.message : err));
+        });
+    });
   }
 
   function deleteComment(id) {
-    fetch(apiBase + "/" + id, { method: "DELETE" })
-      .then(function () {
-        comments = comments.filter(function (c) { return c.id !== id; });
-        renderAllComments();
-      })
-      .catch(function (err) { console.error("Failed to delete comment:", err); });
+    if (demoMode) { return; }
+    ensureSignedIn(function () {
+      authFetch(apiBase + "/" + id, { method: "DELETE" })
+        .then(function () {
+          comments = comments.filter(function (c) { return c.id !== id; });
+          renderAllComments();
+        })
+        .catch(function (err) { console.error("Failed to delete comment:", err); });
+    });
   }
 
   function toggleResolved(id, resolved) {
-    fetch(apiBase + "/" + id, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resolved: resolved }),
-    })
-      .then(function () {
-        for (var i = 0; i < comments.length; i++) {
-          if (comments[i].id === id) {
-            comments[i].resolved = resolved;
-            // Preserve expanded state for this group
-            expandedGroups[comments[i].file + ":" + comments[i].lineFrom] = true;
-            break;
-          }
-        }
-        renderAllComments();
+    if (demoMode) { return; }
+    ensureSignedIn(function () {
+      authFetch(apiBase + "/" + id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolved: resolved })
       })
-      .catch(function (err) { console.error("Failed to toggle resolved:", err); });
+        .then(function () {
+          for (var i = 0; i < comments.length; i++) {
+            if (comments[i].id === id) {
+              comments[i].resolved = resolved;
+              expandedGroups[comments[i].file + ":" + comments[i].lineFrom] = true;
+              break;
+            }
+          }
+          renderAllComments();
+        })
+        .catch(function (err) { console.error("Failed to toggle resolved:", err); });
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Sign-in widget + demo-mode banner                                   */
+  /* ------------------------------------------------------------------ */
+
+  function renderAuthUi() {
+    var existing = document.querySelector(".mdr-auth");
+    if (existing) existing.parentNode.removeChild(existing);
+    var el = document.createElement("div");
+    el.className = "mdr-auth";
+    var email = getEmail();
+    if (email) {
+      var span = document.createElement("span");
+      span.className = "mdr-auth-email";
+      span.textContent = email;
+      var signOut = document.createElement("button");
+      signOut.type = "button";
+      signOut.className = "mdr-auth-btn mdr-auth-signout";
+      signOut.textContent = "Sign out";
+      signOut.addEventListener("click", function () {
+        clearSession();
+        renderAuthUi();
+      });
+      el.appendChild(span);
+      el.appendChild(signOut);
+    } else {
+      var signIn = document.createElement("button");
+      signIn.type = "button";
+      signIn.className = "mdr-auth-btn mdr-auth-signin";
+      signIn.textContent = "Sign in to comment";
+      signIn.addEventListener("click", function () {
+        signInFlow(renderAuthUi);
+      });
+      el.appendChild(signIn);
+    }
+    /* Mount into .topbar-actions if present, else append to body. */
+    var slot = document.querySelector(".topbar-actions");
+    if (slot) { slot.appendChild(el); }
+    else { document.body.appendChild(el); }
+  }
+
+  function signInFlow(after) { signIn(after); }
+
+  function renderDemoBanner() {
+    if (!demoMode) return;
+    var key = "meander:demo-banner-dismissed-v1";
+    if (localStorage.getItem(key) === "true") return;
+    var el = document.createElement("div");
+    el.className = "mdr-demo-banner";
+    var msg = document.createElement("span");
+    msg.textContent = "Demo mode — comments you write here aren't saved.";
+    var dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "mdr-demo-dismiss";
+    dismiss.textContent = "×";
+    dismiss.setAttribute("aria-label", "Dismiss demo banner");
+    dismiss.addEventListener("click", function () {
+      localStorage.setItem(key, "true");
+      el.parentNode.removeChild(el);
+    });
+    el.appendChild(msg);
+    el.appendChild(dismiss);
+    document.body.insertBefore(el, document.body.firstChild);
   }
 
   /* ------------------------------------------------------------------ */
@@ -662,10 +820,15 @@
     renderAllComments();
   });
 
-  // Load comments on page ready
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", fetchComments);
-  } else {
+  function init() {
+    renderDemoBanner();
+    renderAuthUi();
     fetchComments();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
   }
 })();

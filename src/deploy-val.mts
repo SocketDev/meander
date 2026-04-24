@@ -1,7 +1,9 @@
-import ValTown from '@valtown/sdk'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import ValTown from '@valtown/sdk'
 
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
 
@@ -21,16 +23,39 @@ export type DeployValOptions = {
    *  the comment-backend deploy is opt-in (e.g. public fork PRs
    *  that never get the secret). */
   graceful?: boolean | undefined
+  /** Blob-key prefix the val should read from. Matches whatever
+   *  `meander publish` uploads to. Default: "pages". */
+  outDir?: string | undefined
+  /** Comma-separated email-domain allowlist written to the val's
+   *  env. Default: empty (val refuses writes until configured). */
+  allowedEmailDomains?: string | undefined
+  /** When true, the val returns 403 on writes + the comment UI
+   *  shows a "demo" banner. Default: false. */
+  demoMode?: boolean | undefined
+}
+
+/**
+ * Generate a URL-safe random secret. Used to default
+ * MEANDER_JWT_SECRET on first deploy so operators don't have to
+ * hand-craft one. Subsequent deploys preserve the existing
+ * value (we never overwrite a JWT secret — that would log
+ * everyone out).
+ */
+function generateSecret(): string {
+  return randomBytes(48).toString('base64url')
 }
 
 export async function deployVal(
   valName: string,
   options: DeployValOptions = { __proto__: null } as DeployValOptions,
 ): Promise<void> {
-  const { tokenEnv, graceful = false } = {
-    __proto__: null,
-    ...options,
-  } as DeployValOptions
+  const {
+    tokenEnv,
+    graceful = false,
+    outDir = 'pages',
+    allowedEmailDomains = '',
+    demoMode = false,
+  } = { __proto__: null, ...options } as DeployValOptions
 
   const { envName, token } = resolveValTownToken(tokenEnv)
   if (!token) {
@@ -42,11 +67,10 @@ export async function deployVal(
     throw new Error(msg)
   }
 
-  const walkthroughUser: string = process.env['WALKTHROUGH_USER'] ?? ''
-  const walkthroughPass: string = process.env['WALKTHROUGH_PASS'] ?? ''
-  if (!walkthroughUser || !walkthroughPass) {
+  const encryptionKey = process.env['MEANDER_ENCRYPTION_KEY'] ?? ''
+  if (!encryptionKey) {
     const msg =
-      'WALKTHROUGH_USER and WALKTHROUGH_PASS environment variables are required for deploy-val.'
+      'MEANDER_ENCRYPTION_KEY environment variable is required for deploy-val. This password derives the AES-256-GCM key that encrypts walkthrough content at rest.'
     if (graceful) {
       console.log(`[deploy-val] skipped — ${msg}`)
       return
@@ -55,7 +79,6 @@ export async function deployVal(
   }
 
   const client = new ValTown({ bearerToken: token })
-
   const valSource = readFileSync(getValSourcePath(), 'utf-8')
 
   const profile = await client.me.profile.retrieve()
@@ -84,7 +107,6 @@ export async function deployVal(
     console.log(`Created val: ${valId}`)
   }
 
-  // Update the HTTP trigger file
   console.log('Updating val source code...')
   try {
     await client.vals.files.update(valId, {
@@ -102,12 +124,34 @@ export async function deployVal(
     console.log('Created index.ts')
   }
 
-  // Set environment variables
+  /* Env var list. MEANDER_JWT_SECRET is minted once + preserved
+   * across deploys — we only write it when missing. The other
+   * vars are always pushed from the local env + CLI options. */
+  const envVars: Array<{ key: string; value: string; preserveIfSet?: true }> = [
+    { key: 'MEANDER_ENCRYPTION_KEY', value: encryptionKey },
+    { key: 'MEANDER_OUT_DIR', value: outDir },
+    { key: 'MEANDER_ALLOWED_EMAIL_DOMAINS', value: allowedEmailDomains },
+    { key: 'MEANDER_DEMO_MODE', value: demoMode ? 'true' : 'false' },
+    {
+      key: 'MEANDER_JWT_SECRET',
+      value: generateSecret(),
+      preserveIfSet: true,
+    },
+  ]
+
   console.log('Setting environment variables...')
-  for (const [key, value] of [
-    ['WALKTHROUGH_USER', walkthroughUser],
-    ['WALKTHROUGH_PASS', walkthroughPass],
-  ] satisfies Array<[string, string]>) {
+  for (const { key, value, preserveIfSet } of envVars) {
+    if (preserveIfSet) {
+      const exists = await fetch(
+        `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (exists.ok) {
+        console.log(`  Preserved ${key} (already set)`)
+        continue
+      }
+    }
+
     const updateRes = await fetch(
       `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
       {
@@ -147,4 +191,12 @@ export async function deployVal(
 
   const val = await client.vals.retrieve(valId)
   console.log(`\nDone! Val URL: ${val.links.html}`)
+  if (!allowedEmailDomains) {
+    console.log(
+      '\nNote: MEANDER_ALLOWED_EMAIL_DOMAINS is empty — writes will be refused.',
+    )
+    console.log(
+      '      Set it via --allowed-domains=gmail.com,example.com or the val settings.',
+    )
+  }
 }

@@ -2304,3 +2304,83 @@ html[data-theme="neo-kiju"].mdr-theme-toggle-fired
   .mdr-spark-3 {
   animation: mdr-spark-bottom 1.5s ease 0.55s 1 forwards;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Auth widget + demo banner (email magic-code sign-in)               */
+/* ------------------------------------------------------------------ */
+
+.mdr-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
+.mdr-auth-email {
+  font-variant-numeric: tabular-nums;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdr-auth-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-default, #d1d5da);
+  border-radius: 6px;
+  background: var(--bg-card, #fff);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.mdr-auth-btn:hover {
+  background: var(--bg-card-hover, #f6f8fa);
+}
+
+.mdr-auth-btn:focus-visible {
+  outline: 2px solid var(--accent, #0969da);
+  outline-offset: 2px;
+}
+
+.mdr-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--demo-banner-bg, #fff5b1);
+  color: var(--demo-banner-fg, #4d3800);
+  border-bottom: 1px solid var(--demo-banner-border, #e3c100);
+  font-size: 13px;
+}
+
+[data-theme="dark"] .mdr-demo-banner,
+[data-theme="neo-kiju"] .mdr-demo-banner {
+  background: var(--demo-banner-bg, rgba(255, 196, 0, 0.15));
+  color: var(--demo-banner-fg, #ffd54f);
+  border-bottom-color: var(--demo-banner-border, rgba(255, 196, 0, 0.35));
+}
+
+.mdr-demo-dismiss {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.mdr-demo-dismiss:hover {
+  opacity: 1;
+}
+
+.mdr-demo-dismiss:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

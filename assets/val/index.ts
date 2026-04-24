@@ -1,110 +1,228 @@
 /**
- * Walkthrough Val — Hono-based HTTP handler for serving walkthrough HTML
- * from blob storage and managing comments via SQLite.
+ * Walkthrough Val — Hono HTTP handler.
  *
- * Environment variables:
- *   WALKTHROUGH_USER — basic auth username
- *   WALKTHROUGH_PASS — basic auth password
+ * Serves walkthrough HTML out of Val Town blob storage and
+ * manages comments via SQLite, with email magic-code auth for
+ * writes. Reads are open (unauthenticated visitors can see
+ * discussions); writes require an authenticated session token.
+ *
+ * Required env vars (set by `meander deploy-val`):
+ *   MEANDER_ENCRYPTION_KEY         Password derived into the AES-256-GCM key
+ *                                  for at-rest encryption of HTML + comment
+ *                                  body/author fields. Rotate means re-publish.
+ *   MEANDER_JWT_SECRET             Random secret used to sign session JWTs.
+ *                                  Generate once; rotating invalidates every
+ *                                  active login session.
+ *
+ * Optional env vars:
+ *   MEANDER_ALLOWED_EMAIL_DOMAINS  Comma-separated allowlist, e.g.
+ *                                  "gmail.com,socket.dev". Empty / unset
+ *                                  means writes are refused — the safe
+ *                                  default for a fresh deploy.
+ *   MEANDER_OUT_DIR                Blob-key prefix (default: "pages").
+ *                                  Must match what publish emits.
+ *   MEANDER_DEMO_MODE              When "true", composer is still
+ *                                  enabled but comments return a 403 at
+ *                                  write time. UI shows a banner.
  *
  * Blob key conventions:
- *   walkthrough/<slug>/index.html
- *   walkthrough/<slug>/walkthrough-part-<N>.html
- *   walkthrough/<slug>/manifest.json
- *   walkthrough/walkthrough.css
+ *   <outDir>/<slug>/index.html           encrypted
+ *   <outDir>/<slug>/part-<N>.html        encrypted (new name)
+ *   <outDir>/<slug>/walkthrough-part-<N>.html   encrypted (legacy; read-only fallback)
+ *   <outDir>/<slug>/documents.html       encrypted (when documents configured)
+ *   <outDir>/<slug>/manifest.json        plaintext
+ *   <outDir>/meander.css                 plaintext (new name)
+ *   walkthrough/walkthrough.css          plaintext (legacy; read-only fallback)
  */
 
-import { Hono } from "npm:hono@4";
-import { basicAuth } from "npm:hono@4/basic-auth";
-import { blob } from "https://esm.town/v/std/blob";
-import { sqlite } from "https://esm.town/v/std/sqlite/main.ts";
-import type { BaseComment, ExportedComment, ExportedComments, ApiComment } from "./types.ts";
+import { blob } from 'https://esm.town/v/std/blob'
+import { sqlite } from 'https://esm.town/v/std/sqlite/main.ts'
+import { Hono } from 'npm:hono@4'
+import type { Context } from 'npm:hono@4'
+import type {
+  ApiComment,
+  BaseComment,
+  ExportedComment,
+  ExportedComments,
+} from './types.ts'
 
-const app = new Hono();
+const app = new Hono()
 
 /* ------------------------------------------------------------------ */
-/*  Crypto (AES-256-GCM via Web Crypto API)                            */
+/*  Config                                                              */
 /* ------------------------------------------------------------------ */
 
-const VERSION_BYTE = 0x01;
-const SALT = new TextEncoder().encode("meander-walkthrough-v1");
-const ITERATIONS = 600_000;
+const OUT_DIR = (Deno.env.get('MEANDER_OUT_DIR') || 'pages').replace(/\/$/, '')
+const LEGACY_OUT_DIR = 'walkthrough'
+const CRYPTO_PASS =
+  Deno.env.get('MEANDER_ENCRYPTION_KEY') ||
+  /* Backward-compat shim: if a mid-migration deploy still has the
+   * old var, keep decrypting so content isn't instantly bricked.
+   * New deploys should set MEANDER_ENCRYPTION_KEY only. */
+  Deno.env.get('WALKTHROUGH_PASS') ||
+  ''
+const JWT_SECRET = Deno.env.get('MEANDER_JWT_SECRET') || ''
+const ALLOWED_EMAIL_DOMAINS = (
+  Deno.env.get('MEANDER_ALLOWED_EMAIL_DOMAINS') || ''
+)
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean)
+const DEMO_MODE = Deno.env.get('MEANDER_DEMO_MODE') === 'true'
 
-// Get password from env (same as basic auth)
-const CRYPTO_PASS = Deno.env.get("WALKTHROUGH_PASS") || "changeme";
+/* ------------------------------------------------------------------ */
+/*  Crypto (AES-256-GCM + JWT HS256)                                    */
+/* ------------------------------------------------------------------ */
+
+const VERSION_BYTE = 0x01
+const SALT = new TextEncoder().encode('meander-walkthrough-v1')
+const ITERATIONS = 600_000
 
 async function deriveKey(password: string): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
-    "raw",
+    'raw',
     new TextEncoder().encode(password),
-    { name: "PBKDF2" },
+    { name: 'PBKDF2' },
     false,
-    ["deriveKey"]
-  );
-
+    ['deriveKey'],
+  )
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: SALT, iterations: ITERATIONS, hash: "SHA-256" },
+    { name: 'PBKDF2', salt: SALT, iterations: ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
-    { name: "AES-GCM", length: 256 },
+    { name: 'AES-GCM', length: 256 },
     false,
-    ["encrypt", "decrypt"]
-  );
+    ['encrypt', 'decrypt'],
+  )
 }
 
 async function encrypt(plaintext: string, key: CryptoKey): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encoded = new TextEncoder().encode(plaintext)
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: 'AES-GCM', iv },
     key,
-    encoded
-  );
-
-  // Combine: version (1) + iv (12) + ciphertext (includes auth tag)
-  const combined = new Uint8Array(1 + iv.length + ciphertext.byteLength);
-  combined[0] = VERSION_BYTE;
-  combined.set(iv, 1);
-  combined.set(new Uint8Array(ciphertext), 1 + iv.length);
-
-  return btoa(String.fromCharCode(...combined));
+    encoded,
+  )
+  const combined = new Uint8Array(1 + iv.length + ciphertext.byteLength)
+  combined[0] = VERSION_BYTE
+  combined.set(iv, 1)
+  combined.set(new Uint8Array(ciphertext), 1 + iv.length)
+  return btoa(String.fromCharCode(...combined))
 }
 
 async function decrypt(ciphertext: string, key: CryptoKey): Promise<string> {
   const combined = new Uint8Array(
-    atob(ciphertext).split("").map(c => c.charCodeAt(0))
-  );
-
+    atob(ciphertext)
+      .split('')
+      .map(c => c.charCodeAt(0)),
+  )
   if (combined.length < 1 + 12 + 16) {
-    throw new Error("Ciphertext too short");
+    throw new Error('Ciphertext too short')
   }
-
-  const version = combined[0];
-  if (version !== VERSION_BYTE) {
-    throw new Error(`Unsupported encryption version: ${version}`);
+  if (combined[0] !== VERSION_BYTE) {
+    throw new Error(`Unsupported encryption version: ${combined[0]}`)
   }
-
-  const iv = combined.slice(1, 13);
-  const data = combined.slice(13);
-
+  const iv = combined.slice(1, 13)
+  const data = combined.slice(13)
   const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: 'AES-GCM', iv },
     key,
-    data
-  );
-
-  return new TextDecoder().decode(plaintext);
+    data,
+  )
+  return new TextDecoder().decode(plaintext)
 }
 
-// Pre-derive the key at module load (one-time, cached for warm starts)
-const cryptoKeyPromise = deriveKey(CRYPTO_PASS);
+const cryptoKeyPromise = CRYPTO_PASS ? deriveKey(CRYPTO_PASS) : null
+
+function b64urlEncode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+}
+
+function b64urlDecode(s: string): Uint8Array {
+  const padded = s.replaceAll('-', '+').replaceAll('_', '/')
+  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
+  return new Uint8Array(
+    atob(padded + pad)
+      .split('')
+      .map(c => c.charCodeAt(0)),
+  )
+}
+
+async function hmacKey(): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(JWT_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  )
+}
+
+/**
+ * Mint an HS256 JWT with { email, exp }. 30-day expiry.
+ */
+async function signJwt(email: string): Promise<string> {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const payload = { email, iat: now, exp: now + 60 * 60 * 24 * 30 }
+  const encode = (o: object) =>
+    b64urlEncode(new TextEncoder().encode(JSON.stringify(o)))
+  const head = encode(header)
+  const body = encode(payload)
+  const key = await hmacKey()
+  const sig = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(`${head}.${body}`),
+  )
+  return `${head}.${body}.${b64urlEncode(new Uint8Array(sig))}`
+}
+
+/**
+ * Verify a JWT. Returns the `{ email }` claim or null on failure
+ * (bad signature, expired, malformed).
+ */
+async function verifyJwt(token: string): Promise<{ email: string } | null> {
+  const parts = token.split('.')
+  if (parts.length !== 3) {
+    return null
+  }
+  const [head, body, sig] = parts as [string, string, string]
+  const key = await hmacKey()
+  const ok = await crypto.subtle.verify(
+    'HMAC',
+    key,
+    b64urlDecode(sig),
+    new TextEncoder().encode(`${head}.${body}`),
+  )
+  if (!ok) {
+    return null
+  }
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(body)))
+    if (typeof payload.exp !== 'number' || payload.exp < Date.now() / 1000) {
+      return null
+    }
+    if (typeof payload.email !== 'string') {
+      return null
+    }
+    return { email: payload.email }
+  } catch {
+    return null
+  }
+}
 
 /* ------------------------------------------------------------------ */
-/*  Database init                                                      */
+/*  Database init + magic-code helpers                                  */
 /* ------------------------------------------------------------------ */
 
-let dbInitialized = false;
+let dbInitialized = false
 
 async function ensureDb() {
-  if (dbInitialized) return;
+  if (dbInitialized) return
   await sqlite.execute(`
     CREATE TABLE IF NOT EXISTS comments (
       id         TEXT PRIMARY KEY,
@@ -119,206 +237,350 @@ async function ensureDb() {
       resolved   INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
-  await sqlite.execute(`
-    CREATE INDEX IF NOT EXISTS idx_comments_slug_part ON comments(slug, part)
-  `);
-  // Migrations: add columns if table already exists without them
-  for (const col of ["parent_id TEXT", "resolved INTEGER NOT NULL DEFAULT 0"]) {
+  `)
+  await sqlite.execute(
+    `CREATE INDEX IF NOT EXISTS idx_comments_slug_part ON comments(slug, part)`,
+  )
+  for (const col of ['parent_id TEXT', 'resolved INTEGER NOT NULL DEFAULT 0']) {
     try {
-      await sqlite.execute(`ALTER TABLE comments ADD COLUMN ${col}`);
+      await sqlite.execute(`ALTER TABLE comments ADD COLUMN ${col}`)
     } catch {
-      // Column already exists — ignore
+      /* Column already exists — ignore. */
     }
   }
-  dbInitialized = true;
+  await sqlite.execute(`
+    CREATE TABLE IF NOT EXISTS magic_codes (
+      email      TEXT PRIMARY KEY,
+      code_hash  TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts   INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+  dbInitialized = true
+}
+
+async function hashCode(code: string, email: string): Promise<string> {
+  /* Hash the code + email together so a leaked code_hash column
+   * can't be used to crack other users. Salt = email. */
+  const bytes = new TextEncoder().encode(`${email}:${code}`)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return b64urlEncode(new Uint8Array(digest))
+}
+
+function sixDigitCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000
+  return n.toString().padStart(6, '0')
+}
+
+function emailDomainAllowed(email: string): boolean {
+  const at = email.indexOf('@')
+  if (at < 0) return false
+  const domain = email.slice(at + 1).toLowerCase()
+  return ALLOWED_EMAIL_DOMAINS.includes(domain)
+}
+
+/**
+ * Send the magic code via Val Town's std/email. Falls back to
+ * logging the code to stdout when the provider call fails (dev
+ * deploys, offline testing) so setup isn't blocked.
+ */
+async function sendMagicCode(email: string, code: string): Promise<void> {
+  const subject = 'Your meander sign-in code'
+  const text = `Your sign-in code is: ${code}\n\nIt expires in 10 minutes.\n`
+  try {
+    const { email: sendEmail } = await import('https://esm.town/v/std/email')
+    await sendEmail({ to: email, subject, text })
+  } catch (e) {
+    console.log(`[meander] email send failed, code for ${email}: ${code}`, e)
+  }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Basic auth middleware                                               */
+/*  Auth middleware                                                     */
 /* ------------------------------------------------------------------ */
 
-const user = Deno.env.get("WALKTHROUGH_USER") || "admin";
-const pass = Deno.env.get("WALKTHROUGH_PASS") || "changeme";
-
-app.use("*", basicAuth({ username: user, password: pass }));
-
-/* ------------------------------------------------------------------ */
-/*  Shared CSS (not per-walkthrough)                                   */
-/* ------------------------------------------------------------------ */
-
-app.get("/walkthrough.css", async (c) => {
-  try {
-    const data = await blob.get("walkthrough/walkthrough.css");
-    const text = await data.text();
-    return c.text(text, 200, { "Content-Type": "text/css; charset=utf-8" });
-  } catch {
-    return c.text("/* not found */", 404, { "Content-Type": "text/css" });
+/**
+ * Read the bearer token from `Authorization: Bearer <jwt>` and
+ * verify it. Returns the email, or null (no token / bad token).
+ */
+async function currentUser(c: Context): Promise<string | null> {
+  if (!JWT_SECRET) {
+    return null
   }
-});
+  const auth = c.req.header('authorization') || ''
+  const m = auth.match(/^Bearer\s+(.+)$/i)
+  if (!m) {
+    return null
+  }
+  const claim = await verifyJwt(m[1]!)
+  return claim?.email ?? null
+}
+
+function authRequired(
+  email: string | null,
+): { error: string; status: 401 | 403 } | null {
+  if (DEMO_MODE) {
+    return { error: 'demo mode — writes disabled', status: 403 }
+  }
+  if (!email) {
+    return { error: 'authentication required', status: 401 }
+  }
+  if (ALLOWED_EMAIL_DOMAINS.length === 0) {
+    return {
+      error: 'writes disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS',
+      status: 403,
+    }
+  }
+  if (!emailDomainAllowed(email)) {
+    return { error: 'email domain not allowed', status: 403 }
+  }
+  return null
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth routes                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * POST /api/auth/request  { email }
+ * Mints a 6-digit code, stores the hash, sends it via email.
+ */
+app.post('/api/auth/request', async c => {
+  await ensureDb()
+  const body = await c.req.json().catch(() => ({}))
+  const email = typeof body?.email === 'string' ? body.email.trim() : ''
+  if (!email || email.indexOf('@') < 0) {
+    return c.json({ error: 'email required' }, 400)
+  }
+  if (ALLOWED_EMAIL_DOMAINS.length === 0) {
+    return c.json(
+      {
+        error:
+          'writes disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS configured',
+      },
+      403,
+    )
+  }
+  if (!emailDomainAllowed(email)) {
+    return c.json({ error: 'email domain not allowed' }, 403)
+  }
+  const code = sixDigitCode()
+  const codeHash = await hashCode(code, email)
+  const expiresAt = Math.floor(Date.now() / 1000) + 10 * 60
+  await sqlite.execute({
+    sql: `
+      INSERT INTO magic_codes (email, code_hash, expires_at, attempts)
+      VALUES (:email, :codeHash, :expiresAt, 0)
+      ON CONFLICT(email) DO UPDATE SET
+        code_hash = excluded.code_hash,
+        expires_at = excluded.expires_at,
+        attempts = 0
+    `,
+    args: { email, codeHash, expiresAt },
+  })
+  await sendMagicCode(email, code)
+  return c.json({ ok: true })
+})
+
+/**
+ * POST /api/auth/verify  { email, code }
+ * Returns { token } on success. Token goes in Authorization:
+ * Bearer for subsequent write calls.
+ */
+app.post('/api/auth/verify', async c => {
+  await ensureDb()
+  if (!JWT_SECRET) {
+    return c.json({ error: 'server missing MEANDER_JWT_SECRET' }, 500)
+  }
+  const body = await c.req.json().catch(() => ({}))
+  const email = typeof body?.email === 'string' ? body.email.trim() : ''
+  const code = typeof body?.code === 'string' ? body.code.trim() : ''
+  if (!email || !code) {
+    return c.json({ error: 'email + code required' }, 400)
+  }
+  const row = (
+    await sqlite.execute({
+      sql: 'SELECT code_hash, expires_at, attempts FROM magic_codes WHERE email = :email',
+      args: { email },
+    })
+  ).rows[0] as
+    | { code_hash: string; expires_at: number; attempts: number }
+    | undefined
+  if (!row) {
+    return c.json({ error: 'no code for this email' }, 400)
+  }
+  if (row.expires_at < Math.floor(Date.now() / 1000)) {
+    return c.json({ error: 'code expired' }, 400)
+  }
+  if (row.attempts >= 5) {
+    return c.json({ error: 'too many attempts; request a new code' }, 429)
+  }
+  const codeHash = await hashCode(code, email)
+  if (codeHash !== row.code_hash) {
+    await sqlite.execute({
+      sql: 'UPDATE magic_codes SET attempts = attempts + 1 WHERE email = :email',
+      args: { email },
+    })
+    return c.json({ error: 'invalid code' }, 401)
+  }
+  /* One-shot: delete the code after successful use. */
+  await sqlite.execute({
+    sql: 'DELETE FROM magic_codes WHERE email = :email',
+    args: { email },
+  })
+  const token = await signJwt(email)
+  return c.json({ token, email })
+})
+
+/**
+ * GET /api/auth/me — echoes the authenticated email, or 401.
+ * Useful for the client to check session freshness on load.
+ */
+app.get('/api/auth/me', async c => {
+  const email = await currentUser(c)
+  if (!email) {
+    return c.json({ error: 'not authenticated' }, 401)
+  }
+  return c.json({ email, demoMode: DEMO_MODE })
+})
+
+/* ------------------------------------------------------------------ */
+/*  Shared CSS                                                          */
+/* ------------------------------------------------------------------ */
+
+app.get('/meander.css', async c => serveBlobText(c, 'meander.css', 'text/css'))
+/* Legacy alias — old clients still fetch /walkthrough.css. */
+app.get('/walkthrough.css', async c =>
+  serveBlobText(c, 'meander.css', 'text/css'),
+)
 
 /* ------------------------------------------------------------------ */
 /*  Root — list available walkthroughs                                 */
 /* ------------------------------------------------------------------ */
 
-app.get("/", async (c) => {
+app.get('/', async c => {
   try {
-    const blobs = await blob.list("walkthrough/");
-    const slugs = new Set<string>();
+    const blobs = await blob.list(`${OUT_DIR}/`)
+    const slugs = new Set<string>()
     for (const b of blobs) {
-      // Keys look like walkthrough/<slug>/index.html
-      const parts = b.key.split("/");
-      if (parts.length >= 3 && parts[0] === "walkthrough" && parts[1] !== "walkthrough.css") {
-        slugs.add(parts[1]!);
+      /* Keys look like <OUT_DIR>/<slug>/index.html. The shared
+       * CSS file lives at <OUT_DIR>/meander.css — its key has
+       * only two segments, so the slug branch skips it. */
+      const parts = b.key.split('/')
+      if (parts.length >= 3 && parts[0] === OUT_DIR) {
+        slugs.add(parts[1]!)
       }
     }
     const links = [...slugs]
-      .map((s) => `<li><a href="/${s}/">${s}</a></li>`)
-      .join("\n");
+      .map(s => `<li><a href="/${s}/">${s}</a></li>`)
+      .join('\n')
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Walkthroughs</title>
-<link rel="stylesheet" href="/walkthrough.css"></head>
+<link rel="stylesheet" href="/meander.css"></head>
 <body><header class="topbar"><h1>Walkthroughs</h1></header>
-<main style="padding:16px;max-width:900px;"><ul>${links || "<li>No walkthroughs published yet.</li>"}</ul></main></body></html>`;
-    return c.html(html);
+<main style="padding:16px;max-width:900px;"><ul>${links || '<li>No walkthroughs published yet.</li>'}</ul></main></body></html>`
+    return c.html(html)
   } catch {
-    return c.text("Error listing walkthroughs", 500);
+    return c.text('Error listing walkthroughs', 500)
   }
-});
+})
 
 /* ------------------------------------------------------------------ */
-/*  Walkthrough index                                                  */
+/*  Walkthrough pages                                                   */
 /* ------------------------------------------------------------------ */
 
-app.get("/:slug/", async (c) => {
-  const slug = c.req.param("slug");
-  return serveBlobHtml(c, `walkthrough/${slug}/index.html`);
-});
+app.get('/:slug/', async c => {
+  const slug = c.req.param('slug')
+  return serveEncryptedHtml(c, `${slug}/index.html`)
+})
 
-app.get("/:slug", async (c) => {
-  const slug = c.req.param("slug");
-  return c.redirect(`/${slug}/`, 301);
-});
+app.get('/:slug', async c => {
+  const slug = c.req.param('slug')
+  return c.redirect(`/${slug}/`, 301)
+})
 
-/* ------------------------------------------------------------------ */
-/*  Documents page                                                     */
-/* ------------------------------------------------------------------ */
+app.get('/:slug/documents', async c => {
+  const slug = c.req.param('slug')
+  return serveEncryptedHtml(c, `${slug}/documents.html`)
+})
 
-app.get("/:slug/documents", async (c) => {
-  const slug = c.req.param("slug");
-  return serveBlobHtml(c, `walkthrough/${slug}/documents.html`);
-});
-
-/* ------------------------------------------------------------------ */
-/*  Walkthrough parts                                                  */
-/* ------------------------------------------------------------------ */
-
-app.get("/:slug/part/:id", async (c) => {
-  const slug = c.req.param("slug");
-  const id = c.req.param("id");
-  return serveBlobHtml(c, `walkthrough/${slug}/walkthrough-part-${id}.html`);
-});
+app.get('/:slug/part/:id', async c => {
+  const slug = c.req.param('slug')
+  const id = c.req.param('id')
+  return serveEncryptedHtml(c, `${slug}/part-${id}.html`, [
+    `${slug}/walkthrough-part-${id}.html`,
+  ])
+})
 
 /* ------------------------------------------------------------------ */
-/*  Comments API                                                       */
+/*  Comments API                                                        */
 /* ------------------------------------------------------------------ */
 
-app.get("/:slug/api/comments/unresolved", async (c) => {
-  await ensureDb();
-  const slug = c.req.param("slug");
-  const cryptoKey = await cryptoKeyPromise;
-
+app.get('/:slug/api/comments/unresolved', async c => {
+  await ensureDb()
+  const slug = c.req.param('slug')
+  const cryptoKey = await requireCryptoKey(c)
+  if (!cryptoKey) return
   const result = await sqlite.execute({
-    sql: "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND resolved = 0 AND parent_id IS NULL ORDER BY part ASC, created_at ASC",
+    sql: 'SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND resolved = 0 AND parent_id IS NULL ORDER BY part ASC, created_at ASC',
     args: { slug },
-  });
+  })
+  return c.json(await decryptRows(result.rows, cryptoKey))
+})
 
-  const rows = await Promise.all(
-    result.rows.map(async (row: any) => ({
-      id: row.id,
-      slug: row.slug,
-      part: row.part,
-      file: row.file,
-      lineFrom: row.line_from,
-      lineTo: row.line_to,
-      author: await decrypt(row.author, cryptoKey),
-      body: await decrypt(row.body, cryptoKey),
-      parentId: row.parent_id || null,
-      resolved: !!row.resolved,
-      createdAt: row.created_at,
-    }))
-  );
-
-  return c.json(rows);
-});
-
-app.get("/:slug/api/comments", async (c) => {
-  await ensureDb();
-  const slug = c.req.param("slug");
-  const part = c.req.query("part");
+app.get('/:slug/api/comments', async c => {
+  await ensureDb()
+  const slug = c.req.param('slug')
+  const part = c.req.query('part')
   if (!part) {
-    return c.json({ error: "part query parameter required" }, 400);
+    return c.json({ error: 'part query parameter required' }, 400)
   }
-
-  const cryptoKey = await cryptoKeyPromise;
-
+  const cryptoKey = await requireCryptoKey(c)
+  if (!cryptoKey) return
   const result = await sqlite.execute({
-    sql: "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND part = :part ORDER BY created_at ASC",
+    sql: 'SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug AND part = :part ORDER BY created_at ASC',
     args: { slug, part: parseInt(part, 10) },
-  });
+  })
+  return c.json(await decryptRows(result.rows, cryptoKey))
+})
 
-  const rows = await Promise.all(
-    result.rows.map(async (row: any) => ({
-      id: row.id,
-      slug: row.slug,
-      part: row.part,
-      file: row.file,
-      lineFrom: row.line_from,
-      lineTo: row.line_to,
-      author: await decrypt(row.author, cryptoKey),
-      body: await decrypt(row.body, cryptoKey),
-      parentId: row.parent_id || null,
-      resolved: !!row.resolved,
-      createdAt: row.created_at,
-    }))
-  );
+app.post('/:slug/api/comments', async c => {
+  await ensureDb()
+  const email = await currentUser(c)
+  const deny = authRequired(email)
+  if (deny) {
+    return c.json({ error: deny.error }, deny.status)
+  }
+  const cryptoKey = await requireCryptoKey(c)
+  if (!cryptoKey) return
 
-  return c.json(rows);
-});
-
-app.post("/:slug/api/comments", async (c) => {
-  await ensureDb();
-  const slug = c.req.param("slug");
-  const body = await c.req.json();
-  const { part, file, lineFrom, lineTo, author, body: commentBody, parentId } = body;
-
-  // Validate presence and types of required fields
-  const partInt = parseInt(part, 10);
-  const lineFromInt = parseInt(lineFrom, 10);
+  const slug = c.req.param('slug')
+  const body = await c.req.json()
+  const { part, file, lineFrom, lineTo, body: commentBody, parentId } = body
+  const partInt = parseInt(part, 10)
+  const lineFromInt = parseInt(lineFrom, 10)
   if (
-    part == null || isNaN(partInt) ||
-    !file || typeof file !== "string" ||
-    lineFrom == null || isNaN(lineFromInt) ||
-    !author || typeof author !== "string" ||
-    !commentBody || typeof commentBody !== "string"
+    part == null ||
+    isNaN(partInt) ||
+    !file ||
+    typeof file !== 'string' ||
+    lineFrom == null ||
+    isNaN(lineFromInt) ||
+    !commentBody ||
+    typeof commentBody !== 'string'
   ) {
-    return c.json({ error: "Missing or invalid required fields" }, 400);
+    return c.json({ error: 'missing or invalid required fields' }, 400)
   }
-
-  // lineTo defaults to lineFrom when omitted; must be an integer when provided
-  const lineToInt = lineTo != null ? parseInt(lineTo, 10) : lineFromInt;
+  const lineToInt = lineTo != null ? parseInt(lineTo, 10) : lineFromInt
   if (isNaN(lineToInt)) {
-    return c.json({ error: "Invalid lineTo value" }, 400);
+    return c.json({ error: 'invalid lineTo value' }, 400)
   }
-
-  // Encrypt author and body
-  const cryptoKey = await cryptoKeyPromise;
-  const encryptedAuthor = await encrypt(author, cryptoKey);
-  const encryptedBody = await encrypt(commentBody, cryptoKey);
-
-  const id = crypto.randomUUID();
+  /* Author is the authenticated email — clients can't spoof it. */
+  const encryptedAuthor = await encrypt(email!, cryptoKey)
+  const encryptedBody = await encrypt(commentBody, cryptoKey)
+  const id = crypto.randomUUID()
   await sqlite.execute({
-    sql: "INSERT INTO comments (id, slug, part, file, line_from, line_to, author, body, parent_id) VALUES (:id, :slug, :part, :file, :lineFrom, :lineTo, :author, :body, :parentId)",
+    sql: 'INSERT INTO comments (id, slug, part, file, line_from, line_to, author, body, parent_id) VALUES (:id, :slug, :part, :file, :lineFrom, :lineTo, :author, :body, :parentId)',
     args: {
       id,
       slug,
@@ -330,149 +592,200 @@ app.post("/:slug/api/comments", async (c) => {
       body: encryptedBody,
       parentId: parentId || null,
     },
-  });
+  })
+  return c.json(
+    {
+      id,
+      slug,
+      part: partInt,
+      file,
+      lineFrom: lineFromInt,
+      lineTo: lineToInt,
+      author: email,
+      body: commentBody,
+      parentId: parentId || null,
+      resolved: false,
+      createdAt: new Date().toISOString(),
+    },
+    201,
+  )
+})
 
-  return c.json({
-    id,
-    slug,
-    part: partInt,
-    file,
-    lineFrom: lineFromInt,
-    lineTo: lineToInt,
-    author,
-    body: commentBody,
-    parentId: parentId || null,
-    resolved: false,
-    createdAt: new Date().toISOString(),
-  }, 201);
-});
-
-app.patch("/:slug/api/comments/:id", async (c) => {
-  await ensureDb();
-  const id = c.req.param("id");
-  const body = await c.req.json();
-  const { resolved } = body;
-  if (typeof resolved !== "boolean") {
-    return c.json({ error: "resolved field (boolean) required" }, 400);
+app.patch('/:slug/api/comments/:id', async c => {
+  await ensureDb()
+  const email = await currentUser(c)
+  const deny = authRequired(email)
+  if (deny) {
+    return c.json({ error: deny.error }, deny.status)
+  }
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { resolved } = body
+  if (typeof resolved !== 'boolean') {
+    return c.json({ error: 'resolved field (boolean) required' }, 400)
   }
   await sqlite.execute({
-    sql: "UPDATE comments SET resolved = :resolved WHERE id = :id",
+    sql: 'UPDATE comments SET resolved = :resolved WHERE id = :id',
     args: { id, resolved: resolved ? 1 : 0 },
-  });
-  return c.json({ ok: true, id, resolved });
-});
+  })
+  return c.json({ ok: true, id, resolved })
+})
 
-app.delete("/:slug/api/comments/:id", async (c) => {
-  await ensureDb();
-  const id = c.req.param("id");
+app.delete('/:slug/api/comments/:id', async c => {
+  await ensureDb()
+  const email = await currentUser(c)
+  const deny = authRequired(email)
+  if (deny) {
+    return c.json({ error: deny.error }, deny.status)
+  }
+  const id = c.req.param('id')
   await sqlite.execute({
-    sql: "DELETE FROM comments WHERE id = :id",
+    sql: 'DELETE FROM comments WHERE id = :id',
     args: { id },
-  });
-  return c.json({ ok: true });
-});
+  })
+  return c.json({ ok: true })
+})
 
-app.get("/:slug/api/comments/export", async (c) => {
-  await ensureDb();
-  const slug = c.req.param("slug");
-  const unresolvedOnly = c.req.query("unresolved") === "true";
-  const cryptoKey = await cryptoKeyPromise;
+app.get('/:slug/api/comments/export', async c => {
+  await ensureDb()
+  const slug = c.req.param('slug')
+  const unresolvedOnly = c.req.query('unresolved') === 'true'
+  const cryptoKey = await requireCryptoKey(c)
+  if (!cryptoKey) return
 
-  // Build query based on whether we want all or just unresolved
-  let sql = "SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug";
+  let sql =
+    'SELECT id, slug, part, file, line_from, line_to, author, body, parent_id, resolved, created_at FROM comments WHERE slug = :slug'
   if (unresolvedOnly) {
-    sql += " AND resolved = 0";
+    sql += ' AND resolved = 0'
   }
-  sql += " ORDER BY part ASC, file ASC, line_from ASC, created_at ASC";
+  sql += ' ORDER BY part ASC, file ASC, line_from ASC, created_at ASC'
+  const result = await sqlite.execute({ sql, args: { slug } })
+  const comments = await decryptRows(result.rows, cryptoKey)
 
-  const result = await sqlite.execute({
-    sql,
-    args: { slug },
-  });
-
-  // Transform to API format (decrypt author and body)
-  const comments: ApiComment[] = await Promise.all(
-    result.rows.map(async (row: any) => ({
-      id: row.id,
-      slug: row.slug,
-      part: row.part,
-      file: row.file,
-      lineFrom: row.line_from,
-      lineTo: row.line_to,
-      author: await decrypt(row.author, cryptoKey),
-      body: await decrypt(row.body, cryptoKey),
-      parentId: row.parent_id || null,
-      resolved: !!row.resolved,
-      createdAt: row.created_at,
-    }))
-  );
-
-  // Build parent lookup for thread reconstruction
-  const commentById = new Map<string, ApiComment>();
-  for (const comment of comments) {
-    commentById.set(comment.id, comment);
-  }
-
-  // Group root comments by file + line range
-  const rootComments = comments.filter(c => !c.parentId);
-  const repliesByParentId = new Map<string, ApiComment[]>();
-  
+  const repliesByParentId = new Map<string, ApiComment[]>()
   for (const comment of comments) {
     if (comment.parentId) {
-      const siblings = repliesByParentId.get(comment.parentId) || [];
-      siblings.push(comment);
-      repliesByParentId.set(comment.parentId, siblings);
+      const siblings = repliesByParentId.get(comment.parentId) || []
+      siblings.push(comment)
+      repliesByParentId.set(comment.parentId, siblings)
     }
   }
+  const rootComments = comments.filter(x => !x.parentId)
+  const exportedComments: ExportedComments = rootComments.map(
+    (root): ExportedComment => {
+      const replies = repliesByParentId.get(root.id) || []
+      const children: BaseComment[] = replies.map(reply => ({
+        author: reply.author,
+        datetime: new Date(reply.createdAt).getTime(),
+        content: reply.body,
+      }))
+      return {
+        author: root.author,
+        datetime: new Date(root.createdAt).getTime(),
+        content: root.body,
+        children,
+        sourceFile: root.file,
+        startLine: root.lineFrom,
+        endLine: root.lineTo,
+      }
+    },
+  )
 
-  // Build exported comments with threaded structure
-  const exportedComments: ExportedComments = rootComments.map((root): ExportedComment => {
-    // Get all replies for this root comment
-    const replies = repliesByParentId.get(root.id) || [];
-    
-    // Convert replies to BaseComment format
-    const children: BaseComment[] = replies.map(reply => ({
-      author: reply.author,
-      datetime: new Date(reply.createdAt).getTime(),
-      content: reply.body,
-    }));
-
-    return {
-      author: root.author,
-      datetime: new Date(root.createdAt).getTime(),
-      content: root.body,
-      children,
-      sourceFile: root.file,
-      startLine: root.lineFrom,
-      endLine: root.lineTo,
-    };
-  });
-
-  // Set headers for JSON file download
-  c.header("Content-Type", "application/json; charset=utf-8");
-  c.header("Content-Disposition", `attachment; filename="${slug}-comments.json"`);
-  
-  return c.json(exportedComments);
-});
+  c.header('Content-Type', 'application/json; charset=utf-8')
+  c.header(
+    'Content-Disposition',
+    `attachment; filename="${slug}-comments.json"`,
+  )
+  return c.json(exportedComments)
+})
 
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
+/*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-async function serveBlobHtml(c: any, key: string) {
+async function requireCryptoKey(c: Context): Promise<CryptoKey | null> {
+  if (!cryptoKeyPromise) {
+    c.status(500)
+    c.json({ error: 'server missing MEANDER_ENCRYPTION_KEY' })
+    return null
+  }
+  return cryptoKeyPromise
+}
+
+async function decryptRows(
+  rows: readonly unknown[],
+  key: CryptoKey,
+): Promise<ApiComment[]> {
+  return Promise.all(
+    rows.map(async (raw: any) => ({
+      id: raw.id,
+      slug: raw.slug,
+      part: raw.part,
+      file: raw.file,
+      lineFrom: raw.line_from,
+      lineTo: raw.line_to,
+      author: await decrypt(raw.author, key),
+      body: await decrypt(raw.body, key),
+      parentId: raw.parent_id || null,
+      resolved: !!raw.resolved,
+      createdAt: raw.created_at,
+    })),
+  )
+}
+
+async function serveBlobText(c: Context, key: string, contentType: string) {
   try {
-    const data = await blob.get(key);
-    const encrypted = await data.text();
-    const cryptoKey = await cryptoKeyPromise;
-    const html = await decrypt(encrypted, cryptoKey);
-    return c.html(html);
+    const data = await blob.get(`${OUT_DIR}/${key}`)
+    const text = await data.text()
+    return c.text(text, 200, {
+      'Content-Type': `${contentType}; charset=utf-8`,
+    })
   } catch {
-    return c.text("Not found", 404);
+    /* Mid-migration fallback: try the legacy prefix. */
+    try {
+      const data = await blob.get(`${LEGACY_OUT_DIR}/${key}`)
+      const text = await data.text()
+      return c.text(text, 200, {
+        'Content-Type': `${contentType}; charset=utf-8`,
+      })
+    } catch {
+      return c.text('Not found', 404)
+    }
   }
 }
 
+async function serveEncryptedHtml(
+  c: Context,
+  relativeKey: string,
+  legacyAlternatives: readonly string[] = [],
+) {
+  if (!cryptoKeyPromise) {
+    return c.text('server missing MEANDER_ENCRYPTION_KEY', 500)
+  }
+  const cryptoKey = await cryptoKeyPromise
+  const attempts = [
+    `${OUT_DIR}/${relativeKey}`,
+    `${LEGACY_OUT_DIR}/${relativeKey}`,
+    ...legacyAlternatives.flatMap(alt => [
+      `${OUT_DIR}/${alt}`,
+      `${LEGACY_OUT_DIR}/${alt}`,
+    ]),
+  ]
+  for (const key of attempts) {
+    try {
+      const data = await blob.get(key)
+      const encrypted = await data.text()
+      const html = await decrypt(encrypted, cryptoKey)
+      return c.html(html)
+    } catch {
+      /* Keep trying fallback keys. */
+    }
+  }
+  return c.text('Not found', 404)
+}
+
 /* ------------------------------------------------------------------ */
-/*  Export                                                             */
+/*  Export                                                              */
 /* ------------------------------------------------------------------ */
 
-export default app.fetch;
+export default app.fetch

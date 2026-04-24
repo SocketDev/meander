@@ -14,10 +14,16 @@ name: 🌐 Deploy (Val Town)
 #        Name:  VALTOWN_TOKEN
 #        Value: the token from step 1.
 #
-#   3. Also add WALKTHROUGH_USER + WALKTHROUGH_PASS secrets for
-#      the basic-auth credentials the val enforces.
+#   3. Also add MEANDER_ENCRYPTION_KEY — the password that derives
+#      the AES-256-GCM key for at-rest encryption of walkthrough
+#      content. Rotating means re-publishing every encrypted
+#      HTML file (the old ciphertext becomes undecryptable).
 #
-#   4. Rotate by repeating 1-2 and deleting the old token in
+#   4. Optional: set MEANDER_ALLOWED_EMAIL_DOMAINS as a repo
+#      variable (not a secret — it's a non-sensitive comma-
+#      separated list). Without it, the val refuses every write.
+#
+#   5. Rotate by repeating 1-2 and deleting the old token in
 #      Val Town.
 #
 # The workflow never logs the token. Job-level env scope means
@@ -58,8 +64,11 @@ jobs:
       # Job-level scope — only this job sees the secrets. Anything
       # we add later runs without them unless explicitly granted.
       VALTOWN_TOKEN: ${{ secrets.VALTOWN_TOKEN }}
-      WALKTHROUGH_USER: ${{ secrets.WALKTHROUGH_USER }}
-      WALKTHROUGH_PASS: ${{ secrets.WALKTHROUGH_PASS }}
+      MEANDER_ENCRYPTION_KEY: ${{ secrets.MEANDER_ENCRYPTION_KEY }}
+      # Non-secret — allowed-domains is not sensitive. Stored as a
+      # repo *variable*, not a secret, so it shows up in CI logs
+      # (you WANT to see which domains the deploy enabled).
+      MEANDER_ALLOWED_EMAIL_DOMAINS: ${{ vars.MEANDER_ALLOWED_EMAIL_DOMAINS }}
     steps:
       - name: Preflight — verify secrets are configured
         # Fail fast with a clear message if any secret is missing.
@@ -71,8 +80,8 @@ jobs:
             echo "::error::VALTOWN_TOKEN secret is not configured."
             MISSING=1
           fi
-          if [ -z "$WALKTHROUGH_USER" ] || [ -z "$WALKTHROUGH_PASS" ]; then
-            echo "::error::WALKTHROUGH_USER and WALKTHROUGH_PASS secrets are required for deploy-val."
+          if [ -z "$MEANDER_ENCRYPTION_KEY" ]; then
+            echo "::error::MEANDER_ENCRYPTION_KEY secret is required for deploy-val."
             MISSING=1
           fi
           if [ "$MISSING" = "1" ]; then
@@ -95,5 +104,5 @@ jobs:
       - name: Deploy val
         # Uses the built CLI's deploy-val command which uploads
         # assets/val/index.ts to the target val, creating it if
-        # missing, and pushes the basic-auth env vars.
+        # missing, and pushes the env vars the val needs.
         run: pnpm exec meander deploy-val

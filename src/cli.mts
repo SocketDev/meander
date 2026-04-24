@@ -96,9 +96,28 @@ async function main() {
       break
     }
     case 'deploy-val': {
-      const valName = firstPositional(commandArgs) ?? 'walkthrough'
+      const { values, positionals } = parseArgs({
+        args: commandArgs,
+        options: {
+          'token-env': { type: 'string' },
+          graceful: { type: 'boolean', default: false },
+          'out-dir': { type: 'string' },
+          'allowed-domains': { type: 'string' },
+          'demo-mode': { type: 'boolean', default: false },
+        },
+        strict: false,
+        allowPositionals: true,
+      })
+      const valName = positionals[0] ?? 'walkthrough'
       const { deployVal } = await import('./deploy-val.mts')
-      await deployVal(valName, parseValTownFlags(commandArgs))
+      await deployVal(valName, {
+        tokenEnv: values['token-env'] as string | undefined,
+        graceful: values['graceful'] === true,
+        outDir: (values['out-dir'] as string | undefined) ?? 'pages',
+        allowedEmailDomains:
+          (values['allowed-domains'] as string | undefined) ?? '',
+        demoMode: values['demo-mode'] === true,
+      })
       break
     }
     case 'doctor': {
@@ -159,16 +178,25 @@ Flags (publish, deploy-val):
                         throwing. For CI jobs that shouldn't fail when the
                         secret isn't provisioned (fork PRs, demo setups).
 
+Flags (deploy-val only):
+  --out-dir <name>             Blob-key prefix the val reads from. Must match
+                               what 'meander publish' uploads to. Default: pages.
+  --allowed-domains <csv>      Comma-separated email-domain allowlist the val
+                               accepts for writes. Empty (default) means writes
+                               are refused — the safe starting posture.
+  --demo-mode                  Deploy the val in demo mode: comment UI renders
+                               a banner and writes return 403.
+
 Environment variables:
   VALTOWN_TOKEN              Val Town API bearer token (default env name).
                              See docs/publishing.md for scopes.
   MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
                              token from. Set to e.g. "MY_VT_TOKEN" if your
                              GitHub secret has a different name.
-  WALKTHROUGH_USER           Basic-auth username (deploy-val, publish).
-  WALKTHROUGH_PASS           Basic-auth password (deploy-val, publish).
-                             Also derives the at-rest encryption key —
-                             rotating means re-publishing every encrypted
+  MEANDER_ENCRYPTION_KEY     Password that derives the AES-256-GCM key for
+                             at-rest encryption of walkthrough HTML + comment
+                             bodies. Required by publish + deploy-val.
+                             Rotating means re-publishing every encrypted
                              HTML file.`)
       if (command) {
         console.error(`\nUnknown command: ${command}`)

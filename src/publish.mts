@@ -60,10 +60,10 @@ export async function publish(
     throw new Error(msg)
   }
 
-  const password = process.env['WALKTHROUGH_PASS']
+  const password = process.env['MEANDER_ENCRYPTION_KEY']
   if (!password) {
     const msg =
-      'WALKTHROUGH_PASS environment variable is required for publish (used to derive the at-rest encryption key).'
+      'MEANDER_ENCRYPTION_KEY environment variable is required for publish (derives the AES-256-GCM key that encrypts walkthrough content at rest).'
     if (graceful) {
       console.log(`[publish] skipped — ${msg}`)
       return
