@@ -1248,13 +1248,26 @@ export async function generate(
     title,
     hasDocuments: hasDocuments,
     documents: documents ?? [],
-    parts: parts.map((part) => ({
-      id: part.id,
-      title: part.title,
-      files: part.files.length,
-      sections: counts.get(part.id) ?? 0,
-      output: `walkthrough-part-${part.id}.html`,
-    })),
+    parts: parts.map((part) => {
+      const partSections = sectionsByPart.get(part.id) ?? [];
+      return {
+        id: part.id,
+        title: part.title,
+        files: part.files.length,
+        sections: counts.get(part.id) ?? 0,
+        output: `walkthrough-part-${part.id}.html`,
+        /* Per-section metadata for consumers that want to reshape
+         * the tour without reparsing emitted HTML. Additive to
+         * the earlier shape — `sections: <count>` stays for
+         * backwards compat; full records live under `sectionList`. */
+        sectionList: partSections.map((s) => ({
+          id: s.id,
+          file: s.file,
+          startLine: s.startLine,
+          endLine: s.endLine,
+        })),
+      };
+    }),
   };
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(summary, null, 2) + "\n");
 
