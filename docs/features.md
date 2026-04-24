@@ -198,6 +198,40 @@ hurt.)
 - Works offline, works with tight network, works under strict
   CSP.
 
+## Clean part URLs via `filename`
+
+**Opt-in, per-part.** Adding a `filename` field to a part
+shifts its URL from `/<slug>/part/<id>` to
+`/<slug>/parts/<filename>`. The output lands at
+`parts/<filename>.html` in the emit dir.
+
+### Example
+
+```json
+{
+  "parts": [
+    {
+      "id": 1,
+      "title": "Getting started",
+      "filename": "setup",
+      "objective": "…",
+      "keywords": ["…"],
+      "files": ["…"]
+    }
+  ]
+}
+```
+
+Rendered as `/test-docs/parts/setup` instead of
+`/test-docs/part/1`.
+
+### Rules
+
+- Filenames must match `[a-z0-9][a-z0-9-]*`.
+- Filenames must be unique within a walkthrough.
+- Parts without a `filename` keep the legacy numeric URL form
+  (back-compat — existing consumers see no change).
+
 ## llms.txt / llms-full.txt
 
 **Opt-in.** When enabled, meander writes two extra files to

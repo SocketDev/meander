@@ -18,6 +18,16 @@ const WalkthroughPartSchema = Type.Object({
   objective: Type.String({ minLength: 1 }),
   keywords: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
   files: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+  /**
+   * Optional URL-friendly slug. When set, the part is emitted
+   * to /<slug>/parts/<filename>.html instead of
+   * /<slug>/part/<id>.html, giving readers a stable,
+   * human-readable URL. Must be [a-z0-9][a-z0-9-]* and unique
+   * within the walkthrough.
+   */
+  filename: Type.Optional(
+    Type.String({ pattern: "^[a-z0-9][a-z0-9-]*$", minLength: 1 }),
+  ),
 });
 
 /**
@@ -874,7 +884,7 @@ function renderPartNav(
   const partLinks = parts
     .map((part) => {
       const cls = part.id === activePartId ? "active" : "";
-      return `<a class="${cls}" href="${basePath}/${slug}/part/${part.id}">Part ${part.id}</a>`;
+      return `<a class="${cls}" href="${partUrl(slug, part, basePath)}">Part ${part.id}</a>`;
     })
     .join("\n");
   return docsLink + partLinks;
@@ -1068,7 +1078,7 @@ function renderIndexHtml(
   const items = parts
     .map((part) => {
       const count = partCounts.get(part.id) ?? 0;
-      return `<li><a href="${basePath}/${slug}/part/${part.id}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span></li>`;
+      return `<li><a href="${partUrl(slug, part, basePath)}">Part ${part.id}: ${escapeHtml(part.title)}</a> <span class="ok">(${count} sections)</span></li>`;
     })
     .join("\n");
 
@@ -1516,7 +1526,49 @@ function loadAndValidateConfig(filePath: string): WalkthroughConfig {
     throw new Error(`Invalid walkthrough config at ${resolved}:\n${messages}`);
   }
 
+  /* Filename uniqueness — the regex at the schema level enforces
+   * the shape ([a-z0-9][a-z0-9-]*), but the "no two parts share
+   * a filename" check has to be cross-part. Same for docs if we
+   * later add filename to docs. */
+  const seenFilenames = new Map<string, number>();
+  for (const part of raw.parts) {
+    const fn = part.filename;
+    if (!fn) {
+      continue;
+    }
+    const prev = seenFilenames.get(fn);
+    if (prev !== undefined) {
+      throw new Error(
+        `${resolved}: parts ${prev} and ${part.id} both have filename "${fn}". Filenames must be unique.`,
+      );
+    }
+    seenFilenames.set(fn, part.id);
+  }
+
   return raw;
+}
+
+/**
+ * URL path segment for a part. Uses /<slug>/parts/<filename>
+ * when the part sets a filename; falls back to /<slug>/part/<id>.
+ * The numeric-id form is kept for back-compat so existing
+ * consumers see no change.
+ */
+function partUrl(slug: string, part: { id: number; filename?: string }, basePath: string): string {
+  const suffix = part.filename
+    ? `${slug}/parts/${part.filename}`
+    : `${slug}/part/${part.id}`;
+  return `${basePath}/${suffix}`;
+}
+
+/**
+ * Output filename (without path) for a part. Parts-with-
+ * filename land at `parts/<filename>.html`; bare parts land
+ * at `walkthrough-part-<id>.html` (back-compat). Returned
+ * relative to outDir.
+ */
+function partOutputFilename(part: { id: number; filename?: string }): string {
+  return part.filename ? `parts/${part.filename}.html` : `walkthrough-part-${part.id}.html`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1849,7 +1901,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       assetHref("walkthrough.css"),
       headExtra,
     );
-    writeFileSync(path.join(outDir, `walkthrough-part-${part.id}.html`), await finalizeHtml(html));
+    const partOut = path.join(outDir, partOutputFilename(part));
+    mkdirSync(path.dirname(partOut), { recursive: true });
+    writeFileSync(partOut, await finalizeHtml(html));
   }
 
   const indexHtml = renderIndexHtml(
@@ -1931,7 +1985,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         title: part.title,
         files: part.files.length,
         sections: counts.get(part.id) ?? 0,
-        output: `walkthrough-part-${part.id}.html`,
+        output: partOutputFilename(part),
         /* Per-section metadata for consumers that want to reshape
          * the tour without reparsing emitted HTML. Additive to
          * the earlier shape — `sections: <count>` stays for
@@ -1960,7 +2014,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       return siteUrl ? `${siteUrl}${rel}` : rel;
     };
     const partLines = parts.map((part) => {
-      const url = abs(`${basePath}/${slug}/part/${part.id}`);
+      const url = abs(partUrl(slug, part, basePath));
       return `- [Part ${part.id}: ${part.title}](${url}): ${part.objective}`;
     });
     const docLines = (documents ?? []).map((docPath) => {
