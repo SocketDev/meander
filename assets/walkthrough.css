@@ -1698,3 +1698,83 @@ pre.wt-repo-tree {
 pre.wt-repo-tree code {
   color: var(--text);
 }
+
+/* ── JSDoc annotation pills ─────────────────────────────────── */
+
+/* .annotation-md ships at opacity:0 to avoid a flash of
+ * unstyled JSDoc markers (@example / @param / etc. rendered as
+ * plain text for one frame before the pill-wrap runs). The
+ * annotation-ready orchestrator adds .wt-annotation-md-ready
+ * at the start of its pass so the cleaned DOM composites in
+ * the same paint. */
+.annotation-md {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.annotation-md.wt-annotation-md-ready {
+  opacity: 1;
+}
+
+/* Tag pill — "[@throws]" etc. Muted chip that reads as a label
+ * above its body, not competing with prose. */
+.wt-jsdoc-tag {
+  display: inline-block;
+  margin: 4px 6px 4px 0;
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--bg-tint);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Type annotation next to the pill — "@THROWS `{Error}`". */
+.wt-jsdoc-type-inline {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 4px;
+  border-radius: 4px;
+  background: var(--bg-tint);
+  color: var(--text);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.wt-jsdoc-type {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-tint));
+}
+
+.wt-jsdoc-param-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Block wrapper — tag + body as one outlined card so multiple
+ * @param / @throws stack cleanly without running together. */
+.wt-jsdoc-block {
+  display: block;
+  margin: 6px 0;
+  padding-left: 2px;
+}
+
+.wt-jsdoc-body {
+  display: block;
+  padding-left: 4px;
+  color: var(--text);
+}
+
+/* Description card leads the stack and gets no pill border;
+ * it reads as lead prose. */
+.wt-jsdoc-block-desc .wt-jsdoc-tag {
+  display: none;
+}
+
+.wt-jsdoc-block-desc .wt-jsdoc-body {
+  padding-left: 0;
+}
