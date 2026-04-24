@@ -5,6 +5,14 @@ import { extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { marked, Marked, Renderer, type Tokens } from "marked";
 
+import {
+  isEmail,
+  isPurl,
+  isScopedPackage,
+  isUrl,
+  _PURL_RE,
+} from "./classifiers.js";
+
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
 /* ------------------------------------------------------------------ */
@@ -163,58 +171,32 @@ function stripMultilineCommentsPreserveLines(code: string): string {
 /*  Annotation markdown renderer                                       */
 /* ------------------------------------------------------------------ */
 
-/**
- * Fixed-grammar identifier patterns we can hand-tokenize inside
- * inline `<code>` spans. hljs auto-detect mis-parses them because
- * `/`, `@`, `?`, `#` aren't operators in code-style grammars.
- * Pre-tokenizing lets consumers paint each segment (scheme /
- * type / ns / name / version / query / fragment) in its own
- * syntax colors without shipping a client-side classifier.
- *
- * The per-segment character classes lean on RFC 3986 `pchar` —
- * unreserved + pct-encoded + sub-delims + `:` + `@`. Tight
- * enough to reject whitespace and stray `<>`/`"` that would
- * break the enclosing <code> span; loose enough that we don't
- * claim to validate (invalid-but-shape-matching strings still
- * get painted — the user's content is what the user gets).
- *
- *   scheme  = "pkg:"
- *   type    = ALPHA *( ALPHA / DIGIT / "." / "+" / "-" )
- *   path    = "/" 1*pchar *( "/" 1*pchar )       ; namespace/name
- *   version = "@" 1*VCHAR                        ; VCHAR = pchar minus "?" "#"
- *   query   = "?" 1*QCHAR *( "&" 1*QCHAR )       ; QCHAR = pchar minus "#" "&"
- *   frag    = "#" 1*pchar *( "/" 1*pchar )
- */
-const PCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%";
-const VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%";           // no '?' or '#'
-const QCHAR = "A-Za-z0-9\\-._~!$'()*+,;=:@%";            // no '&', '#'
-const PATH_SEG = `[${PCHAR}]+`;
-const PURL_PATTERN = new RegExp(
-  `^(pkg:)` +
-  `([A-Za-z][A-Za-z0-9.+\\-]*)` +                       // type
-  `((?:\\/${PATH_SEG})+)` +                             // path = /seg(/seg)*
-  `(@[${VCHAR}]+)?` +                                   // version
-  `(\\?[${QCHAR}]+(?:&[${QCHAR}]+)*)?` +                // query
-  `(#(?:[${PCHAR}]+)(?:\\/[${PCHAR}]+)*)?` +            // fragment
-  `$`,
-);
+/* Inline <code> classifiers live in ./classifiers; these
+ * helpers wrap each kind in semantic markup so consumers can
+ * style them per-kind. Helpers return a full HTML string on
+ * match or `null` to fall through to marked's default. The
+ * codespan renderer tries them in decreasing specificity so a
+ * PURL (which could also pass isUrl broadly) is caught first. */
 
+const span = (cls: string, content: string): string =>
+  `<span class="${cls}">${escapeHtml(content)}</span>`;
+
+/**
+ * Emit a PURL as segmented spans. Reuses the compiled regex
+ * from ./classifiers so the character-class definition lives
+ * in one place. Splits path into namespace + name on the last
+ * slash.
+ */
 function tokenizePurlString(text: string): string | null {
-  const match = PURL_PATTERN.exec(text);
+  const match = _PURL_RE.exec(text);
   if (!match) {
     return null;
   }
   const [, scheme, type, path, version, query, fragment] = match;
-  const span = (cls: string, content: string) =>
-    `<span class="${cls}">${escapeHtml(content)}</span>`;
   const pathMatch = path!.match(/^\/(.+)\/([^/]+)$/);
-  let pathHtml: string;
-  if (pathMatch) {
-    pathHtml =
-      `/${span("purl-namespace", pathMatch[1]!)}/${span("purl-name", pathMatch[2]!)}`;
-  } else {
-    pathHtml = `/${span("purl-name", path!.slice(1))}`;
-  }
+  const pathHtml = pathMatch
+    ? `/${span("purl-namespace", pathMatch[1]!)}/${span("purl-name", pathMatch[2]!)}`
+    : `/${span("purl-name", path!.slice(1))}`;
   return (
     `<code class="purl">` +
     span("purl-scheme", scheme!) +
@@ -224,6 +206,55 @@ function tokenizePurlString(text: string): string | null {
     (query ? span("purl-query", query) : "") +
     (fragment ? span("purl-fragment", fragment) : "") +
     `</code>`
+  );
+}
+
+/** Email inside a <code> — render as a clickable mailto pill. */
+function tokenizeEmailString(text: string): string | null {
+  if (!isEmail(text)) {
+    return null;
+  }
+  return `<code class="email"><a href="mailto:${escapeHtml(text)}">${escapeHtml(text)}</a></code>`;
+}
+
+/** Scoped npm/jsr package (`@scope/name`) — two-tone chip. */
+function tokenizeScopedPackageString(text: string): string | null {
+  if (!isScopedPackage(text)) {
+    return null;
+  }
+  const slash = text.indexOf("/");
+  const scope = text.slice(0, slash);
+  const name = text.slice(slash + 1);
+  return (
+    `<code class="package-scoped">` +
+    span("package-scope", scope) +
+    `/` +
+    span("package-name", name) +
+    `</code>`
+  );
+}
+
+/** Absolute URL — clickable external link inside a <code>. */
+function tokenizeUrlString(text: string): string | null {
+  if (!isUrl(text)) {
+    return null;
+  }
+  return `<code class="url"><a href="${escapeHtml(text)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a></code>`;
+}
+
+/**
+ * Try each tokenizer in specificity order. PURL first (most
+ * specific — scheme + structured path + optional query/frag);
+ * then email (unambiguous shape); then scoped package (leading
+ * `@` + single `/`); then URL (any scheme + `://`). First match
+ * wins; all misses return null and marked's default codespan
+ * renderer handles the span. */
+function tokenizeInlineCode(text: string): string | null {
+  return (
+    tokenizePurlString(text) ??
+    tokenizeEmailString(text) ??
+    tokenizeScopedPackageString(text) ??
+    tokenizeUrlString(text)
   );
 }
 
@@ -320,26 +351,34 @@ function splitAnnotationByTags(
 const annotationMarked = new Marked({
   gfm: true,
   breaks: false,
+  /* Unwrap mailto auto-links when the address isn't actually
+   * an email — e.g. `core@7.0.0`, `name@1.2.3` get wrongly
+   * classified by GFM's email tokenizer. Real emails
+   * (`alice@example.com`) keep their mailto. The email
+   * classifier's shape check does the distinguishing. */
   walkTokens(token: Tokens.Generic) {
     if (
       token.type === "link" &&
       typeof token.href === "string" &&
       token.href.startsWith("mailto:")
     ) {
-      token.type = "text";
-      token.text = token.raw;
+      const addr = token.href.slice("mailto:".length);
+      if (!isEmail(addr)) {
+        token.type = "text";
+        token.text = token.raw;
+      }
     }
   },
 });
-/* PURL-shaped inline code gets hand-tokenized so consumers can
- * paint scheme / type / ns / name / version / query / fragment
- * with their own syntax colors. Non-PURL inline code falls
- * through to marked's default renderer (returning false from a
+/* Inline <code> spans are dispatched through a shape
+ * classifier (purl / email / scoped-package / url). Whichever
+ * kind matches gets a semantically-classed chip; plain code
+ * falls through to marked's default (returning false from the
  * renderer hook signals "use the default"). */
 annotationMarked.use({
   renderer: {
     codespan(token: Tokens.Codespan): string | false {
-      return tokenizePurlString(token.text) ?? false;
+      return tokenizeInlineCode(token.text) ?? false;
     },
   },
 });
