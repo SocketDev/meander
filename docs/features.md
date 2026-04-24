@@ -273,6 +273,23 @@ that delegate to `hljs.highlight()` get the grammar they
 need. On pages without any `.line-code` blocks, `onHljsReady`
 resolves immediately.
 
+## Dev server watch mode
+
+`pnpm dev --watch` starts the local preview server **and** a
+file watcher that re-runs `generate()` on change. Scoped to:
+
+- the fixture dir (source files referenced by parts + docs)
+- `walkthrough.json` itself
+- `assets/` (CSS + client-side JS bundled into emitted pages)
+
+Events are debounced (150ms) so multi-file saves trigger a
+single regen. The emitted `walkthrough/` subdir is explicitly
+ignored — writes from `generate()` itself would otherwise
+infinite-loop.
+
+Without `--watch`, `pnpm dev` runs a single `generate()` and
+then serves.
+
 ## Footer
 
 **On by default.** Every page renders a small attribution
