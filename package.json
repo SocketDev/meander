@@ -18,7 +18,12 @@
   ],
   "scripts": {
     "build": "tsc",
+    "check": "node --experimental-strip-types --no-warnings scripts/check.mts",
+    "clean": "node --experimental-strip-types --no-warnings scripts/clean.mts",
     "dev": "node --experimental-strip-types --no-warnings scripts/dev.mts",
+    "fix": "node --experimental-strip-types --no-warnings scripts/fix.mts",
+    "lint": "node --experimental-strip-types --no-warnings scripts/lint.mts",
+    "update": "node --experimental-strip-types --no-warnings scripts/update.mts",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {

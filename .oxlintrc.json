@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "eslint/no-console": "off",
+    "eslint/no-empty": ["error", { "allowEmptyCatch": true }],
+    "eslint/no-unused-vars": "off",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-unused-vars": "off"
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "test-walkthrough-docs/walkthrough",
+    "assets/**/*.js"
+  ]
+}

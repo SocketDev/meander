@@ -671,7 +671,7 @@ function buildSections(parts: readonly WalkthroughPart[], sourceMap: Map<string,
       }
 
       sections.push({
-        id: `${owner.id}-${file}-${first.startLine}`.replaceAll(/[\/.]/g, "-"),
+        id: `${owner.id}-${file}-${first.startLine}`.replaceAll(/[/.]/g, "-"),
         partId: owner.id,
         file,
         startLine: codeStart,
