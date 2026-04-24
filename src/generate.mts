@@ -878,7 +878,7 @@ ${sectionRows}
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
   ${headExtra}
-  <link rel="stylesheet" href="${cssHref}" />
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
   ${HLJS_LINK_CSS}
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'${commentBackendAttr}>
@@ -978,7 +978,7 @@ function renderIndexHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   ${headExtra}
-  <link rel="stylesheet" href="${cssHref}" />
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
 </head>
 <body>
   <header class="topbar">
@@ -1048,7 +1048,7 @@ function renderDocumentsHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documents - ${escapeHtml(slug)}</title>
   ${headExtra}
-  <link rel="stylesheet" href="${cssHref}" />
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
   ${HLJS_LINK_CSS}
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents"${commentBackendAttr}>
@@ -1695,9 +1695,14 @@ export async function generate(
   /* Head-injected scripts. boot.js sets up the shared namespace;
    * theme.js resolves the stored theme pref and writes
    * <html data-theme> synchronously, before first paint, so the
-   * page never flashes light on a dark-preferring system. */
+   * page never flashes light on a dark-preferring system.
+   * theme.js only loads when theme is enabled — when the
+   * consumer pinned to a single palette, we skip the toggle JS
+   * entirely rather than ship dead code. */
   const bootJs = readFileSync(path.join(bundledAssetsDir, 'boot.js'), 'utf-8')
-  const themeJs = readFileSync(path.join(bundledAssetsDir, 'theme.js'), 'utf-8')
+  const themeJs = resolved.theme.enabled
+    ? readFileSync(path.join(bundledAssetsDir, 'theme.js'), 'utf-8')
+    : ''
   const splitterJs = readFileSync(
     path.join(bundledAssetsDir, 'splitter.js'),
     'utf-8',
@@ -1829,12 +1834,15 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * else at output root. `bundledAssetsDir` (declared above) is
    * the npm-package-bundled asset *source* path; `assetDir` is
    * the user-chosen emit subdir. Must land before renders so
-   * the cssHref in emitted HTML resolves correctly. */
-  let css = readFileSync(path.join(bundledAssetsDir, 'meander.css'), 'utf-8')
-  {
-    /* CSS minify. Inline read of config.minify (the shared
-     * minifyMod binding lives further down, set up as part of
-     * the finalizeHtml pipeline; we write CSS before that). */
+   * the cssHref in emitted HTML resolves correctly.
+   *
+   * Skipped entirely when `styles: false` (the consumer is
+   * shipping their own stylesheet via headExtra or equivalent).
+   * The template still has a <link> tag — gated below — so when
+   * styles are off, no CSS file lands AND no link points at it. */
+  const emitStyles = resolved.styles.base
+  if (emitStyles) {
+    let css = readFileSync(path.join(bundledAssetsDir, 'meander.css'), 'utf-8')
     const minifyCssHere =
       !!config.minify &&
       (typeof config.minify === 'object' ? config.minify.css !== false : true)
@@ -1842,10 +1850,10 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       const m = await import('./minify.mts')
       css = await m.minifyAsset(css, { kind: 'css' })
     }
+    const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir
+    mkdirSync(cssOutDir, { recursive: true })
+    writeFileSync(path.join(cssOutDir, 'meander.css'), css)
   }
-  const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir
-  mkdirSync(cssOutDir, { recursive: true })
-  writeFileSync(path.join(cssOutDir, 'meander.css'), css)
 
   /* Copy favicon assets. Default: meander ships a bezel-derived
    * set (svg + ico + sized pngs + apple-touch-icon). Consumer
@@ -2045,7 +2053,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       symbols,
       hasDocuments,
       basePath,
-      assetHref('meander.css'),
+      emitStyles ? assetHref('meander.css') : '',
       headExtra,
       footerHtml,
       commentBackendAttr,
@@ -2062,7 +2070,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     counts,
     hasDocuments,
     basePath,
-    assetHref('meander.css'),
+    emitStyles ? assetHref('meander.css') : '',
     headExtra,
     lineCounts,
     !!config.sizeTiers,
@@ -2119,7 +2127,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       renderedDocs,
       documentsInlineJs,
       basePath,
-      assetHref('meander.css'),
+      emitStyles ? assetHref('meander.css') : '',
       headExtra,
       footerHtml,
       commentBackendAttr,
