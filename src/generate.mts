@@ -813,27 +813,58 @@ function renderPartHtml(
   const fileBlocks = orderedFiles
     .map((file) => {
       const fileSections = sectionsByFile.get(file) ?? [];
+      const thisAnchor = fileAnchor(file);
+
+      /* Section row labels used by both the file-head sections
+       * menu AND every per-chunk chip that clones from it. The
+       * section's id is the anchor target (matches what each
+       * .code-section emits as its DOM id). */
+      const sectionRows = fileSections
+        .map((section, i) => {
+          const label = `Section ${i + 1}`;
+          const meta =
+            section.endLine > section.startLine
+              ? `Lines ${section.startLine}–${section.endLine}`
+              : `Line ${section.startLine}`;
+          return `        <a href="#${section.id}"><span class="mdr-section-label">${label}</span><span class="mdr-section-meta">${meta}</span></a>`;
+        })
+        .join("\n");
+
       const pairedRows = fileSections
-        .map((section) => {
+        .map((section, i) => {
           const codeLines = section.code.split("\n");
           const tableRows = codeLines
-            .map((line, i) => {
-              const lineNum = section.startLine + i;
+            .map((line, j) => {
+              const lineNum = section.startLine + j;
               return `<tr><td class="line-num">${lineNum}</td><td class="line-code"><code class="language-${section.languageClass}">${escapeHtml(line)}</code></td></tr>`;
             })
             .join("\n");
 
           const annotationHtml = renderAnnotationMarkdown(section.annotation);
+          /* Per-chunk chip — a compact sections dropdown at the
+           * top of each .code-section. Panel starts empty; the
+           * first open clones the file-head menu's panel in
+           * nav-menus.js and marks this chunk's anchor active.
+           * Empty panel on disk saves repeat markup when a file
+           * has many sections. Suppressed on single-section
+           * files — nothing to navigate to. */
+          const chip =
+            fileSections.length > 1
+              ? `  <details class="mdr-sections-menu mdr-section-chip" data-sections-for="${thisAnchor}" data-active-id="${section.id}">
+    <summary class="count">Section ${i + 1} of ${fileSections.length}</summary>
+    <div class="mdr-sections-panel"></div>
+  </details>
+`
+              : "";
           return `<article class="annotation-card" id="ann-${section.id}">
   <div class="annotation-md">${annotationHtml}</div>
 </article>
 <section class="code-section" id="${section.id}">
-  <pre><table class="code-table" data-file="${escapeHtml(section.file)}">${tableRows}</table></pre>
+${chip}  <pre><table class="code-table" data-file="${escapeHtml(section.file)}">${tableRows}</table></pre>
 </section>`;
         })
         .join("\n");
 
-      const thisAnchor = fileAnchor(file);
       /* Only render the jump-to-file menu when there are at least
        * two files — a dropdown with one row is noise. */
       const pathCell =
@@ -851,10 +882,22 @@ ${fileEntries
     </details>`
           : `<span class="path">${escapeHtml(file)}</span>`;
 
+      /* Same rule: ≥2 sections → dropdown, single section →
+       * plain count text (no useless menu). */
+      const countCell =
+        fileSections.length > 1
+          ? `<details class="mdr-sections-menu">
+      <summary class="count">${fileSections.length} sections</summary>
+      <div class="mdr-sections-panel">
+${sectionRows}
+      </div>
+    </details>`
+          : `<span class="count">1 section</span>`;
+
       return `<section class="file-block" id="${thisAnchor}">
   <header class="file-head">
     ${pathCell}
-    <span class="count">${fileSections.length} section${fileSections.length === 1 ? "" : "s"}</span>
+    ${countCell}
   </header>
   <div class="pair-grid file-grid">
     ${pairedRows || '<div class="empty">No walkthrough prose found for this file.</div><div class="empty">No source ranges found for this file.</div>'}
