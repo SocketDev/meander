@@ -170,9 +170,34 @@ function stripMultilineCommentsPreserveLines(code: string): string {
  * Pre-tokenizing lets consumers paint each segment (scheme /
  * type / ns / name / version / query / fragment) in its own
  * syntax colors without shipping a client-side classifier.
+ *
+ * The per-segment character classes lean on RFC 3986 `pchar` —
+ * unreserved + pct-encoded + sub-delims + `:` + `@`. Tight
+ * enough to reject whitespace and stray `<>`/`"` that would
+ * break the enclosing <code> span; loose enough that we don't
+ * claim to validate (invalid-but-shape-matching strings still
+ * get painted — the user's content is what the user gets).
+ *
+ *   scheme  = "pkg:"
+ *   type    = ALPHA *( ALPHA / DIGIT / "." / "+" / "-" )
+ *   path    = "/" 1*pchar *( "/" 1*pchar )       ; namespace/name
+ *   version = "@" 1*VCHAR                        ; VCHAR = pchar minus "?" "#"
+ *   query   = "?" 1*QCHAR *( "&" 1*QCHAR )       ; QCHAR = pchar minus "#" "&"
+ *   frag    = "#" 1*pchar *( "/" 1*pchar )
  */
-const PURL_PATTERN =
-  /^(pkg:)([A-Za-z][A-Za-z0-9.+-]*)(\/.+?)(@[^?#]+)?(\?[^#]+)?(#.+)?$/;
+const PCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%";
+const VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%";           // no '?' or '#'
+const QCHAR = "A-Za-z0-9\\-._~!$'()*+,;=:@%";            // no '&', '#'
+const PATH_SEG = `[${PCHAR}]+`;
+const PURL_PATTERN = new RegExp(
+  `^(pkg:)` +
+  `([A-Za-z][A-Za-z0-9.+\\-]*)` +                       // type
+  `((?:\\/${PATH_SEG})+)` +                             // path = /seg(/seg)*
+  `(@[${VCHAR}]+)?` +                                   // version
+  `(\\?[${QCHAR}]+(?:&[${QCHAR}]+)*)?` +                // query
+  `(#(?:[${PCHAR}]+)(?:\\/[${PCHAR}]+)*)?` +            // fragment
+  `$`,
+);
 
 function tokenizePurlString(text: string): string | null {
   const match = PURL_PATTERN.exec(text);
