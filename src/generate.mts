@@ -138,6 +138,36 @@ const FILE_LANG: Record<string, string> = {
   ".sh": "bash",
 };
 
+/* Pinned highlight.js CDN assets. Hashes are sha384 for SRI —
+ * computed once from the pinned @11.11.1 bytes; if the pin
+ * bumps, recompute via:
+ *   curl -sL <url> | openssl dgst -sha384 -binary | base64
+ * Browsers refuse to execute/apply a file whose delivered bytes
+ * don't match the integrity hash, so a CDN compromise or
+ * silent version drift gets blocked before rendering.
+ *
+ * TypeScript grammar is loaded alongside the core bundle so
+ * fenced ```typescript blocks in annotations (JSDoc @example)
+ * highlight correctly — without it, hljs auto-detect often
+ * mis-classes TS as JavaScript and loses generic syntax. */
+const HLJS_CDN = {
+  css: "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css",
+  cssSri: "sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH",
+  js: "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js",
+  jsSri: "sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU",
+  tsGrammar: "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/languages/typescript.min.js",
+  tsGrammarSri: "sha384-df1w1nJ43GNwmgbSCrT8YFIYyqFAm+lzj+b6ofuziX8Cfdg9QHFwbORDgAaj//wi",
+} as const;
+
+const HLJS_LINK_CSS =
+  `<link rel="stylesheet" href="${HLJS_CDN.css}" ` +
+  `integrity="${HLJS_CDN.cssSri}" crossorigin="anonymous" />`;
+const HLJS_SCRIPT_JS =
+  `<script src="${HLJS_CDN.js}" ` +
+  `integrity="${HLJS_CDN.jsSri}" crossorigin="anonymous"></script>\n  ` +
+  `<script src="${HLJS_CDN.tsGrammar}" ` +
+  `integrity="${HLJS_CDN.tsGrammarSri}" crossorigin="anonymous"></script>`;
+
 function getAssetsDir(): string {
   const thisFile = fileURLToPath(import.meta.url);
   // In dist/generate.js → assets is at ../assets
@@ -775,7 +805,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
   ${headExtra}
   <link rel="stylesheet" href="${cssHref}" />
-  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
+  ${HLJS_LINK_CSS}
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="${part.id}">
   <header class="topbar">
@@ -790,7 +820,7 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
     ${fileBlocks || '<div class="empty">No walkthrough sections matched this part.</div>'}
   </main>
 
-  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
+  ${HLJS_SCRIPT_JS}
   <script>
     for (const block of document.querySelectorAll('.line-code code')) {
       hljs.highlightElement(block);
@@ -887,7 +917,7 @@ function renderDocumentsHtml(
   <title>Documents - ${escapeHtml(slug)}</title>
   ${headExtra}
   <link rel="stylesheet" href="${cssHref}" />
-  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" />
+  ${HLJS_LINK_CSS}
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents">
   <header class="topbar">
@@ -906,7 +936,7 @@ function renderDocumentsHtml(
     ${tabPanes}
   </main>
 
-  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
+  ${HLJS_SCRIPT_JS}
   <script>
     for (const block of document.querySelectorAll('.doc-content pre code')) {
       hljs.highlightElement(block);
