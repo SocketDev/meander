@@ -79,13 +79,13 @@ or end-of-file) becomes the paired code block.
  */
 export function loadConfig(): Config {
   return {
-    port: parseInt(process.env.PORT ?? '3000', 10),
-    version: process.env.API_VERSION ?? 'v1',
+    port: Number(process.env['PORT'] ?? 3000),
+    version: process.env['API_VERSION'] ?? 'v1',
   }
 }
 ```
 
-Prose supports full Markdown.
+Prose inside the comment supports full Markdown.
 
 ### 2. Describe the walkthrough
 
@@ -132,8 +132,6 @@ pages/
   manifest.json     build summary
 ```
 
-Override the output directory via the config's `outDir` field.
-
 ## Config reference
 
 ### Top-level fields
@@ -157,26 +155,26 @@ Override the output directory via the config's `outDir` field.
 | `files`     | `string[]` | Yes      | Source files in this part, relative to the config file.                     |
 | `filename`  | `string`   | No       | URL-friendly slug for clean part URLs (`/:slug/parts/<filename>.html`).     |
 
-### Full reference
+### How `keywords` resolves overlap
 
-The full schema — comments / theme / styles opt-outs, favicon
-overrides, CSP, SRI, mermaid, minify, service worker — lives in
-[`docs/features.md`](docs/features.md).
-
-## Section assignment
-
-When the same file appears in multiple parts, Meander picks an
+When the same file appears in multiple parts, meander picks an
 owner per comment block using keyword scoring. Each `keywords`
 list is checked against the block's cleaned text and its file
 path; the part with the most matches wins, ties broken by
 config order. Pick keywords that distinguish parts, not generic
 terms.
 
+### Full reference
+
+The full schema — comments / theme / styles opt-outs, favicon
+overrides, CSP, SRI, mermaid, minify, service worker — lives in
+[`docs/features.md`](docs/features.md).
+
 ## Publishing with comments
 
 The commenting layer runs in a Val Town val. If you only want
-static pages, you can skip this — `pnpm dev` / `meander serve`
-preview the HTML standalone.
+static pages, you can skip this — `meander serve` previews the
+HTML standalone.
 
 To deploy the val + publish encrypted pages:
 

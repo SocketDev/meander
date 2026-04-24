@@ -186,18 +186,18 @@ Or customize:
 - `cacheDir`: path (relative to `meander.config.json`'s dir) where
   rendered SVGs are cached. Default: `.cache/mermaid`.
 
-### Peer dependencies
+### Optional runtime deps
 
-`mermaid` and `puppeteer` are optional peer deps. When you
-enable the feature, install them in your project:
+`mermaid` and `puppeteer` aren't installed by default — meander
+loads them dynamically only when you enable this feature. Add
+them to your project when you're ready:
 
 ```bash
 pnpm add -D mermaid puppeteer
 ```
 
-(`svgo` is already a meander devDep but optionally also
-becomes a peer in future versions; installing it doesn't
-hurt.)
+`svgo` ships with meander as a direct dep and is always
+available.
 
 ### How it works
 
@@ -576,12 +576,13 @@ the emitted CSP meta match the minified inline-script bytes
 the browser sees. SRI runs last (attribute-only; doesn't
 touch content).
 
-### Peer dep
+### Dep notes
 
-`svgo` is an optional peer dep (alongside mermaid + puppeteer).
-Without it installed, the SVG pass silently no-ops. esbuild is
-already a meander devDep so JS/CSS minification is always
-available when enabled.
+`svgo` ships as a direct dep — the SVG minify pass is always
+available. `esbuild` is loaded dynamically; if a consumer
+enables `config.minify.js` or `config.minify.css` without
+installing esbuild themselves, the pass logs + skips rather
+than aborting the build.
 
 ## Subresource Integrity (SRI)
 

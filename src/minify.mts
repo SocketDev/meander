@@ -13,9 +13,11 @@
  * a string that's always valid HTML / CSS / JS even on partial
  * failure.
  *
- * `esbuild` is already a meander devDep. `svgo` is a peer dep
- * (optional) — consumers who want inline-SVG shrinking install
- * it alongside their mermaid + puppeteer peers.
+ * Both `esbuild` and `svgo` are loaded via dynamic import so
+ * the generator still works when a consumer opts into minify
+ * without installing esbuild. `svgo` ships as a direct meander
+ * dep; `esbuild` is a meander devDep that consumers add to
+ * their own project if they want JS/CSS minification.
  */
 import { HTMLElement, parse as parseHtml } from 'node-html-parser'
 
@@ -63,45 +65,57 @@ export async function minifyEmittedHtml(
   let changed = false
 
   if (js) {
-    const { transform } = await import('esbuild')
-    const scripts = root.querySelectorAll('script')
-    /* Inline <script> only — tags with a `src` attribute fetch
-     * their body over the network and are minified (if at all)
-     * at the file-emission step, not inside the HTML. */
-    const inlineScripts: HTMLElement[] = []
-    for (const s of scripts) {
-      if (s.getAttribute('src')) {
-        continue
-      }
-      if (!s.text) {
-        continue
-      }
-      inlineScripts.push(s)
+    let esbuildMod: typeof import('esbuild') | null = null
+    try {
+      esbuildMod = await import('esbuild')
+      /* v8 ignore start -- optional-dep absence; esbuild is a meander devDep so this branch never fires in tests. */
+    } catch {
+      /* esbuild isn't installed — skip the JS pass rather than
+       * erroring. Consumers enable minify.js by installing it
+       * alongside mermaid + puppeteer. */
     }
-    const results = await Promise.allSettled(
-      inlineScripts.map(s =>
-        transform(s.text, {
-          loader: 'js',
-          minify: true,
-          target: 'es2022',
-          legalComments: 'none',
-        }),
-      ),
-    )
-    for (const [i, r] of results.entries()) {
-      if (r.status !== 'fulfilled') {
-        console.error(
-          '[minify] inline <script> failed:',
-          (r.reason as Error)?.message ?? r.reason,
-        )
-        continue
+    /* v8 ignore stop */
+    if (esbuildMod) {
+      const { transform } = esbuildMod
+      const scripts = root.querySelectorAll('script')
+      /* Inline <script> only — tags with a `src` attribute fetch
+       * their body over the network and are minified (if at all)
+       * at the file-emission step, not inside the HTML. */
+      const inlineScripts: HTMLElement[] = []
+      for (const s of scripts) {
+        if (s.getAttribute('src')) {
+          continue
+        }
+        if (!s.text) {
+          continue
+        }
+        inlineScripts.push(s)
       }
-      const el = inlineScripts[i]!
-      /* Replace the text node inside the <script>. node-html-
-       * parser exposes `set_content` for this exact case — a
-       * direct textContent assignment would HTML-escape the JS. */
-      el.set_content(r.value.code)
-      changed = true
+      const results = await Promise.allSettled(
+        inlineScripts.map(s =>
+          transform(s.text, {
+            loader: 'js',
+            minify: true,
+            target: 'es2022',
+            legalComments: 'none',
+          }),
+        ),
+      )
+      for (const [i, r] of results.entries()) {
+        if (r.status !== 'fulfilled') {
+          console.error(
+            '[minify] inline <script> failed:',
+            (r.reason as Error)?.message ?? r.reason,
+          )
+          continue
+        }
+        const el = inlineScripts[i]!
+        /* Replace the text node inside the <script>. node-html-
+         * parser exposes `set_content` for this exact case — a
+         * direct textContent assignment would HTML-escape the JS. */
+        el.set_content(r.value.code)
+        changed = true
+      }
     }
   }
 
