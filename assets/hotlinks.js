@@ -6,7 +6,7 @@
  *     navigate to that block's anchor (same window).
  *
  * The <a> is invisible (no underline, inherits color) until the
- * modifier key is held — body.wt-mod-pressed flips on and CSS
+ * modifier key is held — body.mdr-mod-pressed flips on and CSS
  * reveals a dotted underline + pointer. Bare clicks do nothing
  * so code selection still works.
  *
@@ -124,7 +124,7 @@
           frag.appendChild(document.createTextNode(text.slice(cursor, m.start)));
         }
         const a = document.createElement("a");
-        a.className = "wt-src-link";
+        a.className = "mdr-src-link";
         a.setAttribute("data-link-type", m.type);
         a.href = m.href;
         if (m.type === "url") {
@@ -157,7 +157,7 @@
       }
     }
 
-    /* Modifier-key tracking — toggle body.wt-mod-pressed while
+    /* Modifier-key tracking — toggle body.mdr-mod-pressed while
      * Cmd (macOS) / Ctrl (others) is held. Dedupe because
      * auto-repeat keydown fires continuously. */
     let modState = false;
@@ -166,7 +166,7 @@
         return;
       }
       modState = pressed;
-      document.body.classList.toggle("wt-mod-pressed", pressed);
+      document.body.classList.toggle("mdr-mod-pressed", pressed);
     };
     const passive = { passive: true };
     addEventListener(
@@ -191,7 +191,7 @@
 
     /* Block plain clicks; only modifier-held clicks navigate. */
     document.addEventListener("click", (e) => {
-      const link = e.target.closest?.(".wt-src-link");
+      const link = e.target.closest?.(".mdr-src-link");
       if (!link) {
         return;
       }

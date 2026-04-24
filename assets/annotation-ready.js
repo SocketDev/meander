@@ -26,7 +26,7 @@
        * Setting the class at the START of the pass lets the
        * browser composite the cleaned DOM in the same paint as
        * this function's mutations. */
-      container.classList.add("wt-annotation-md-ready");
+      container.classList.add("mdr-annotation-md-ready");
       ns.wrapJsdocTags(container);
       ns.groupJsdocBlocks(container);
     }

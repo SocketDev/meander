@@ -6,8 +6,8 @@
  *   2. Runs hljs over fenced @example blocks (language-javascript
  *      default when none is set).
  *   3. Walks text nodes to wrap `@tag` tokens in
- *      <span class="wt-jsdoc-tag">, plus their optional
- *      `{Type}` annotation as <code class="wt-jsdoc-type-inline">.
+ *      <span class="mdr-jsdoc-tag">, plus their optional
+ *      `{Type}` annotation as <code class="mdr-jsdoc-type-inline">.
  *
  * Exposes ns.wrapJsdocTags(container) so the group pass
  * (jsdoc-group.js) can call it. Kept separate so each file
@@ -88,13 +88,13 @@
        * span itself) or inside code/pre (a `@foo` in user code
        * is not a JSDoc tag). */
       const parent = n.parentElement;
-      if (parent && !parent.closest(".wt-jsdoc-tag, code, pre")) {
+      if (parent && !parent.closest(".mdr-jsdoc-tag, code, pre")) {
         textNodes.push(n);
       }
       n = walker.nextNode();
     }
     /* Match the @tag token plus an optional trailing `{…}` type
-     * annotation. Tag itself becomes a muted `.wt-jsdoc-tag`
+     * annotation. Tag itself becomes a muted `.mdr-jsdoc-tag`
      * span; `{Type}` becomes a separate inline <code>. Any
      * whitespace between is preserved as a text node. */
     const tagPattern = /@([A-Za-z]+)\b(\s*)(\{[^}]*\})?/g;
@@ -121,7 +121,7 @@
           parts.push(document.createElement("br"));
         }
         const tagSpan = document.createElement("span");
-        tagSpan.className = "wt-jsdoc-tag";
+        tagSpan.className = "mdr-jsdoc-tag";
         tagSpan.textContent = "@" + m[1];
         tagSpan.dataset.tag = m[1].toLowerCase();
         parts.push(tagSpan);
@@ -130,7 +130,7 @@
             parts.push(document.createTextNode(m[2]));
           }
           const typeCode = document.createElement("code");
-          typeCode.className = "wt-jsdoc-type-inline";
+          typeCode.className = "mdr-jsdoc-type-inline";
           typeCode.textContent = m[3];
           parts.push(typeCode);
         }

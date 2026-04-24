@@ -3,7 +3,7 @@
  * make rendered annotation + document HTML read better without
  * touching source content:
  *
- *   - highlightProseNumbers: wrap digit tokens in <span class="wt-num">
+ *   - highlightProseNumbers: wrap digit tokens in <span class="mdr-num">
  *   - italicizeParentheticals: wrap `(aside)` in <em>
  *   - anchorifyHeadings: give h2/h3/h4 an id + trailing `#` permalink
  *   - enhanceRepoTrees: mark ASCII directory-tree code blocks for
@@ -73,7 +73,7 @@ export function highlightProseNumbers(html: string): string {
           continue;
         }
         pattern.lastIndex = 0;
-        any.rawText = text.replace(pattern, '<span class="wt-num">$1</span>');
+        any.rawText = text.replace(pattern, '<span class="mdr-num">$1</span>');
       } else if (any.nodeType === 1) {
         walk(child as HTMLElement);
       }
@@ -134,7 +134,7 @@ export function italicizeParentheticals(html: string): string {
 
 /**
  * Give every heading (h2-h4) in rendered doc HTML an id slug
- * + a trailing `<a class="wt-heading-anchor">#</a>` so readers
+ * + a trailing `<a class="mdr-heading-anchor">#</a>` so readers
  * can copy a deep-link to the section. h1 is skipped — it's the
  * page title and the URL itself already anchors it.
  *
@@ -149,7 +149,7 @@ export function anchorifyHeadings(html: string): string {
     /* Idempotency: skip if a permalink anchor was already
      * inserted (double-polishing a page shouldn't produce two
      * `#` links per heading). */
-    if (h.querySelector(".wt-heading-anchor")) {
+    if (h.querySelector(".mdr-heading-anchor")) {
       continue;
     }
     const existingId = h.getAttribute("id");
@@ -178,7 +178,7 @@ export function anchorifyHeadings(html: string): string {
     used.add(slug);
     h.insertAdjacentHTML(
       "beforeend",
-      ` <a class="wt-heading-anchor" href="#${slug}" aria-label="Permalink to this section">#</a>`,
+      ` <a class="mdr-heading-anchor" href="#${slug}" aria-label="Permalink to this section">#</a>`,
     );
   }
   return root.toString();
@@ -188,7 +188,7 @@ export function anchorifyHeadings(html: string): string {
  * Mark ASCII repo-tree code blocks (ones that draw a directory
  * hierarchy with `├──`, `└──`, `│`) so CSS can dim the drawing
  * glyphs and lift the trailing annotation column. Adds
- * `.wt-repo-tree` to the <pre> and `nohighlight` to the <code>
+ * `.mdr-repo-tree` to the <pre> and `nohighlight` to the <code>
  * so hljs skips it — drawing glyphs become random tokens
  * otherwise.
  */
@@ -201,7 +201,7 @@ export function enhanceRepoTrees(html: string): string {
       continue;
     }
     const existingClass = pre.getAttribute("class") ?? "";
-    pre.setAttribute("class", `${existingClass} wt-repo-tree`.trim());
+    pre.setAttribute("class", `${existingClass} mdr-repo-tree`.trim());
     for (const code of pre.querySelectorAll("code")) {
       const cc = code.getAttribute("class") ?? "";
       code.setAttribute("class", `${cc} nohighlight`.trim());

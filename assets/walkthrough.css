@@ -1371,16 +1371,16 @@ body.col-resizing * {
 
 /* ── Jump-to-file menu ───────────────────────────────────────── */
 
-/* The file-head .path is wrapped in a <details class="wt-files-menu">
+/* The file-head .path is wrapped in a <details class="mdr-files-menu">
  * whose <summary> is the path text. Clicking opens a floating panel
  * listing every file on the page. Dashed underline on the summary
  * is the "clickable" affordance without the weight of a button. */
-.wt-files-menu {
+.mdr-files-menu {
   position: relative;
   display: inline-block;
 }
 
-.wt-files-menu > summary {
+.mdr-files-menu > summary {
   cursor: pointer;
   list-style: none;
   display: inline-flex;
@@ -1396,21 +1396,21 @@ body.col-resizing * {
 }
 
 /* Suppress the native disclosure marker in every browser. */
-.wt-files-menu > summary::marker {
+.mdr-files-menu > summary::marker {
   content: "";
   display: none;
 }
 
-.wt-files-menu > summary::-webkit-details-marker {
+.mdr-files-menu > summary::-webkit-details-marker {
   display: none;
 }
 
-.wt-files-menu[open] > summary {
+.mdr-files-menu[open] > summary {
   color: var(--text);
   text-decoration-color: var(--text);
 }
 
-.wt-files-panel {
+.mdr-files-panel {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -1430,7 +1430,7 @@ body.col-resizing * {
   gap: 1px;
 }
 
-.wt-files-panel a {
+.mdr-files-panel a {
   display: block;
   padding: 6px 10px;
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
@@ -1448,30 +1448,30 @@ body.col-resizing * {
 /* Zebra stripe — subtle tint on alternating rows to help the eye
  * track long lists. Dark theme gets a lighter tint so the band
  * still reads without dominating. */
-.wt-files-panel a:nth-child(even) {
+.mdr-files-panel a:nth-child(even) {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
-html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
+html[data-theme="dark"] .mdr-files-panel a:nth-child(even) {
   background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
-.wt-files-panel a:hover {
+.mdr-files-panel a:hover {
   background: var(--bg-tint);
   color: var(--text);
 }
 
-.wt-files-panel a.active {
+.mdr-files-panel a.active {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--text);
   font-weight: 600;
 }
 
-.wt-files-panel::-webkit-scrollbar {
+.mdr-files-panel::-webkit-scrollbar {
   width: 8px;
 }
 
-.wt-files-panel::-webkit-scrollbar-thumb {
+.mdr-files-panel::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 999px;
   border: 2px solid var(--bg-card);
@@ -1629,8 +1629,8 @@ html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
 /* ── Prose polishers ─────────────────────────────────────────── */
 
 /* highlightProseNumbers — accent-color digits + version strings
- * wrapped in <span class="wt-num"> by the server-side polisher. */
-.wt-num {
+ * wrapped in <span class="mdr-num"> by the server-side polisher. */
+.mdr-num {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -1639,7 +1639,7 @@ html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
 /* anchorifyHeadings — GitHub-style `#` permalink that appears
  * on heading hover. Hidden at rest to keep the heading clean,
  * fades in when the reader is visibly close. */
-.wt-heading-anchor {
+.mdr-heading-anchor {
   opacity: 0;
   margin-left: 0.35em;
   color: var(--muted);
@@ -1648,30 +1648,30 @@ html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
   transition: opacity 120ms ease;
 }
 
-h2:hover .wt-heading-anchor,
-h3:hover .wt-heading-anchor,
-h4:hover .wt-heading-anchor,
-.wt-heading-anchor:focus {
+h2:hover .mdr-heading-anchor,
+h3:hover .mdr-heading-anchor,
+h4:hover .mdr-heading-anchor,
+.mdr-heading-anchor:focus {
   opacity: 1;
 }
 
-.wt-heading-anchor:hover {
+.mdr-heading-anchor:hover {
   color: var(--accent);
   text-decoration: none;
 }
 
 /* hotlinks.js — Cmd/Ctrl-click URLs/paths inside code cells.
  * Invisible at rest (inherit color, no underline, no pointer)
- * so the code cell reads as plain text. body.wt-mod-pressed
+ * so the code cell reads as plain text. body.mdr-mod-pressed
  * is flipped on when the user holds the modifier key and
  * flips back off on keyup/blur — that's the visible state. */
-.wt-src-link {
+.mdr-src-link {
   color: inherit;
   text-decoration: none;
   cursor: text;
 }
 
-body.wt-mod-pressed .wt-src-link {
+body.mdr-mod-pressed .mdr-src-link {
   cursor: pointer;
   text-decoration: underline dotted;
   text-decoration-thickness: 1px;
@@ -1679,7 +1679,7 @@ body.wt-mod-pressed .wt-src-link {
   text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
 }
 
-body.wt-mod-pressed .wt-src-link:hover {
+body.mdr-mod-pressed .mdr-src-link:hover {
   text-decoration-color: var(--accent);
   color: var(--accent);
 }
@@ -1689,13 +1689,13 @@ body.wt-mod-pressed .wt-src-link:hover {
  * read as the signal. `nohighlight` on the inner <code> tells
  * hljs to skip, so drawing chars never get random token
  * colors. */
-pre.wt-repo-tree {
+pre.mdr-repo-tree {
   /* Re-assert mono so we don't inherit a proportional font from
    * any surrounding prose container. */
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-pre.wt-repo-tree code {
+pre.mdr-repo-tree code {
   color: var(--text);
 }
 
@@ -1704,7 +1704,7 @@ pre.wt-repo-tree code {
 /* .annotation-md ships at opacity:0 to avoid a flash of
  * unstyled JSDoc markers (@example / @param / etc. rendered as
  * plain text for one frame before the pill-wrap runs). The
- * annotation-ready orchestrator adds .wt-annotation-md-ready
+ * annotation-ready orchestrator adds .mdr-annotation-md-ready
  * at the start of its pass so the cleaned DOM composites in
  * the same paint. */
 .annotation-md {
@@ -1712,13 +1712,13 @@ pre.wt-repo-tree code {
   transition: opacity 120ms ease;
 }
 
-.annotation-md.wt-annotation-md-ready {
+.annotation-md.mdr-annotation-md-ready {
   opacity: 1;
 }
 
 /* Tag pill — "[@throws]" etc. Muted chip that reads as a label
  * above its body, not competing with prose. */
-.wt-jsdoc-tag {
+.mdr-jsdoc-tag {
   display: inline-block;
   margin: 4px 6px 4px 0;
   padding: 1px 7px;
@@ -1735,7 +1735,7 @@ pre.wt-repo-tree code {
 }
 
 /* Type annotation next to the pill — "@THROWS `{Error}`". */
-.wt-jsdoc-type-inline {
+.mdr-jsdoc-type-inline {
   display: inline-block;
   padding: 1px 6px;
   margin: 0 4px;
@@ -1746,24 +1746,24 @@ pre.wt-repo-tree code {
   font-size: 12px;
 }
 
-.wt-jsdoc-type {
+.mdr-jsdoc-type {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-tint));
 }
 
-.wt-jsdoc-param-name {
+.mdr-jsdoc-param-name {
   color: var(--accent);
   font-weight: 600;
 }
 
 /* Block wrapper — tag + body as one outlined card so multiple
  * @param / @throws stack cleanly without running together. */
-.wt-jsdoc-block {
+.mdr-jsdoc-block {
   display: block;
   margin: 6px 0;
   padding-left: 2px;
 }
 
-.wt-jsdoc-body {
+.mdr-jsdoc-body {
   display: block;
   padding-left: 4px;
   color: var(--text);
@@ -1771,10 +1771,10 @@ pre.wt-repo-tree code {
 
 /* Description card leads the stack and gets no pill border;
  * it reads as lead prose. */
-.wt-jsdoc-block-desc .wt-jsdoc-tag {
+.mdr-jsdoc-block-desc .mdr-jsdoc-tag {
   display: none;
 }
 
-.wt-jsdoc-block-desc .wt-jsdoc-body {
+.mdr-jsdoc-block-desc .mdr-jsdoc-body {
   padding-left: 0;
 }

@@ -3,8 +3,8 @@
  *
  * After jsdoc-wrap has turned `@tag` text into pill spans, this
  * pass:
- *   - Wraps each `.wt-jsdoc-tag` + its following siblings into
- *     a `<span class="wt-jsdoc-block">` so pill and content
+ *   - Wraps each `.mdr-jsdoc-tag` + its following siblings into
+ *     a `<span class="mdr-jsdoc-block">` so pill and content
  *     render as one card. Pulls @example code blocks, @param
  *     names, and {Type} annotations into the right spots.
  *   - Drops empty @description cards, lifts every block to the
@@ -89,7 +89,7 @@
       : null;
     if (firstTextNode && nameMatch && nameMatch[1]) {
       const paramName = document.createElement("code");
-      paramName.className = "wt-jsdoc-type-inline wt-jsdoc-param-name";
+      paramName.className = "mdr-jsdoc-type-inline mdr-jsdoc-param-name";
       paramName.textContent = nameMatch[1];
       tagEl.insertAdjacentElement("afterend", paramName);
       firstTextNode.nodeValue = (firstTextNode.nodeValue ?? "").slice(
@@ -104,7 +104,7 @@
   const liftTypeAnnotation = (tagEl, body) => {
     /* Any tag carrying a `{Type}` (@throws {Error}, @returns
      * {Promise<T>}): the regex rendered the brace-type as
-     * <code class="wt-jsdoc-type-inline"> that sits as an early
+     * <code class="mdr-jsdoc-type-inline"> that sits as an early
      * child of the body. Pull it up next to the tag on the top
      * strip so the header reads "[THROWS] `{Error}`" with the
      * description on the next line. */
@@ -113,13 +113,13 @@
       typeChild &&
       typeChild.nodeType === 1 &&
       typeChild.tagName === "CODE" &&
-      typeChild.classList.contains("wt-jsdoc-type-inline") &&
+      typeChild.classList.contains("mdr-jsdoc-type-inline") &&
       /^\{[^}]*\}$/.test(typeChild.textContent ?? "")
     ) {
       while (body.firstChild && body.firstChild !== typeChild) {
         body.firstChild.remove();
       }
-      typeChild.classList.add("wt-jsdoc-type");
+      typeChild.classList.add("mdr-jsdoc-type");
       tagEl.insertAdjacentElement("afterend", typeChild);
       /* Strip leading whitespace / separator from the next text
        * node so the description starts clean. */
@@ -140,26 +140,26 @@
   };
 
   const buildBlocks = (container) => {
-    /* Group each .wt-jsdoc-tag + its following siblings into a
-     * <span class="wt-jsdoc-block">. Walk forward; reverse-walk
+    /* Group each .mdr-jsdoc-tag + its following siblings into a
+     * <span class="mdr-jsdoc-block">. Walk forward; reverse-walk
      * nests cards inside each other. */
-    const tags = [...container.querySelectorAll(".wt-jsdoc-tag")];
+    const tags = [...container.querySelectorAll(".mdr-jsdoc-tag")];
     for (const tagEl of tags) {
       const parent = tagEl.parentElement;
-      if (!parent || parent.classList.contains("wt-jsdoc-block")) {
+      if (!parent || parent.classList.contains("mdr-jsdoc-block")) {
         continue;
       }
       const block = document.createElement("span");
-      block.className = "wt-jsdoc-block";
+      block.className = "mdr-jsdoc-block";
       parent.insertBefore(block, tagEl);
       block.appendChild(tagEl);
       const body = document.createElement("span");
-      body.className = "wt-jsdoc-body";
+      body.className = "mdr-jsdoc-body";
       block.appendChild(body);
       let cur = block.nextSibling;
       while (cur) {
         const next = cur.nextSibling;
-        if (cur.nodeType === 1 && cur.classList?.contains("wt-jsdoc-tag")) {
+        if (cur.nodeType === 1 && cur.classList?.contains("mdr-jsdoc-tag")) {
           break;
         }
         /* Trim stray <br> at head of body. */
@@ -186,15 +186,15 @@
      *   [@fileoverview?, explicit @description?, synthetic
      *    @description from leftover prose?, others in source
      *    order]. */
-    const allBlocks = [...container.querySelectorAll(".wt-jsdoc-block")];
+    const allBlocks = [...container.querySelectorAll(".mdr-jsdoc-block")];
     const emptyDescs = allBlocks.filter((b) => {
       const isDesc = b.querySelector(
-        ':scope > .wt-jsdoc-tag[data-tag="description"]',
+        ':scope > .mdr-jsdoc-tag[data-tag="description"]',
       );
       if (!isDesc) {
         return false;
       }
-      const body = b.querySelector(":scope > .wt-jsdoc-body");
+      const body = b.querySelector(":scope > .mdr-jsdoc-body");
       return !body || (body.textContent ?? "").trim() === "";
     });
     for (const b of emptyDescs) {
@@ -202,11 +202,11 @@
     }
     const liveBlocks = allBlocks.filter((b) => !emptyDescs.includes(b));
     const explicitDesc = liveBlocks.find((b) =>
-      b.querySelector(':scope > .wt-jsdoc-tag[data-tag="description"]'),
+      b.querySelector(':scope > .mdr-jsdoc-tag[data-tag="description"]'),
     );
     const otherBlocks = liveBlocks.filter((b) => b !== explicitDesc);
     if (explicitDesc) {
-      explicitDesc.classList.add("wt-jsdoc-block-desc");
+      explicitDesc.classList.add("mdr-jsdoc-block-desc");
     }
     /* Lift every tag block out of its markdown-wrapper parent
      * so the synthesis below only sees true leftover prose. */
@@ -220,17 +220,17 @@
     let syntheticDesc = null;
     if (!explicitDesc) {
       const descBlock = document.createElement("span");
-      descBlock.className = "wt-jsdoc-block wt-jsdoc-block-desc";
+      descBlock.className = "mdr-jsdoc-block mdr-jsdoc-block-desc";
       const descTag = document.createElement("span");
-      descTag.className = "wt-jsdoc-tag";
+      descTag.className = "mdr-jsdoc-tag";
       descTag.textContent = "@description";
       descTag.dataset.tag = "description";
       descBlock.appendChild(descTag);
       const descBody = document.createElement("span");
-      descBody.className = "wt-jsdoc-body";
+      descBody.className = "mdr-jsdoc-body";
       descBlock.appendChild(descBody);
       for (const node of [...container.childNodes]) {
-        if (node.nodeType === 1 && node.classList.contains("wt-jsdoc-block")) {
+        if (node.nodeType === 1 && node.classList.contains("mdr-jsdoc-block")) {
           continue;
         }
         descBody.appendChild(node);
@@ -240,7 +240,7 @@
       }
     }
     const fileoverview = otherBlocks.find((b) =>
-      b.querySelector(':scope > .wt-jsdoc-tag[data-tag="fileoverview"]'),
+      b.querySelector(':scope > .mdr-jsdoc-tag[data-tag="fileoverview"]'),
     );
     const otherBlocksMinusOverview = otherBlocks.filter((b) => b !== fileoverview);
     const ordered = [

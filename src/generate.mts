@@ -838,9 +838,9 @@ function renderPartHtml(
        * two files — a dropdown with one row is noise. */
       const pathCell =
         fileEntries.length > 1
-          ? `<details class="wt-files-menu">
+          ? `<details class="mdr-files-menu">
       <summary class="path">${escapeHtml(file)}</summary>
-      <div class="wt-files-panel">
+      <div class="mdr-files-panel">
 ${fileEntries
   .map((f) => {
     const active = f.anchor === thisAnchor ? ' class="active"' : "";
@@ -1476,7 +1476,7 @@ export async function generate(
   const bootJs = readFileSync(path.join(bundledAssetsDir, "boot.js"), "utf-8");
   const themeJs = readFileSync(path.join(bundledAssetsDir, "theme.js"), "utf-8");
   const splitterJs = readFileSync(path.join(bundledAssetsDir, "splitter.js"), "utf-8");
-  const filesMenuJs = readFileSync(path.join(bundledAssetsDir, "files-menu.js"), "utf-8");
+  const navMenusJs = readFileSync(path.join(bundledAssetsDir, "nav-menus.js"), "utf-8");
   const hotlinksJs = readFileSync(path.join(bundledAssetsDir, "hotlinks.js"), "utf-8");
   const jsdocWrapJs = readFileSync(path.join(bundledAssetsDir, "jsdoc-wrap.js"), "utf-8");
   const jsdocGroupJs = readFileSync(path.join(bundledAssetsDir, "jsdoc-group.js"), "utf-8");
@@ -1498,8 +1498,8 @@ export async function generate(
     ? readFileSync(path.join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
-    ? [splitterJs, filesMenuJs, hotlinksJs, jsdocJs, lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
-    : [splitterJs, filesMenuJs, hotlinksJs, jsdocJs, lineSelectJs, srefJs].join("\n");
+    ? [splitterJs, navMenusJs, hotlinksJs, jsdocJs, lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
+    : [splitterJs, navMenusJs, hotlinksJs, jsdocJs, lineSelectJs, srefJs].join("\n");
   const documentsInlineJs = commentsEnabled
     ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
     : [blockSelectJs, docTabsJs, docTocJs].join("\n");
