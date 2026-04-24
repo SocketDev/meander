@@ -57,6 +57,11 @@ async function main() {
       await deployVal(valName);
       break;
     }
+    case "doctor": {
+      const { doctor } = await import("./doctor.mts");
+      await doctor();
+      break;
+    }
     case "serve": {
       /* Local preview server. Generate first, then serve so
        * the output reflects the latest source. Port defaults
@@ -99,6 +104,7 @@ Commands:
   meander serve <walkthrough.json>      Generate + start local preview
   meander publish <walkthrough.json>    Publish HTML to Val Town blob storage
   meander deploy-val [val-name]         Deploy or update the Val Town val
+  meander doctor                        Report system + peer-dep status
 
 Environment variables:
   VALTOWN_TOKEN       Val Town API bearer token (publish, deploy-val)
