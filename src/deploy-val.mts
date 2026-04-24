@@ -75,11 +75,11 @@ export async function deployVal(valName: string): Promise<void> {
   for (const [key, value] of [
     ["WALKTHROUGH_USER", walkthroughUser],
     ["WALKTHROUGH_PASS", walkthroughPass],
-  ] satisfies [string, string][]) {
+  ] satisfies Array<[string, string]>) {
     const updateRes = await fetch(`${API_BASE}/v2/vals/${valId}/environment_variables/${key}`, {
       method: "PUT",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ value }),
@@ -92,7 +92,7 @@ export async function deployVal(valName: string): Promise<void> {
     const createRes = await fetch(`${API_BASE}/v2/vals/${valId}/environment_variables`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ key, value }),

@@ -10,10 +10,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
 
-const targets = [
-  "dist",
-  "test-walkthrough-docs/walkthrough",
-];
+const targets = ["dist", "test-walkthrough-docs/walkthrough"];
 for (const t of targets) {
   const full = path.join(repoRoot, t);
   rmSync(full, { recursive: true, force: true });

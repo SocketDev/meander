@@ -5,13 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { marked, Marked, Renderer, type Tokens } from "marked";
 
-import {
-  isEmail,
-  isPurl,
-  isScopedPackage,
-  isUrl,
-  _PURL_RE,
-} from "./classifiers.mts";
+import { isEmail, isPurl, isScopedPackage, isUrl, _PURL_RE } from "./classifiers.mts";
 
 /* ------------------------------------------------------------------ */
 /*  TypeBox Schemas                                                    */
@@ -58,28 +52,30 @@ const FaviconSchema = Type.Union([
   Type.Object({
     svg: Type.Optional(Type.String({ minLength: 1 })),
     ico: Type.Optional(Type.String({ minLength: 1 })),
-    png: Type.Optional(Type.Object({
-      "16":  Type.Optional(Type.String({ minLength: 1 })),
-      "32":  Type.Optional(Type.String({ minLength: 1 })),
-      "48":  Type.Optional(Type.String({ minLength: 1 })),
-      "180": Type.Optional(Type.String({ minLength: 1 })),
-    })),
-    themeColor: Type.Optional(Type.Union([
-      Type.String({ minLength: 1 }),
+    png: Type.Optional(
       Type.Object({
-        light: Type.String({ minLength: 1 }),
-        dark:  Type.String({ minLength: 1 }),
+        "16": Type.Optional(Type.String({ minLength: 1 })),
+        "32": Type.Optional(Type.String({ minLength: 1 })),
+        "48": Type.Optional(Type.String({ minLength: 1 })),
+        "180": Type.Optional(Type.String({ minLength: 1 })),
       }),
-    ])),
+    ),
+    themeColor: Type.Optional(
+      Type.Union([
+        Type.String({ minLength: 1 }),
+        Type.Object({
+          light: Type.String({ minLength: 1 }),
+          dark: Type.String({ minLength: 1 }),
+        }),
+      ]),
+    ),
   }),
 ]);
 
 const WalkthroughConfigSchema = Type.Object({
   slug: Type.String({ minLength: 1, pattern: "^[a-z0-9][a-z0-9-]*$" }),
   title: Type.String({ minLength: 1 }),
-  documents: Type.Optional(
-    Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })
-  ),
+  documents: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
   parts: Type.Array(WalkthroughPartSchema, { minItems: 1 }),
   /**
    * Opt out of the inlined comment-client bundle when the
@@ -200,7 +196,9 @@ function lineNumberAt(text: string, index: number): number {
 function cleanCommentText(raw: string): string {
   const withoutDelimiters = raw.replace(/^\/\*/, "").replace(/\*\/$/, "");
   const lines = withoutDelimiters.split("\n").map((line) => line.replace(/^\s*\*\s?/, ""));
-  const filtered = lines.filter((line, i, arr) => !(line.trim().length === 0 && (i === 0 || i === arr.length - 1)));
+  const filtered = lines.filter(
+    (line, i, arr) => !(line.trim().length === 0 && (i === 0 || i === arr.length - 1)),
+  );
   return filtered.join("\n").trim();
 }
 
@@ -350,12 +348,38 @@ function tokenizeInlineCode(text: string): string | null {
  * Unknown `@foo` tokens in prose pass through untouched.
  */
 const JSDOC_TAGS = new Set([
-  "augments", "callback", "default", "deprecated", "description",
-  "example", "extends", "fileoverview", "inheritdoc", "internal",
-  "memberof", "module", "namespace", "override", "param",
-  "private", "prop", "property", "protected", "public", "readonly",
-  "return", "returns", "see", "since", "static", "template",
-  "this", "throw", "throws", "type", "typedef",
+  "augments",
+  "callback",
+  "default",
+  "deprecated",
+  "description",
+  "example",
+  "extends",
+  "fileoverview",
+  "inheritdoc",
+  "internal",
+  "memberof",
+  "module",
+  "namespace",
+  "override",
+  "param",
+  "private",
+  "prop",
+  "property",
+  "protected",
+  "public",
+  "readonly",
+  "return",
+  "returns",
+  "see",
+  "since",
+  "static",
+  "template",
+  "this",
+  "throw",
+  "throws",
+  "type",
+  "typedef",
 ]);
 
 /**
@@ -365,22 +389,22 @@ const JSDOC_TAGS = new Set([
  * `@tag` line up to (but not including) the next `@tag` line or
  * end-of-input, so multi-line @example bodies stay with their tag.
  */
-function splitAnnotationByTags(
-  markdown: string,
-): Array<{ kind: "prose"; text: string } | {
-  kind: "tag";
-  tag: string;
-  type: string | null;
-  body: string;
-}> {
+function splitAnnotationByTags(markdown: string): Array<
+  | { kind: "prose"; text: string }
+  | {
+      kind: "tag";
+      tag: string;
+      type: string | null;
+      body: string;
+    }
+> {
   const lines = markdown.split("\n");
   const out: Array<
     | { kind: "prose"; text: string }
     | { kind: "tag"; tag: string; type: string | null; body: string }
   > = [];
   let buffer: string[] = [];
-  let currentTag: { tag: string; type: string | null; body: string[] } | null =
-    null;
+  let currentTag: { tag: string; type: string | null; body: string[] } | null = null;
   const flushProse = () => {
     if (buffer.length > 0 && buffer.join("").trim() !== "") {
       out.push({ kind: "prose", text: buffer.join("\n") });
@@ -491,11 +515,8 @@ function renderAnnotationMarkdown(markdown: string): string {
     const typeHtml = chunk.type
       ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
       : "";
-    const bodyHtml = chunk.body
-      ? (annotationMarked.parse(chunk.body) as string)
-      : "";
-    const order =
-      chunk.tag === "fileoverview" ? 0 : chunk.tag === "description" ? 1 : 2;
+    const bodyHtml = chunk.body ? (annotationMarked.parse(chunk.body) as string) : "";
+    const order = chunk.tag === "fileoverview" ? 0 : chunk.tag === "description" ? 1 : 2;
     blocks.push({
       html:
         `<div class="annotation-block" data-tag="${chunk.tag}">` +
@@ -526,7 +547,7 @@ function renderAnnotationMarkdown(markdown: string): string {
     blocks.unshift({ html: `<div class="annotation-prose">${bodyHtml}</div>`, order: -1 });
   }
   blocks.sort((a, b) => a.order - b.order);
-  return blocks.map(b => b.html).join("");
+  return blocks.map((b) => b.html).join("");
 }
 
 /* ------------------------------------------------------------------ */
@@ -585,7 +606,7 @@ function buildSymbols(
   for (const part of parts) {
     for (const file of part.files) {
       const source = sources.get(file);
-      if (!source) continue;
+      if (!source) {continue;}
       for (const sym of extractSymbols(source)) {
         const loc: SymbolLocation = [file, sym.line, part.id];
         const existing = byName.get(sym.name);
@@ -607,7 +628,7 @@ function buildSymbols(
      * unchanged — the array shape preserves every location so
      * consumers can disambiguate instead of silently losing
      * them. */
-    if (name.length < 3) continue;
+    if (name.length < 3) {continue;}
     table[name] = locs;
   }
   return table;
@@ -635,7 +656,10 @@ function loadSources(rootDir: string, files: readonly string[]): Map<string, str
   return map;
 }
 
-function buildSections(parts: readonly WalkthroughPart[], sourceMap: Map<string, string>): Section[] {
+function buildSections(
+  parts: readonly WalkthroughPart[],
+  sourceMap: Map<string, string>,
+): Section[] {
   const sections: Section[] = [];
 
   for (const file of uniqueFiles(parts)) {
@@ -663,7 +687,10 @@ function buildSections(parts: readonly WalkthroughPart[], sourceMap: Map<string,
       while (j < blocks.length) {
         const next = blocks[j + 1];
         codeEnd = next ? Math.max(codeStart, next.startLine - 1) : lines.length;
-        const rawCode = lines.slice(Math.max(0, codeStart - 1), codeEnd).join("\n").trimEnd();
+        const rawCode = lines
+          .slice(Math.max(0, codeStart - 1), codeEnd)
+          .join("\n")
+          .trimEnd();
         code = stripMultilineCommentsPreserveLines(rawCode)
           .replace(/^(?:[ \t]*\n)+/, "")
           .trimEnd();
@@ -747,9 +774,18 @@ function renderPartNav(
   return docsLink + partLinks;
 }
 
-
-
-function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: WalkthroughPart, sections: readonly Section[], inlineJs: string, symbols: SymbolTable, hasDocuments: boolean, basePath: string, cssHref: string, headExtra: string): string {
+function renderPartHtml(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  part: WalkthroughPart,
+  sections: readonly Section[],
+  inlineJs: string,
+  symbols: SymbolTable,
+  hasDocuments: boolean,
+  basePath: string,
+  cssHref: string,
+  headExtra: string,
+): string {
   const sectionsByFile = new Map<string, Section[]>();
   for (const section of sections) {
     const existing = sectionsByFile.get(section.file);
@@ -832,7 +868,16 @@ function renderPartHtml(slug: string, parts: readonly WalkthroughPart[], part: W
 </html>`;
 }
 
-function renderIndexHtml(slug: string, title: string, parts: readonly WalkthroughPart[], partCounts: Map<number, number>, hasDocuments: boolean, basePath: string, cssHref: string, headExtra: string): string {
+function renderIndexHtml(
+  slug: string,
+  title: string,
+  parts: readonly WalkthroughPart[],
+  partCounts: Map<number, number>,
+  hasDocuments: boolean,
+  basePath: string,
+  cssHref: string,
+  headExtra: string,
+): string {
   const docsItem = hasDocuments
     ? `<li><a href="${basePath}/${slug}/documents">Documents</a></li>\n`
     : "";
@@ -944,7 +989,7 @@ function renderDocumentsHtml(
   </script>
   <script>
     window[Symbol.for("meander:toc")] = ${JSON.stringify(
-      renderedDocs.map((d) => ({ file: d.filePath, headings: d.headings }))
+      renderedDocs.map((d) => ({ file: d.filePath, headings: d.headings })),
     )};
   </script>
   <script>${inlineJs}</script>
@@ -988,9 +1033,9 @@ type ResolvedDocRef = {
 function resolveDocRef(
   href: string,
   currentDocPath: string,
-  allDocPaths: readonly string[]
+  allDocPaths: readonly string[],
 ): ResolvedDocRef | null {
-  if (!href) return null;
+  if (!href) {return null;}
 
   // Check if this is a link to another markdown file
   // Supports formats like: ./other.md, other.md, ../other.md, other.md#anchor
@@ -1009,7 +1054,7 @@ function resolveDocRef(
   }
 
   // Must reference a markdown file
-  if (!targetPath.endsWith(".md")) return null;
+  if (!targetPath.endsWith(".md")) {return null;}
 
   // Resolve the target path relative to the current document's directory.
   // This handles ./, ../, and plain filenames uniformly.
@@ -1020,8 +1065,8 @@ function resolveDocRef(
   const resolvedTarget = base
     .split("/")
     .reduce((acc: string[], seg) => {
-      if (seg === "..") acc.pop();
-      else if (seg !== ".") acc.push(seg);
+      if (seg === "..") {acc.pop();}
+      else if (seg !== ".") {acc.push(seg);}
       return acc;
     }, [])
     .join("/");
@@ -1033,7 +1078,7 @@ function resolveDocRef(
     const normalizedDocPath = docPath.replace(/\\/g, "/").replace(/^\.\//, "");
     if (normalizedDocPath === resolvedTarget) {
       // Link targets this document — treat as a same-doc anchor
-      if (docPath === currentDocPath) return { docIndex: i, anchor, sameDoc: true };
+      if (docPath === currentDocPath) {return { docIndex: i, anchor, sameDoc: true };}
       return { docIndex: i, anchor };
     }
   }
@@ -1080,7 +1125,7 @@ function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
             `<div class="doc-block" data-block-id="${blockId}">`,
             `<div class="doc-block-gutter"></div>`,
             ...blockLines,
-            `</div>`
+            `</div>`,
           );
           blockId += 1;
           inBlock = false;
@@ -1114,7 +1159,7 @@ function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
           `<div class="doc-block" data-block-id="${blockId}">`,
           `<div class="doc-block-gutter"></div>`,
           ...blockLines,
-          `</div>`
+          `</div>`,
         );
         blockId += 1;
         inBlock = false;
@@ -1129,7 +1174,7 @@ function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
       `<div class="doc-block" data-block-id="${blockId}">`,
       `<div class="doc-block-gutter"></div>`,
       ...blockLines,
-      `</div>`
+      `</div>`,
     );
     blockId += 1;
   }
@@ -1148,7 +1193,7 @@ function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
 function renderMarkdownDocument(
   filePath: string,
   docIndex: number,
-  allDocPaths: readonly string[]
+  allDocPaths: readonly string[],
 ): RenderedDocument {
   const markdown = readFileSync(filePath, "utf-8");
   const headings: Array<{ id: string; text: string; level: number }> = [];
@@ -1324,7 +1369,7 @@ export async function generate(
    * Both parts are optional. Empty → assets at site root, flat. */
   const assetHref = (filename: string): string => {
     const segments = [basePath, assetDir, filename]
-      .map(p => p.replace(/^\/+|\/+$/g, ""))
+      .map((p) => p.replace(/^\/+|\/+$/g, ""))
       .filter(Boolean);
     return "/" + segments.join("/");
   };
@@ -1428,7 +1473,7 @@ export async function generate(
   const faviconOpt = config.favicon;
   const faviconEnabled = faviconOpt !== false;
   type FaviconAssets = {
-    svg?: string;   // filename in outDir
+    svg?: string; // filename in outDir
     ico?: string;
     png16?: string;
     png32?: string;
@@ -1438,30 +1483,27 @@ export async function generate(
   const faviconAssets: FaviconAssets = {};
   if (faviconEnabled) {
     const bundledFavDir = path.join(bundledAssetsDir, "favicon");
-    const override = (faviconOpt && typeof faviconOpt === "object")
-      ? faviconOpt
-      : null;
+    const override = faviconOpt && typeof faviconOpt === "object" ? faviconOpt : null;
     /* For each slot, prefer the consumer's override path
      * (resolved relative to walkthrough.json's dir), falling
      * back to the bundled default if the override isn't
      * provided or doesn't exist. */
     const resolveOverride = (p?: string): string | undefined => {
-      if (!p) return undefined;
+      if (!p) {return undefined;}
       const full = path.resolve(rootDir, p);
       return existsSync(full) ? full : undefined;
     };
     const slots: Array<[keyof FaviconAssets, string, string | undefined]> = [
-      ["svg",    "favicon.svg",           override?.svg],
-      ["ico",    "favicon.ico",           override?.ico],
-      ["png16",  "favicon-16.png",        override?.png?.["16"]],
-      ["png32",  "favicon-32.png",        override?.png?.["32"]],
-      ["png48",  "favicon-48.png",        override?.png?.["48"]],
-      ["png180", "apple-touch-icon.png",  override?.png?.["180"]],
+      ["svg", "favicon.svg", override?.svg],
+      ["ico", "favicon.ico", override?.ico],
+      ["png16", "favicon-16.png", override?.png?.["16"]],
+      ["png32", "favicon-32.png", override?.png?.["32"]],
+      ["png48", "favicon-48.png", override?.png?.["48"]],
+      ["png180", "apple-touch-icon.png", override?.png?.["180"]],
     ];
     for (const [slot, outName, overridePath] of slots) {
-      const src = resolveOverride(overridePath)
-        ?? path.join(bundledFavDir, outName);
-      if (!existsSync(src)) continue;
+      const src = resolveOverride(overridePath) ?? path.join(bundledFavDir, outName);
+      if (!existsSync(src)) {continue;}
       copyFileSync(src, path.join(outDir, outName));
       faviconAssets[slot] = outName;
     }
@@ -1472,23 +1514,29 @@ export async function generate(
    * assetDir rewrites apply. */
   const faviconTags = faviconEnabled
     ? [
-        faviconAssets.svg    && `<link rel="icon" type="image/svg+xml" href="${assetHref(faviconAssets.svg)}" />`,
-        faviconAssets.ico    && `<link rel="icon" type="image/x-icon" href="${assetHref(faviconAssets.ico)}" />`,
-        faviconAssets.png16  && `<link rel="icon" type="image/png" sizes="16x16" href="${assetHref(faviconAssets.png16)}" />`,
-        faviconAssets.png32  && `<link rel="icon" type="image/png" sizes="32x32" href="${assetHref(faviconAssets.png32)}" />`,
-        faviconAssets.png180 && `<link rel="apple-touch-icon" href="${assetHref(faviconAssets.png180)}" />`,
-      ].filter(Boolean).join("\n  ")
+        faviconAssets.svg &&
+          `<link rel="icon" type="image/svg+xml" href="${assetHref(faviconAssets.svg)}" />`,
+        faviconAssets.ico &&
+          `<link rel="icon" type="image/x-icon" href="${assetHref(faviconAssets.ico)}" />`,
+        faviconAssets.png16 &&
+          `<link rel="icon" type="image/png" sizes="16x16" href="${assetHref(faviconAssets.png16)}" />`,
+        faviconAssets.png32 &&
+          `<link rel="icon" type="image/png" sizes="32x32" href="${assetHref(faviconAssets.png32)}" />`,
+        faviconAssets.png180 &&
+          `<link rel="apple-touch-icon" href="${assetHref(faviconAssets.png180)}" />`,
+      ]
+        .filter(Boolean)
+        .join("\n  ")
     : "";
 
   /* theme-color meta — either a single color or per-scheme
    * light/dark variants. Emitted as zero, one, or two meta tags.
    * Consumers that didn't opt in get no theme-color (browsers
    * use their default). */
-  const themeColor = (faviconOpt && typeof faviconOpt === "object")
-    ? faviconOpt.themeColor
-    : undefined;
+  const themeColor =
+    faviconOpt && typeof faviconOpt === "object" ? faviconOpt.themeColor : undefined;
   const themeColorTags = (() => {
-    if (!themeColor) return "";
+    if (!themeColor) {return "";}
     if (typeof themeColor === "string") {
       return `<meta name="theme-color" content="${themeColor}" />`;
     }
@@ -1503,11 +1551,31 @@ export async function generate(
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];
     counts.set(part.id, partSections.length);
-    const html = renderPartHtml(slug, parts, part, partSections, inlineJs, symbols, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
+    const html = renderPartHtml(
+      slug,
+      parts,
+      part,
+      partSections,
+      inlineJs,
+      symbols,
+      hasDocuments,
+      basePath,
+      assetHref("walkthrough.css"),
+      headExtra,
+    );
     writeFileSync(path.join(outDir, `walkthrough-part-${part.id}.html`), html);
   }
 
-  const indexHtml = renderIndexHtml(slug, title, parts, counts, hasDocuments, basePath, assetHref("walkthrough.css"), headExtra);
+  const indexHtml = renderIndexHtml(
+    slug,
+    title,
+    parts,
+    counts,
+    hasDocuments,
+    basePath,
+    assetHref("walkthrough.css"),
+    headExtra,
+  );
   writeFileSync(path.join(outDir, "index.html"), indexHtml);
 
   if (documents && documents.length > 0) {
@@ -1520,7 +1588,16 @@ export async function generate(
         headings: rendered.headings,
       };
     });
-    const documentsHtml = renderDocumentsHtml(slug, parts, documents, renderedDocs, documentsInlineJs, basePath, assetHref("walkthrough.css"), headExtra);
+    const documentsHtml = renderDocumentsHtml(
+      slug,
+      parts,
+      documents,
+      renderedDocs,
+      documentsInlineJs,
+      basePath,
+      assetHref("walkthrough.css"),
+      headExtra,
+    );
     writeFileSync(path.join(outDir, "documents.html"), documentsHtml);
     console.log(`Generated documents.html with ${documents.length} documents`);
   }

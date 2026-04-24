@@ -8,7 +8,7 @@ async function uploadBlob(token: string, key: string, content: string): Promise<
   const res = await fetch(`${API_BASE}/v1/blob/${encodeURIComponent(key)}`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: content,
   });

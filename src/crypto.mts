@@ -23,19 +23,11 @@ export function deriveKey(password: string): Buffer {
 export function encrypt(plaintext: string, key: Buffer): string {
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(plaintext, "utf-8"),
-    cipher.final(),
-  ]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf-8"), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   // [version][iv][ciphertext][tag]
-  const combined = Buffer.concat([
-    Buffer.from([VERSION_BYTE]),
-    iv,
-    ciphertext,
-    tag,
-  ]);
+  const combined = Buffer.concat([Buffer.from([VERSION_BYTE]), iv, ciphertext, tag]);
 
   return combined.toString("base64");
 }
@@ -63,10 +55,7 @@ export function decrypt(ciphertext: string, key: Buffer): string {
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
 
-  const plaintext = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ]);
+  const plaintext = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
   return plaintext.toString("utf-8");
 }

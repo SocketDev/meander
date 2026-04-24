@@ -1,10 +1,14 @@
 /**
- * Update: taze bumps every dep to its latest compatible version
- * (respecting semver ranges in package.json). Because we pin all
- * deps to exact versions, taze rewrites each pinned version to
- * the latest one and reinstalls.
+ * Update: taze bumps every dep to the latest compatible version.
+ * Config lives in .config/taze.config.mts — key policy bits:
+ *   - maturityPeriod: 7  (skip versions released in the last 7 days;
+ *                         matches the fleet-wide cooldown to avoid
+ *                         adopting compromised or broken releases
+ *                         before the ecosystem catches them)
+ *   - mode: 'latest'     (bump to latest across major boundaries)
+ *   - write: true        (edit package.json in place)
  *
- * `pnpm update` — runs taze + pnpm install to refresh lockfile.
+ * `pnpm update` — runs taze + pnpm install to refresh the lockfile.
  * Review the diff before committing.
  */
 import { spawnSync } from "node:child_process";
@@ -16,8 +20,5 @@ function run(cmd: string, args: string[]): void {
   }
 }
 
-/* -w writes changes to package.json; without it taze only prints.
- * -f forces exact-version pins (no caret/tilde prefixes) — matches
- * our pin policy. */
-run("pnpm", ["exec", "taze", "-w", "-f"]);
+run("pnpm", ["exec", "taze"]);
 run("pnpm", ["install"]);

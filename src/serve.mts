@@ -27,20 +27,20 @@ type ServeOptions = {
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
-  ".css":  "text/css; charset=utf-8",
-  ".js":   "text/javascript; charset=utf-8",
-  ".mjs":  "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".svg":  "image/svg+xml",
-  ".png":  "image/png",
-  ".jpg":  "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
-  ".gif":  "image/gif",
-  ".ico":  "image/x-icon",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
   ".woff": "font/woff",
   ".woff2": "font/woff2",
-  ".txt":  "text/plain; charset=utf-8",
-  ".md":   "text/markdown; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
 };
 
 /**
@@ -64,9 +64,7 @@ function routeToFile(
     return "index.html";
   }
   // /:slug/part/:n
-  const partMatch = clean.match(
-    new RegExp(`^${escapeRegex(slug)}/part/(\\d+)$`),
-  );
+  const partMatch = clean.match(new RegExp(`^${escapeRegex(slug)}/part/(\\d+)$`));
   if (partMatch) {
     const n = Number(partMatch[1]);
     if (partIds.has(n)) {
@@ -117,7 +115,7 @@ async function readWalkthroughMeta(outDir: string): Promise<{
   const partIds = new Set<number>();
   for (const e of entries) {
     const m = e.match(/^walkthrough-part-(\d+)\.html$/);
-    if (m) partIds.add(Number(m[1]));
+    if (m) {partIds.add(Number(m[1]));}
   }
   return {
     slug: "",
@@ -140,7 +138,7 @@ export async function serve(
   if (!existsSync(outDir)) {
     console.error(
       `No walkthrough/ directory found at ${outDir}.\n` +
-      `Run \`meander generate ${configPath}\` first, or use \`pnpm run dev\`.`,
+        `Run \`meander generate ${configPath}\` first, or use \`pnpm run dev\`.`,
     );
     process.exitCode = 1;
     return;

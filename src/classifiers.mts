@@ -28,12 +28,12 @@ const PURL_VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%";
 const PURL_PATH_SEG = `[${PCHAR}]+`;
 const PURL_RE = new RegExp(
   `^(pkg:)` +
-  `([A-Za-z][A-Za-z0-9.+\\-]*)` +                            // type
-  `((?:\\/${PURL_PATH_SEG})+)` +                             // path
-  `(@[${PURL_VCHAR}]+)?` +                                   // version
-  `(\\?[${PURL_QCHAR}]+(?:&[${PURL_QCHAR}]+)*)?` +           // query
-  `(#(?:[${PCHAR}]+)(?:\\/[${PCHAR}]+)*)?` +                 // fragment
-  `$`,
+    `([A-Za-z][A-Za-z0-9.+\\-]*)` + // type
+    `((?:\\/${PURL_PATH_SEG})+)` + // path
+    `(@[${PURL_VCHAR}]+)?` + // version
+    `(\\?[${PURL_QCHAR}]+(?:&[${PURL_QCHAR}]+)*)?` + // query
+    `(#(?:[${PCHAR}]+)(?:\\/[${PCHAR}]+)*)?` + // fragment
+    `$`,
 );
 
 /* HTML5 email input validator's pattern, tightened so the TLD
@@ -49,15 +49,13 @@ const EMAIL_RE =
 /* Scoped npm / jsr package shape: `@scope/name`. Scope and
  * name use the npm package-name character class (minus leading
  * `.` / `_`). */
-const SCOPED_PACKAGE_RE =
-  /^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
+const SCOPED_PACKAGE_RE = /^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
 
 /* Absolute URL with a scheme. Sub-delims + '%' allow encoded
  * chars; `?` / `#` open query / fragment. Permissive on path/
  * query/fragment chars since the regex is a shape check, not a
  * spec validator. */
-const URL_RE =
-  /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s"'<>`]+$/;
+const URL_RE = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s"'<>`]+$/;
 
 export function isEmail(text: string): boolean {
   return EMAIL_RE.test(text);
