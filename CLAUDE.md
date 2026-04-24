@@ -166,7 +166,7 @@ Meander is published to npm as `@divmain/meander`. Consumers place `meander.conf
 
 - Logos: authored as `assets/logo/logo-black.svg` (master silhouette). Color + bezel variants are regenerated from the master via the scripts in `scripts/` when the master changes.
 - Favicon: generated from `assets/favicon/favicon.svg` (the brand mark) at 16/32/48/180 + `.ico` bundle. Not auto-rebuilt — regenerate manually when the mark changes.
-- SVGs: run `pnpm optimize-svgs` after editing to ensure svgo passes (removes Inkscape metadata, preserves `xmlns` / `viewBox` / `<title>` for a11y).
+- SVGs: source SVGs stay verbose — inline SVGs shipped in HTML are optimized at emit time via `src/minify.mts` when the consumer enables `config.minify.svg`. There's no source-tree rewrite pass.
 
 ### hljs CDN
 
@@ -184,8 +184,9 @@ Meander is published to npm as `@divmain/meander`. Consumers place `meander.conf
 
 ### Testing & CI
 
-- **No unit-test suite yet** — when one is added, prefer `node:test` (matches hooks' test files) to keep the runtime-dep footprint minimal.
-- **CI**: GitHub Actions at `.github/workflows/` — keep action refs pinned to full SHAs, not tags.
+See [docs/contributing.md](docs/contributing.md) for the test
+layout, coverage thresholds, tmpdir + `safeDelete` pattern,
+and CI pinning rules.
 
 ### Context & edit safety
 

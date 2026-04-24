@@ -4,63 +4,64 @@ Guidelines for AI coding agents operating in the `@divmain/meander` repository.
 
 ## Project Overview
 
-Meander is a TypeScript CLI tool that generates annotated code walkthrough HTML pages
-with an interactive comment system, hosted on Val Town. The codebase has two layers:
+Meander is a TypeScript CLI that turns block comments in source
+files into navigable walkthrough pages, with an optional live
+comment system hosted on Val Town.
 
-- **`src/`** — 4 TypeScript source files (CLI, generate, publish, deploy-val)
-- **`assets/`** — Vanilla JavaScript browser scripts and CSS inlined into generated HTML
-- **`assets/val/`** — Hono HTTP handler deployed as a Val Town val (Deno runtime)
+- **`src/*.mts`** — CLI + generator (HTML emission, schema,
+  annotation pipeline, PURL rendering, publish, deploy-val,
+  serve, minify, security passes, render-mermaid, doctor).
+- **`assets/*.js`** — client-side scripts inlined into emitted
+  HTML (ES5-compatible IIFEs).
+- **`assets/val/`** — the Hono HTTP handler deployed to Val
+  Town, serving encrypted blobs + the comment API.
+- **`test/`** — vitest suite. Fixtures under `test/fixtures/`.
+- **`scripts/`** — dev automation (`build`, `test`, `cover`,
+  `lint`, `fix`, `check`, `clean`, `dev`).
 
-Dependencies: `@sinclair/typebox` (schema validation), `@valtown/sdk`, `marked` (Markdown).
+See `package.json` for the current dep list.
 
-## Build / Lint / Test Commands
+## Commands
 
-```bash
-npm run build          # Compile TypeScript (runs `tsc`)
-npx tsc --noEmit       # Type-check without emitting (useful for verification)
-```
-
-- **Linter + formatter**: oxlint + oxfmt. `pnpm lint`, `pnpm fix`.
-- **Tests**: vitest, `test/**/*.test.mts`. `pnpm test`. Coverage via `pnpm cover`.
-- **Fixtures**: `test/fixtures/test-docs/` is the reference fixture used by `pnpm dev`, the CI smoke test, and the GH Pages demo workflow.
-- **CI**: `.github/workflows/ci.yml` (lint + type + smoke test), `.github/workflows/pages.yml` (demo site).
-
-### Running Locally
-
-```bash
-npm run build
-node dist/cli.js generate <path-to-meander.config.json>
-node dist/cli.js publish <path-to-meander.config.json>    # requires VALTOWN_TOKEN
-node dist/cli.js deploy-val [val-name]                  # requires VALTOWN_TOKEN, WALKTHROUGH_USER, WALKTHROUGH_PASS
-```
+See [docs/contributing.md](docs/contributing.md) for the full set.
+Short version: `pnpm build`, `pnpm test`, `pnpm cover`, `pnpm
+check`, `pnpm fix`, `pnpm dev`.
 
 ## Code Style
 
 ### Formatting
 
-- **2-space indentation** everywhere (TypeScript and JavaScript).
-- **Double quotes** for strings in TypeScript. Single quotes only inside HTML template literals
-  for attribute values.
-- **Semicolons always** — never rely on ASI.
+oxfmt enforces the style — see `.oxfmtrc.json`. Highlights:
+
+- **2-space indentation** everywhere.
+- **Single quotes** for strings. Double quotes inside JSX / HTML
+  attribute values.
+- **No semicolons** (ASI).
+- **Arrow parens avoided** when safe (`x => x.id`, not `(x) => x.id`).
 - **Trailing commas** in multi-line objects, arrays, and parameter lists.
 
 ### Imports
 
-Order imports in this sequence with no blank lines between them:
+oxfmt sorts imports into three groups separated by blank lines:
 
-1. Third-party npm packages
-2. Node.js built-ins (always use the `node:` prefix — `"node:fs"`, `"node:path"`)
-3. Local/relative modules
+1. Node built-ins (always `node:` prefix — `'node:fs'`).
+2. Third-party npm packages.
+3. Local/relative modules.
 
 ```typescript
-import { Type, type Static } from "@sinclair/typebox";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+
+import { Type } from '@sinclair/typebox'
+import type { Static } from '@sinclair/typebox'
+
+import { loadMeanderConfig } from './config.mts'
 ```
 
-- Prefer **named imports**. Use default imports only when the library API requires it.
-- Use inline `type` keyword for mixed value+type imports: `import { Type, type Static } from ...`
-- Use `import type` as a separate statement for type-only imports.
+- Prefer **named imports**. Default imports only when the library
+  requires it (e.g. `import path from 'node:path'`).
+- Type-only imports are **always** separate `import type`
+  statements — never inline `type` in a value import.
 
 ### Naming Conventions
 
@@ -68,10 +69,10 @@ import { join, resolve } from "node:path";
 |-----------------------------|---------------------|-----------------------------------|
 | Variables, functions        | `camelCase`         | `configPath`, `escapeHtml`        |
 | Types, interfaces, classes  | `PascalCase`        | `Block`, `Section`, `ApiComment`  |
-| TypeBox schemas             | `PascalCase+Schema` | `WalkthroughConfigSchema`         |
+| TypeBox schemas             | `PascalCase+Schema` | `MeanderConfigSchema`             |
 | True constants              | `UPPER_SNAKE_CASE`  | `API_BASE`, `FILE_LANG`           |
 | Database columns            | `snake_case`        | `line_from`, `parent_id`          |
-| CSS classes (in JS)         | `kebab-case`        | `"comment-add-btn"`               |
+| CSS classes (in JS)         | `kebab-case`        | `'comment-add-btn'`               |
 
 ### Types
 
@@ -91,12 +92,12 @@ import { join, resolve } from "node:path";
 - Use **`function` declarations** for all named/top-level functions (not arrow functions).
 - Use **arrow functions** only as inline callbacks (`.map()`, `.filter()`, `.catch()`).
 - Each `src/` module exports **exactly one primary async function** via named export.
-  The CLI dynamically imports them: `const { generate } = await import("./generate.js")`.
+  The CLI dynamically imports them: `const { generate } = await import('./generate.mts')`.
 
 ### Error Handling
 
 - Use **`process.exitCode = 1`** and `return` — never call `process.exit()` directly.
-- Top-level entry points catch with: `main().catch((error) => { ... process.exitCode = 1; })`.
+- Top-level entry points catch with: `main().catch(e => { ... process.exitCode = 1 })`.
 - Validate preconditions early with **guard clauses** (throw or early return).
 - Use **bare `catch {}`** (no parameter) when intentionally ignoring expected errors
   (e.g., SQLite migrations where a column may already exist).
@@ -131,6 +132,9 @@ Browser scripts target older runtimes and follow different rules:
 - **ES5 compatible** — use `var` (never `const`/`let`), `function` expressions (never arrows),
   classic `for` loops (never `for...of`), string concatenation (never template literals).
 - Wrap every file in an **IIFE**: `(function () { "use strict"; ... })();`
+  (double quotes + semicolons in assets/*.js are intentional —
+  these are classic scripts, not modules, and we keep them
+  consistent with the surrounding browser-targeted style).
 - Use the **DOMContentLoaded guard** pattern in every script:
   ```javascript
   if (document.readyState === "loading") {
@@ -145,6 +149,6 @@ Browser scripts target older runtimes and follow different rules:
 
 - Prefer **`for...of`** over `.forEach()` in TypeScript source.
 - Use **`Map` and `Set`** for collections in TypeScript (plain objects in browser JS).
-- Access environment variables with **bracket notation**: `process.env["VALTOWN_TOKEN"]`.
+- Access environment variables with **bracket notation**: `process.env['MEANDER_OUT_DIR']`.
 - Use **non-null assertions (`!`)** for known-safe array accesses: `defs[0]!`.
 - Use **`Omit<>`** and intersection types (`&`) for type derivation.

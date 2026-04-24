@@ -19,39 +19,58 @@
 
 ---
 
+Meander turns `/* … */` comments in your source files into a
+narrated, navigable walkthrough. Each comment becomes a prose
+card; the code that follows becomes the paired, highlighted code
+block. Readers can leave threaded comments on any line range.
 
-You write `/* ... */` prose comments directly in your source files. Meander parses them, pairs each comment with the code that follows it, and generates a set of static HTML pages — one per walkthrough part — served through a Hono HTTP handler deployed to your Val Town account. Readers can leave threaded comments on any line range, resolve discussions, and export the full comment history as JSON.
+The generator emits static HTML. Comments are stored server-side
+in a Val Town val (SQLite + blob storage, encrypted at rest) —
+you only need that piece if you want the commenting layer.
 
 ## Features
 
-- **Side-by-side annotation + code** — each block comment becomes a prose card paired with the highlighted source code that follows it
-- **Multi-part walkthroughs** — split a codebase into ordered parts; a top nav lets readers move between them
-- **Go-to-definition linking** — exported symbols are indexed so readers can jump to any definition across parts
-- **Line-range commenting** — shift-click to select lines, type a comment, reply in threads, resolve or delete
-- **Documents tab** — optional Markdown files rendered with syntax highlighting, a floating table of contents, block-level comments, and cross-document links
-- **Unresolved comments widget** — a dropdown listing every open thread with direct links
-- **JSON comment export** — download all (or only unresolved) comments as structured JSON
-- **Val Town hosting** — a single Hono val serves all walkthroughs behind HTTP basic auth, storing HTML in blob storage and comments in SQLite
-- **Encryption at rest** — HTML files and comment content are encrypted with AES-256-GCM; the encryption key is derived from your basic auth password
-- **Reader UX** — resizable prose/code splitter, jump-to-file and jump-to-section menus, theme toggle (system/light/dark), Cmd/Ctrl-click hotlinks in code, JSDoc annotation pipeline, prose polishers, opt-in Mermaid diagram pre-rendering. See [`docs/features.md`](docs/features.md) for details and config.
+- **Side-by-side prose + code** — each block comment pairs with
+  the code that follows it.
+- **Multi-part walkthroughs** — split a codebase into ordered
+  parts; the top nav moves readers between them.
+- **Go-to-definition** — exported symbols are indexed so readers
+  can jump to any definition across parts.
+- **Line-range commenting** — shift-click to select lines, type a
+  comment, reply, resolve, delete.
+- **Documents tab** — optional Markdown pages with syntax
+  highlighting, a floating table of contents, block-level
+  comments, and cross-doc links.
+- **Reader UX** — resizable prose/code splitter, jump-to-file
+  menus, theme toggle, Cmd/Ctrl-click hotlinks, JSDoc annotation,
+  opt-in Mermaid pre-rendering.
+- **Val Town hosting** — one Hono val serves every walkthrough
+  out of blob storage, with encryption at rest.
 
-## Installation
+See [docs/features.md](docs/features.md) for the full feature
+list and configuration knobs.
+
+## Install
 
 ```bash
-npm install -g @divmain/meander
+pnpm install -g @divmain/meander
 ```
 
-Or use it without installing:
+Or run without installing:
 
 ```bash
 npx @divmain/meander generate meander.config.json
 ```
 
-## Quick Start
+**Requirements**: Node >= 20.
 
-### 1. Annotate your source files
+## Quick start
 
-Add multiline comments (`/* ... */`) anywhere in your source files. The comment becomes the prose annotation; the code that follows (until the next comment or end-of-file) becomes the paired code block.
+### 1. Annotate your source
+
+Add block comments anywhere in your source files. The comment
+becomes the prose; the code that follows (up to the next comment
+or end-of-file) becomes the paired code block.
 
 ```typescript
 /*
@@ -60,17 +79,17 @@ Add multiline comments (`/* ... */`) anywhere in your source files. The comment 
  */
 export function loadConfig(): Config {
   return {
-    port: parseInt(process.env.PORT ?? "3000", 10),
-    version: process.env.API_VERSION ?? "v1",
-  };
+    port: parseInt(process.env.PORT ?? '3000', 10),
+    version: process.env.API_VERSION ?? 'v1',
+  }
 }
 ```
 
-Annotations support full Markdown (rendered client-side via `marked`).
+Prose supports full Markdown.
 
-### 2. Create `meander.config.json`
+### 2. Describe the walkthrough
 
-Place `meander.config.json` at the root of your project:
+Create `meander.config.json` at the root of your project:
 
 ```json
 {
@@ -95,185 +114,92 @@ Place `meander.config.json` at the root of your project:
 }
 ```
 
-### 3. Generate the HTML
+### 3. Build + preview
 
 ```bash
-meander generate meander.config.json
+meander generate meander.config.json   # emit HTML
+meander serve meander.config.json      # local preview at http://127.0.0.1:8080
 ```
 
-This writes the following files into a `pages/` directory next to your config:
+`generate` writes into `pages/` next to your config:
 
 ```
-pages/                  # default emit dir; override via meander.config.json's outDir
-  index.html            # Part listing
-  part-1.html           # One file per part (when part has no `filename`)
+pages/
+  index.html        part listing
+  part-1.html       one file per part
   part-2.html
-  parts/<name>.html     # When a part carries `filename: "name"`
-  meander.css           # Styles (copied from package assets)
-  manifest.json         # Build summary
+  meander.css       shared styles
+  manifest.json     build summary
 ```
 
-Open any HTML file directly in a browser to preview locally. (The comment system requires the Val Town backend to function.)
+Override the output directory via the config's `outDir` field.
 
-## Configuration Reference
+## Config reference
 
-### `meander.config.json` fields
+### Top-level fields
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `slug` | `string` | Yes | URL-safe identifier for this walkthrough (`[a-z0-9][a-z0-9-]*`). Used in all blob storage keys and URL paths. |
-| `title` | `string` | Yes | Human-readable title shown in the index page. |
-| `parts` | `Part[]` | Yes | Ordered list of walkthrough parts (at least one). |
-| `documents` | `string[]` | No | Paths to Markdown files (relative to the config file) to render as a Documents tab. Must end in `.md`. |
+| Field        | Type       | Required | Description                                                                 |
+| ------------ | ---------- | -------- | --------------------------------------------------------------------------- |
+| `slug`       | `string`   | Yes      | URL-safe identifier, `[a-z0-9][a-z0-9-]*`. Used in URLs and storage keys.   |
+| `title`      | `string`   | Yes      | Title shown on the index page.                                              |
+| `parts`      | `Part[]`   | Yes      | Ordered list of walkthrough parts (at least one).                           |
+| `documents`  | `string[]` | No       | Markdown files to render as a Documents tab, relative to the config file.   |
+| `outDir`     | `string`   | No       | Directory to emit into, default `pages`. Also the Val Town blob prefix.     |
 
 ### Part fields
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `id` | `integer` | Yes | Unique part number starting from 1. Used in file names and URL paths. |
-| `title` | `string` | Yes | Short part title shown in the nav bar. |
-| `objective` | `string` | Yes | One-sentence description of what the reader will learn. |
-| `keywords` | `string[]` | Yes | Words used to assign comments to this part when a file appears in multiple parts. |
-| `files` | `string[]` | Yes | Source files for this part, relative to the directory containing `meander.config.json`. |
+| Field       | Type       | Required | Description                                                                  |
+| ----------- | ---------- | -------- | ---------------------------------------------------------------------------- |
+| `id`        | `integer`  | Yes      | Unique part number (starts at 1).                                            |
+| `title`     | `string`   | Yes      | Short title shown in the nav.                                                |
+| `objective` | `string`   | Yes      | One sentence describing what the reader will learn.                          |
+| `keywords`  | `string[]` | Yes      | Words used to resolve ownership when a file appears in multiple parts.      |
+| `files`     | `string[]` | Yes      | Source files in this part, relative to the config file.                     |
+| `filename`  | `string`   | No       | URL-friendly slug for clean part URLs (`/:slug/parts/<filename>.html`).     |
 
-### Section assignment
+### Full reference
 
-When the same file appears in multiple parts, Meander uses keyword scoring to decide which part owns each comment block. A block's cleaned text and its file path are checked against each candidate part's `keywords` list. The part with the most keyword matches wins. If scores tie, the part that appears first in the config wins.
+The full schema — comments / theme / styles opt-outs, favicon
+overrides, CSP, SRI, mermaid, minify, service worker — lives in
+[`docs/features.md`](docs/features.md).
 
-## Documents Tab
+## Section assignment
 
-Add a `documents` array to your config to enable a tabbed reference docs section:
+When the same file appears in multiple parts, Meander picks an
+owner per comment block using keyword scoring. Each `keywords`
+list is checked against the block's cleaned text and its file
+path; the part with the most matches wins, ties broken by
+config order. Pick keywords that distinguish parts, not generic
+terms.
 
-```json
-{
-  "slug": "my-project",
-  "title": "My Project",
-  "documents": [
-    "docs/overview.md",
-    "docs/api.md",
-    "docs/architecture.md"
-  ],
-  "parts": [...]
-}
-```
+## Publishing with comments
 
-Each Markdown file is rendered with:
+The commenting layer runs in a Val Town val. If you only want
+static pages, you can skip this — `pnpm dev` / `meander serve`
+preview the HTML standalone.
 
-- Syntax-highlighted code blocks (highlight.js)
-- Auto-generated heading IDs and a floating table of contents
-- Block-level comments (shift-click to select paragraph blocks)
-- Cross-document links: links to other `.md` files in the `documents` list are resolved client-side without page navigation
-
-Cross-document links work with relative paths:
-
-```markdown
-See [API docs](./api.md) or jump to [a specific section](./api.md#authentication).
-```
-
-## Publishing to Val Town
-
-### Prerequisites
-
-- A [Val Town](https://val.town) account
-- A Val Town API token (create one at `https://val.town/settings/api`)
-
-### Set up environment variables
+To deploy the val + publish encrypted pages:
 
 ```bash
-export VALTOWN_TOKEN=vtwn_...
-export WALKTHROUGH_USER=youruser
-export WALKTHROUGH_PASS=yourpassword
+meander deploy-val                     # first-time val setup
+meander publish meander.config.json    # upload encrypted HTML
 ```
 
-`WALKTHROUGH_USER` and `WALKTHROUGH_PASS` are the HTTP basic auth credentials that protect your hosted walkthroughs. `WALKTHROUGH_PASS` is also used to derive the encryption key for all stored content — changing it will make existing encrypted data inaccessible until you re-publish and clear comments.
+See [docs/publishing.md](docs/publishing.md) for the full setup
+(env vars, CI integration, graceful skip for fork PRs).
 
-### Deploy the val (first time only)
+## Further reading
 
-```bash
-meander deploy-val
-# or with a custom val name:
-meander deploy-val my-walkthrough-val
-```
-
-This creates (or updates) a Val Town HTTP val running the Hono server, and sets `WALKTHROUGH_USER` / `WALKTHROUGH_PASS` as val environment variables.
-
-### Publish HTML
-
-```bash
-meander generate meander.config.json
-meander publish meander.config.json
-```
-
-`publish` encrypts the generated HTML files with AES-256-GCM and uploads them to Val Town blob storage under keys like `walkthrough/<slug>/walkthrough-part-1.html`. The shared CSS file is uploaded unencrypted (since browsers must read it directly). After publishing, your walkthrough is live at:
-
-```
-https://<username>-<valname>.web.val.run/<slug>/
-```
-
-Re-publish after regenerating to update the live content. The val itself only needs to be redeployed when you want to update the server code.
-
-## Encryption at Rest
-
-All user content is encrypted before storage using AES-256-GCM via the Web Crypto API.
-
-### What is encrypted
-
-| Data | Encryption |
-|---|---|
-| Walkthrough HTML files (`index.html`, `walkthrough-part-*.html`, `documents.html`) | AES-256-GCM with unique IV per file |
-| Comment `body` and `author` fields | AES-256-GCM with unique IV per comment |
-| Comment metadata (`id`, `file`, `line_from`, `line_to`, `parent_id`, `resolved`, `created_at`) | **Not encrypted** — stored as plaintext |
-| CSS file (`meander.css`) | **Not encrypted** — served directly by browsers |
-| Manifest (`manifest.json`) | **Not encrypted** — contains only metadata |
-
-### Key derivation
-
-The encryption key is derived from `WALKTHROUGH_PASS` using PBKDF2-SHA256 with 600,000 iterations and a fixed salt. This means:
-
-- **No additional credentials** — the same password protects both access (basic auth) and data (encryption)
-- **Deterministic key** — the same password always produces the same key, so the val and publish CLI stay in sync automatically
-- **Password rotation** — changing `WALKTHROUGH_PASS` requires re-publishing all walkthroughs (HTML files) and clears all existing comments (since old encrypted data becomes undecryptable)
-
-### Binary format
-
-Encrypted values are stored as base64-encoded:
-
-```
-[1 byte: version 0x01][12 bytes: random IV][N bytes: AES-GCM ciphertext + 16-byte auth tag]
-```
-
-The version byte enables future algorithm migrations without breaking existing deployments.
-
-## Comment System
-
-The hosted val exposes a REST API used by the browser client:
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/:slug/api/comments?part=N` | Fetch all comments for a part |
-| `POST` | `/:slug/api/comments` | Create a new comment or reply |
-| `PATCH` | `/:slug/api/comments/:id` | Resolve or unresolve a comment |
-| `DELETE` | `/:slug/api/comments/:id` | Delete a comment |
-| `GET` | `/:slug/api/comments/unresolved` | List all unresolved root comments |
-| `GET` | `/:slug/api/comments/export` | Download comments as JSON |
-
-Comments are stored in a Val Town SQLite database scoped by `slug` and `part`, so multiple walkthroughs share the same val without conflict. Comment `body` and `author` fields are encrypted at rest using AES-256-GCM; metadata (file paths, line numbers, resolved status, timestamps) remains unencrypted.
-
-## Supported File Types
-
-Syntax highlighting is applied automatically based on file extension:
-
-| Extension | Language |
-|---|---|
-| `.ts`, `.tsx` | TypeScript / TSX |
-| `.js`, `.mjs` | JavaScript |
-| `.json` | JSON |
-| `.sh` | Bash |
-| anything else | plaintext |
-
-## Local Preview
-
-Generated HTML files reference assets from the deployed val (`/meander.css`, highlight.js CDN). To preview locally without a val, open any generated `.html` file directly — layout and code formatting will work, but the nav links and comment API will not.
+- [Features + configuration](docs/features.md) — every opt-in and
+  opt-out knob, with examples.
+- [Publishing](docs/publishing.md) — Val Town setup, env vars,
+  CI.
+- [Comment API](docs/comment-api.md) — the REST endpoints the
+  browser client hits.
+- [Encryption at rest](docs/encryption.md) — what's encrypted,
+  key derivation, binary format.
+- [Contributing](docs/contributing.md) — working on meander
+  itself: tests, CI, style, architecture tour.
 
 ## License
 
