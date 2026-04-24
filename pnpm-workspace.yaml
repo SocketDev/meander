@@ -1,9 +1,22 @@
-
 # Register .claude/hooks/* as workspace packages so `pnpm install`
 # resolves each hook's deps + taze (via `pnpm run update`) bumps
 # them alongside the root manifest. Keeps hook deps in lockstep.
 packages:
   - .claude/hooks/*
 allowBuilds:
+  # esbuild ships platform-specific binaries via a postinstall;
+  # it's a devDep of meander and a peer dep consumers use for
+  # the opt-in minify pass, so always let it run.
   esbuild: true
-  puppeteer: set this to true or false
+  # puppeteer's postinstall downloads ~300MB of Chromium. meander
+  # itself never renders mermaid in CI — the fixture has no
+  # mermaid blocks — so skip the build script here. Consumers
+  # who enable { "mermaid": true } install puppeteer as their
+  # own peer dep and allow the build in their own
+  # pnpm-workspace.yaml.
+  puppeteer: false
+# Apply a 7-day cooldown on fresh releases (matches taze's
+# maturityPeriod). Blocks install of any version published in
+# the last 7 days; gives the ecosystem time to catch
+# compromised uploads.
+minimumReleaseAge: 10080
