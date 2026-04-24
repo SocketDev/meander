@@ -24,6 +24,14 @@ const WalkthroughConfigSchema = Type.Object({
     Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })
   ),
   parts: Type.Array(WalkthroughPartSchema, { minItems: 1 }),
+  /**
+   * Opt out of the inlined comment-client bundle when the
+   * consumer plans to ship their own (e.g. an encrypted or
+   * SSO-gated comment system). Default: true. When false,
+   * the ~30KB of comment + line-select scripts aren't
+   * concatenated into the emitted pages.
+   */
+  comments: Type.Optional(Type.Boolean()),
 });
 
 type WalkthroughPart = Static<typeof WalkthroughPartSchema>;
@@ -1183,16 +1191,34 @@ export async function generate(
   const defIndex = buildDefinitionIndex(parts, sources);
 
   const bundledAssetsDir = getAssetsDir();
+  /* Non-comment scripts — always inlined (line-select is nav-ish
+   * UX, def-link is the definition-jump feature, doc-tabs/doc-toc
+   * power the documents page layout). */
   const lineSelectJs = readFileSync(join(bundledAssetsDir, "line-select.js"), "utf-8");
-  const commentClientJs = readFileSync(join(bundledAssetsDir, "comment-client.js"), "utf-8");
   const defLinkJs = readFileSync(join(bundledAssetsDir, "def-link.js"), "utf-8");
-  const unresolvedJs = readFileSync(join(bundledAssetsDir, "unresolved-comments.js"), "utf-8");
-  const exportJs = readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8");
   const docTabsJs = readFileSync(join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(join(bundledAssetsDir, "block-select.js"), "utf-8");
   const docTocJs = readFileSync(join(bundledAssetsDir, "doc-toc.js"), "utf-8");
-  const inlineJs = lineSelectJs + "\n" + commentClientJs + "\n" + defLinkJs + "\n" + unresolvedJs + "\n" + exportJs;
-  const documentsInlineJs = blockSelectJs + "\n" + commentClientJs + "\n" + unresolvedJs + "\n" + exportJs + "\n" + docTabsJs + "\n" + docTocJs;
+  /* Comment-client bundle — only inlined when comments are
+   * enabled. Consumers shipping their own system (e.g. encrypted
+   * or SSO-gated) can set `comments: false` in walkthrough.json
+   * to drop the default client + its API-endpoint assumptions. */
+  const commentsEnabled = config.comments !== false;
+  const commentClientJs = commentsEnabled
+    ? readFileSync(join(bundledAssetsDir, "comment-client.js"), "utf-8")
+    : "";
+  const unresolvedJs = commentsEnabled
+    ? readFileSync(join(bundledAssetsDir, "unresolved-comments.js"), "utf-8")
+    : "";
+  const exportJs = commentsEnabled
+    ? readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8")
+    : "";
+  const inlineJs = commentsEnabled
+    ? [lineSelectJs, commentClientJs, defLinkJs, unresolvedJs, exportJs].join("\n")
+    : [lineSelectJs, defLinkJs].join("\n");
+  const documentsInlineJs = commentsEnabled
+    ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
+    : [blockSelectJs, docTabsJs, docTocJs].join("\n");
 
   console.log(`Definition index: ${Object.keys(defIndex).length} unique symbols`);
 
