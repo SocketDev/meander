@@ -460,7 +460,7 @@ type SymbolLocation = {
  * places (length > 1, e.g. a `parse` function exported from
  * several ecosystem-specific files, or TypeScript overload
  * signatures on consecutive lines). The consumer
- * (assets/sym-ref.js) picks a single target for the trivial
+ * (assets/sref.js) picks a single target for the trivial
  * case and shows a disambiguator for the multi-target case —
  * rather than silently dropping ambiguous names like the old
  * singleton shape did.
@@ -1271,10 +1271,10 @@ export async function generate(
 
   const bundledAssetsDir = getAssetsDir();
   /* Non-comment scripts — always inlined (line-select is nav-ish
-   * UX, sym-ref is the symbol-reference link feature, doc-tabs/doc-toc
+   * UX, sref is the symbol-reference link feature, doc-tabs/doc-toc
    * power the documents page layout). */
   const lineSelectJs = readFileSync(join(bundledAssetsDir, "line-select.js"), "utf-8");
-  const symRefJs = readFileSync(join(bundledAssetsDir, "sym-ref.js"), "utf-8");
+  const srefJs = readFileSync(join(bundledAssetsDir, "sref.js"), "utf-8");
   const docTabsJs = readFileSync(join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(join(bundledAssetsDir, "block-select.js"), "utf-8");
   const docTocJs = readFileSync(join(bundledAssetsDir, "doc-toc.js"), "utf-8");
@@ -1293,8 +1293,8 @@ export async function generate(
     ? readFileSync(join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
-    ? [lineSelectJs, commentClientJs, symRefJs, unresolvedJs, exportJs].join("\n")
-    : [lineSelectJs, symRefJs].join("\n");
+    ? [lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
+    : [lineSelectJs, srefJs].join("\n");
   const documentsInlineJs = commentsEnabled
     ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
     : [blockSelectJs, docTabsJs, docTocJs].join("\n");
