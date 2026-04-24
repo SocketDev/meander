@@ -798,6 +798,15 @@ function renderPartHtml(
 
   const orderedFiles = part.files.filter((file) => sectionsByFile.has(file));
 
+  /* Stable anchor ID per file — for jump-to-file menu links and
+   * IntersectionObserver-driven "current file" highlighting. */
+  const fileAnchor = (file: string): string =>
+    `file-${file.replaceAll(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+  const fileEntries = orderedFiles.map((file) => ({
+    path: file,
+    anchor: fileAnchor(file),
+  }));
+
   const fileBlocks = orderedFiles
     .map((file) => {
       const fileSections = sectionsByFile.get(file) ?? [];
@@ -821,9 +830,27 @@ function renderPartHtml(
         })
         .join("\n");
 
-      return `<section class="file-block">
+      const thisAnchor = fileAnchor(file);
+      /* Only render the jump-to-file menu when there are at least
+       * two files — a dropdown with one row is noise. */
+      const pathCell =
+        fileEntries.length > 1
+          ? `<details class="wt-files-menu">
+      <summary class="path">${escapeHtml(file)}</summary>
+      <div class="wt-files-panel">
+${fileEntries
+  .map((f) => {
+    const active = f.anchor === thisAnchor ? ' class="active"' : "";
+    return `        <a href="#${f.anchor}"${active}>${escapeHtml(f.path)}</a>`;
+  })
+  .join("\n")}
+      </div>
+    </details>`
+          : `<span class="path">${escapeHtml(file)}</span>`;
+
+      return `<section class="file-block" id="${thisAnchor}">
   <header class="file-head">
-    <span class="path">${escapeHtml(file)}</span>
+    ${pathCell}
     <span class="count">${fileSections.length} section${fileSections.length === 1 ? "" : "s"}</span>
   </header>
   <div class="pair-grid file-grid">
@@ -1420,6 +1447,15 @@ export async function generate(
   const docTabsJs = readFileSync(path.join(bundledAssetsDir, "doc-tabs.js"), "utf-8");
   const blockSelectJs = readFileSync(path.join(bundledAssetsDir, "block-select.js"), "utf-8");
   const docTocJs = readFileSync(path.join(bundledAssetsDir, "doc-toc.js"), "utf-8");
+  /* Head-injected scripts. boot.js sets up the shared namespace;
+   * theme.js resolves the stored theme pref and writes
+   * <html data-theme> synchronously, before first paint, so the
+   * page never flashes light on a dark-preferring system. */
+  const bootJs = readFileSync(path.join(bundledAssetsDir, "boot.js"), "utf-8");
+  const themeJs = readFileSync(path.join(bundledAssetsDir, "theme.js"), "utf-8");
+  const splitterJs = readFileSync(path.join(bundledAssetsDir, "splitter.js"), "utf-8");
+  const filesMenuJs = readFileSync(path.join(bundledAssetsDir, "files-menu.js"), "utf-8");
+  const headJs = [bootJs, themeJs].join("\n");
   /* Comment-client bundle — only inlined when comments are
    * enabled. Consumers shipping their own system (e.g. encrypted
    * or SSO-gated) can set `comments: false` in walkthrough.json
@@ -1435,8 +1471,8 @@ export async function generate(
     ? readFileSync(path.join(bundledAssetsDir, "export-comments.js"), "utf-8")
     : "";
   const inlineJs = commentsEnabled
-    ? [lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
-    : [lineSelectJs, srefJs].join("\n");
+    ? [splitterJs, filesMenuJs, lineSelectJs, commentClientJs, srefJs, unresolvedJs, exportJs].join("\n")
+    : [splitterJs, filesMenuJs, lineSelectJs, srefJs].join("\n");
   const documentsInlineJs = commentsEnabled
     ? [blockSelectJs, commentClientJs, unresolvedJs, exportJs, docTabsJs, docTocJs].join("\n")
     : [blockSelectJs, docTabsJs, docTocJs].join("\n");
@@ -1546,7 +1582,11 @@ export async function generate(
     ].join("\n  ");
   })();
 
-  const headExtra = [faviconTags, themeColorTags].filter(Boolean).join("\n  ");
+  /* headJs is injected synchronously in <head> so theme.js can
+   * write <html data-theme> before first paint — no flash of
+   * light theme on dark-preferring systems. */
+  const headJsTag = `<script>${headJs}</script>`;
+  const headExtra = [faviconTags, themeColorTags, headJsTag].filter(Boolean).join("\n  ");
 
   for (const part of parts) {
     const partSections = sectionsByPart.get(part.id) ?? [];

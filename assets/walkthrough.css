@@ -1,13 +1,52 @@
-:root {
+:root,
+html[data-theme="light"] {
   --bg: #ffffff;
   --bg-elev: #f5f6f8;
   --bg-card: #ffffff;
+  --bg-tint: #eef0f4;
   --text: #1a1a1a;
   --muted: #6b7280;
   --accent: #2563eb;
   --border: #e0e0e0;
+  --border-strong: #c6cbd3;
   --code-bg: #0d1117;
   --ok: #16a34a;
+  /* Column split ratio (percent) the splitter handle writes back
+   * via inline style on :root. 50 = balanced. */
+  --col-split: 50;
+}
+
+/* Follow OS preference when no explicit data-theme pick. Script
+ * bootstrap resolves 'system' to 'light' or 'dark' on load, so
+ * this block is a fallback for pre-JS paint. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --bg-elev: #121212;
+    --bg-card: #141414;
+    --bg-tint: #1a1a1a;
+    --text: #fafafa;
+    --muted: #9ca3af;
+    --accent: #93c5fd;
+    --border: #262626;
+    --border-strong: #404040;
+    --code-bg: #0d1117;
+  }
+}
+
+/* Explicit dark pick — matches the @media fallback so the user's
+ * choice and the system preference land in the same palette. */
+html[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --bg-elev: #121212;
+  --bg-card: #141414;
+  --bg-tint: #1a1a1a;
+  --text: #fafafa;
+  --muted: #9ca3af;
+  --accent: #93c5fd;
+  --border: #262626;
+  --border-strong: #404040;
+  --code-bg: #0d1117;
 }
 
 * {
@@ -85,13 +124,18 @@ a:hover {
 
 .layout {
   display: grid;
-  grid-template-columns: 34% 66%;
+  grid-template-columns:
+    calc(var(--col-split) * 1%)
+    calc((100 - var(--col-split)) * 1%);
   min-height: calc(100vh - 100px);
 }
 
 .pair-grid {
+  position: relative;
   display: grid;
-  grid-template-columns: 34% 66%;
+  grid-template-columns:
+    calc(var(--col-split) * 1%)
+    calc((100 - var(--col-split)) * 1%);
   column-gap: 12px;
   row-gap: 0;
   align-items: start;
@@ -136,9 +180,9 @@ a:hover {
     linear-gradient(
       to right,
       transparent 0,
-      transparent 34%,
-      transparent calc(34% + 12px),
-      var(--code-bg) calc(34% + 12px),
+      transparent calc(var(--col-split) * 1%),
+      transparent calc(var(--col-split) * 1% + 12px),
+      var(--code-bg) calc(var(--col-split) * 1% + 12px),
       var(--code-bg) 100%
     );
   align-items: stretch;
@@ -1210,3 +1254,374 @@ pre code {
 .doc-toc-h4 { padding-left: 56px; }
 .doc-toc-h5 { padding-left: 70px; }
 .doc-toc-h6 { padding-left: 84px; }
+
+/* ── Column splitter ─────────────────────────────────────────── */
+
+/* Vertical handle between prose + code columns. Positioned
+ * absolute against the .pair-grid (position: relative set above)
+ * so the rail only spans the prose+code region — never overshoots
+ * into .file-head above or below the grid.
+ *
+ * 6px hit target masks top/bottom 6% to transparent so the clipped
+ * rail ends fade instead of cutting flat. */
+.col-splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(clamp(20%, var(--col-split, 50) * 1%, 80%));
+  width: 6px;
+  margin-left: -3px;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+}
+
+/* Visible rail — 1px centered in the 6px hit zone. Faint until
+ * hover / focus, hidden while dragging (the hotspot takes over). */
+.col-splitter::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 120ms ease;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+}
+
+.col-splitter:hover::before,
+.col-splitter:focus-visible::before {
+  background: var(--border-strong);
+}
+
+.col-splitter.dragging::before {
+  background: transparent;
+}
+
+/* Hotspot — a tall soft glow translated by pointer Y via
+ * translate3d so motion stays on the compositor path. Only visible
+ * while .dragging so the rest state isn't affected. */
+.col-splitter .col-hotspot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 800px;
+  margin-top: -400px;
+  transform: translate3d(-50%, 0, 0);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 55%, transparent) 50%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.col-splitter.dragging .col-hotspot {
+  opacity: 1;
+  will-change: transform;
+}
+
+.col-splitter:focus-visible {
+  outline: none;
+}
+
+/* Drag-wide cursor lock — a fast pointer outside the handle still
+ * reads as col-resize while the body class is set. */
+body.col-resizing,
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* ── Jump-to-file menu ───────────────────────────────────────── */
+
+/* The file-head .path is wrapped in a <details class="wt-files-menu">
+ * whose <summary> is the path text. Clicking opens a floating panel
+ * listing every file on the page. Dashed underline on the summary
+ * is the "clickable" affordance without the weight of a button. */
+.wt-files-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.wt-files-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+  transition:
+    color 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+/* Suppress the native disclosure marker in every browser. */
+.wt-files-menu > summary::marker {
+  content: "";
+  display: none;
+}
+
+.wt-files-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wt-files-menu[open] > summary {
+  color: var(--text);
+  text-decoration-color: var(--text);
+}
+
+.wt-files-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wt-files-panel a {
+  display: block;
+  padding: 6px 10px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+/* Zebra stripe — subtle tint on alternating rows to help the eye
+ * track long lists. Dark theme gets a lighter tint so the band
+ * still reads without dominating. */
+.wt-files-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="dark"] .wt-files-panel a:nth-child(even) {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.wt-files-panel a:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.wt-files-panel a.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wt-files-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.wt-files-panel::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg-card);
+}
+
+/* ── Theme toggle ────────────────────────────────────────────── */
+
+.theme-toggle-wrapper {
+  position: relative;
+}
+
+/* Button is position: relative so its four stacked icons (all
+ * absolute, inset: 0, margin: auto) center themselves identically
+ * — switching pref only flips opacity, no layout shift. */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.theme-toggle[aria-expanded="true"] {
+  background: var(--bg-tint);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Stacked icons — all three rendered on top of each other; only
+ * the one matching the current pref is visible. opacity (not
+ * display: none) keeps every icon in the layout tree so CSS
+ * transitions fire on pref change. */
+.theme-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.theme-toggle-wrapper[data-pref="system"] .theme-icon-system,
+.theme-toggle-wrapper[data-pref="light"] .theme-icon-light,
+.theme-toggle-wrapper[data-pref="dark"] .theme-icon-dark {
+  opacity: 1;
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-menu[hidden] {
+  display: none;
+}
+
+.theme-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.theme-menu-item:hover {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.theme-menu-item[aria-checked="true"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+
+.theme-menu-item[aria-checked="true"] .theme-menu-check {
+  opacity: 1;
+}
+
+.theme-menu-check {
+  opacity: 0;
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  transition: opacity 120ms ease;
+}
+
+.theme-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.theme-menu-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.theme-menu-item[aria-checked="true"] .theme-menu-icon,
+.theme-menu-item:hover .theme-menu-icon {
+  color: var(--text);
+}
+
+/* Mobile — fixed-column layout below 1100px, splitter hidden
+ * (single column = nothing to split). */
+@media (max-width: 1100px) {
+  .col-splitter {
+    display: none;
+  }
+}
