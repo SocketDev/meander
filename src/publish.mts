@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { deriveKey, encrypt } from './crypto.mts'
+import {
+  encrypt,
+  packEnvelope,
+  randomDataKey,
+  wrapKey,
+} from './crypto.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
 
 const API_BASE = 'https://api.val.town'
@@ -10,7 +15,7 @@ export type PublishOptions = {
   /** Override the env var read for the bearer token. Default:
    *  MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN. */
   tokenEnv?: string | undefined
-  /** When true, missing token / password log a warning and
+  /** When true, missing token / blob key log a warning and
    *  return 0 instead of throwing. Used by CI workflows that
    *  shouldn't fail just because the publish secret isn't
    *  provisioned (e.g. fork PRs). */
@@ -37,8 +42,38 @@ async function uploadBlob(
   console.log(`  Uploaded: ${key}`)
 }
 
-function encryptHtml(html: string, key: Buffer): string {
-  return encrypt(html, key)
+/**
+ * Decode a 32-byte blob wrapping key from its env-var form. We
+ * accept hex (64 chars) — easy to print, easy to paste, no padding
+ * ambiguity. The shape check below is the only validation; if a
+ * caller supplies the wrong length, AES-256-GCM rejects later with
+ * a clear error, which is fine for ops debugging.
+ */
+function loadBlobWrappingKey(): Buffer | null {
+  const hex = process.env['MEANDER_BLOB_KEY']
+  if (!hex) {
+    return null
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(
+      'MEANDER_BLOB_KEY must be 64 hex characters (32 bytes). Generate one with `meander blob key init`.',
+    )
+  }
+  return Buffer.from(hex, 'hex')
+}
+
+/**
+ * Encrypt a single HTML payload using the envelope scheme:
+ *   1. Random per-blob DEK.
+ *   2. Body ciphertext = AES-256-GCM(DEK, html).
+ *   3. wrappedDEK = AES-256-GCM(MEANDER_BLOB_KEY, DEK).
+ *   4. Return `ENVELOPE:1:<wrappedDEK>:<body>`.
+ */
+function encryptBlob(html: string, wrappingKey: Buffer): string {
+  const dek = randomDataKey()
+  const body = encrypt(html, dek)
+  const wrapped = wrapKey(dek, wrappingKey)
+  return packEnvelope(body, wrapped)
 }
 
 export async function publish(
@@ -60,23 +95,26 @@ export async function publish(
     throw new Error(msg)
   }
 
-  const password = process.env['MEANDER_ENCRYPTION_KEY']
-  if (!password) {
-    const msg =
-      'MEANDER_ENCRYPTION_KEY environment variable is required for publish (derives the AES-256-GCM key that encrypts walkthrough content at rest).'
-    if (graceful) {
-      console.log(`[publish] skipped — ${msg}`)
-      return
-    }
-    throw new Error(msg)
-  }
-
-  const key = deriveKey(password)
   const resolved = path.resolve(configPath)
   const config = JSON.parse(readFileSync(resolved, 'utf-8'))
   const slug: string = config.slug
   if (!slug) {
     throw new Error("meander.config.json must have a 'slug' field")
+  }
+
+  const encryptBlobsEnabled = config.encryptBlobs === true
+  let wrappingKey: Buffer | null = null
+  if (encryptBlobsEnabled) {
+    wrappingKey = loadBlobWrappingKey()
+    if (!wrappingKey) {
+      const msg =
+        'encryptBlobs is true but MEANDER_BLOB_KEY is not set. Generate one with `meander blob key init` and place it in your env.'
+      if (graceful) {
+        console.log(`[publish] skipped — ${msg}`)
+        return
+      }
+      throw new Error(msg)
+    }
   }
 
   /* outDir is the shared prefix both local emit + Val Town blob
@@ -94,34 +132,30 @@ export async function publish(
   const localOutDir = path.join(configDir, outDirName)
   const parts: Array<{ id: number }> = config.parts
 
+  const mode = encryptBlobsEnabled ? 'envelope-encrypted' : 'plaintext'
   console.log(
-    `Publishing walkthrough "${slug}" from ${localOutDir} → blob prefix "${outDirName}/" (${parts.length} parts)...`,
+    `Publishing walkthrough "${slug}" from ${localOutDir} → blob prefix "${outDirName}/" (${parts.length} parts, ${mode})...`,
   )
 
-  // Upload shared CSS
+  const wrap = (html: string): string =>
+    wrappingKey ? encryptBlob(html, wrappingKey) : html
+
+  // Upload shared CSS (always plaintext — browsers can't read encrypted CSS)
   const css = readFileSync(path.join(localOutDir, 'meander.css'), 'utf-8')
   await uploadBlob(token, `${outDirName}/meander.css`, css)
 
-  // Upload index.html (encrypted)
+  // Upload index.html
   const indexHtml = readFileSync(path.join(localOutDir, 'index.html'), 'utf-8')
-  await uploadBlob(
-    token,
-    `${outDirName}/${slug}/index.html`,
-    encryptHtml(indexHtml, key),
-  )
+  await uploadBlob(token, `${outDirName}/${slug}/index.html`, wrap(indexHtml))
 
-  // Upload part HTML files (encrypted)
+  // Upload part HTML files
   for (const part of parts) {
     const filename = `part-${part.id}.html`
     const html = readFileSync(path.join(localOutDir, filename), 'utf-8')
-    await uploadBlob(
-      token,
-      `${outDirName}/${slug}/${filename}`,
-      encryptHtml(html, key),
-    )
+    await uploadBlob(token, `${outDirName}/${slug}/${filename}`, wrap(html))
   }
 
-  // Upload documents.html if present (encrypted)
+  // Upload documents.html if present
   const documentsPath = path.join(localOutDir, 'documents.html')
   let hasDocuments = false
   if (existsSync(documentsPath)) {
@@ -129,12 +163,12 @@ export async function publish(
     await uploadBlob(
       token,
       `${outDirName}/${slug}/documents.html`,
-      encryptHtml(documentsHtml, key),
+      wrap(documentsHtml),
     )
     hasDocuments = true
   }
 
-  // Upload manifest
+  // Upload manifest (always plaintext — used for build introspection)
   const manifest = readFileSync(
     path.join(localOutDir, 'manifest.json'),
     'utf-8',

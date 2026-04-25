@@ -242,6 +242,28 @@ export const MeanderConfigSchema = Type.Object({
     Type.String({ pattern: '^[a-z0-9][a-z0-9-]*$', minLength: 1 }),
   ),
 
+  /**
+   * When `true`, `meander publish` envelope-encrypts each
+   * walkthrough HTML blob before uploading to Val Town:
+   *
+   *   1. Generates a random per-blob data key (DEK).
+   *   2. Encrypts the HTML with that DEK (AES-256-GCM).
+   *   3. Wraps the DEK with the operator's `MEANDER_BLOB_KEY`.
+   *   4. Uploads `ENVELOPE:1:<wrappedDEK>:<ciphertext>`.
+   *
+   * The val recognizes the prefix and decrypts before serving.
+   * Plaintext blobs (no prefix) are served as-is — opt-in is
+   * by setting this flag *and* having `MEANDER_BLOB_KEY` set on
+   * both the publisher and the val.
+   *
+   * Default: `false`. The common case is GitHub-Pages-served
+   * walkthroughs where Val Town hosts only the comments.
+   * Set `true` for private-repo projects that publish HTML to
+   * Val Town and don't want the prose readable from a cold blob
+   * dump.
+   */
+  encryptBlobs: Type.Optional(Type.Boolean()),
+
   /* ---------------- page chrome ---------------- */
 
   /**
