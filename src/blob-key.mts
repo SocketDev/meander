@@ -73,7 +73,9 @@ export async function blobKeyInit(
   deps.io.printLine(
     'Local env: set the same key in your shell so `meander publish`',
   )
-  deps.io.printLine('can encrypt blobs (encryptBlobs: true in meander.config.json):')
+  deps.io.printLine(
+    'can encrypt blobs (encryptBlobs: true in meander.config.json):',
+  )
   deps.io.printLine('')
   deps.io.printLine(`  export ${BLOB_KEY}=${hex}`)
 }
@@ -151,7 +153,9 @@ export async function blobKeyRestore(
   const hex = bytesToHex(recovered)
 
   if (existing === hex) {
-    deps.io.printLine(`  Shares match existing ${BLOB_KEY} — nothing to restore`)
+    deps.io.printLine(
+      `  Shares match existing ${BLOB_KEY} — nothing to restore`,
+    )
     return
   }
   if (existing) {

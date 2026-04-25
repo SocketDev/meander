@@ -7,18 +7,18 @@
  *
  * Gated on ns.onHljsReady so @example block highlighting has
  * the hljs grammar loaded. No-op on pages without hljs. */
-"use strict";
-(() => {
-  const ns = window[Symbol.for("meander:pages")];
+'use strict'
+;(() => {
+  const ns = window[Symbol.for('meander:pages')]
   if (!ns) {
-    return;
+    return
   }
 
   const cleanupAnnotationProse = () => {
     if (!ns.wrapJsdocTags || !ns.groupJsdocBlocks) {
-      return;
+      return
     }
-    for (const container of document.querySelectorAll(".annotation-md")) {
+    for (const container of document.querySelectorAll('.annotation-md')) {
       /* Mark the container as processed so CSS can reveal it.
        * `.annotation-md` ships opacity:0 to avoid a flash of
        * unstyled JSDoc markers (@example / @param / etc.
@@ -26,14 +26,14 @@
        * Setting the class at the START of the pass lets the
        * browser composite the cleaned DOM in the same paint as
        * this function's mutations. */
-      container.classList.add("mdr-annotation-md-ready");
-      ns.wrapJsdocTags(container);
-      ns.groupJsdocBlocks(container);
+      container.classList.add('mdr-annotation-md-ready')
+      ns.wrapJsdocTags(container)
+      ns.groupJsdocBlocks(container)
     }
-  };
+  }
 
   ns.onHljsReady(() => {
-    cleanupAnnotationProse();
-    requestAnimationFrame(cleanupAnnotationProse);
-  });
-})();
+    cleanupAnnotationProse()
+    requestAnimationFrame(cleanupAnnotationProse)
+  })
+})()

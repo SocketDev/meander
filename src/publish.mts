@@ -1,12 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import {
-  encrypt,
-  packEnvelope,
-  randomDataKey,
-  wrapKey,
-} from './crypto.mts'
+import { encrypt, packEnvelope, randomDataKey, wrapKey } from './crypto.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
 
 const API_BASE = 'https://api.val.town'

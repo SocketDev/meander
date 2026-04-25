@@ -10,7 +10,7 @@ export interface BaseComment {
 }
 
 export type ExportedComment = BaseComment & {
-  children: Array<BaseComment>
+  children: BaseComment[]
   sourceFile: string
   startLine: number
   endLine: number

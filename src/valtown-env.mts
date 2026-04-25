@@ -164,9 +164,7 @@ export async function listEnvVarNames(
     { headers: { Authorization: `Bearer ${token}` } },
   )
   if (!res.ok) {
-    throw new Error(
-      `listEnvVarNames failed: ${res.status} ${await res.text()}`,
-    )
+    throw new Error(`listEnvVarNames failed: ${res.status} ${await res.text()}`)
   }
   const body = (await res.json()) as { data?: Array<{ key?: string }> }
   const out: string[] = []

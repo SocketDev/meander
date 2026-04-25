@@ -3,11 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 import ValTown from '@valtown/sdk'
 
-import {
-  generateSecret,
-  getEnvVar,
-  setEnvVar,
-} from './valtown-env.mts'
+import { generateSecret, getEnvVar, setEnvVar } from './valtown-env.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
 
 function getValSourcePath(): string {

@@ -39,7 +39,9 @@ const TAG_BYTES = 16
  */
 export async function importKey(raw: Uint8Array): Promise<CryptoKey> {
   if (raw.length !== KEY_BYTES) {
-    throw new Error(`importKey: raw must be ${KEY_BYTES} bytes, got ${raw.length}`)
+    throw new Error(
+      `importKey: raw must be ${KEY_BYTES} bytes, got ${raw.length}`,
+    )
   }
   return crypto.subtle.importKey(
     'raw',
@@ -118,7 +120,9 @@ export async function wrapKey(
   wrappingKey: CryptoKey,
 ): Promise<string> {
   if (rawDek.length !== KEY_BYTES) {
-    throw new Error(`wrapKey: rawDek must be ${KEY_BYTES} bytes, got ${rawDek.length}`)
+    throw new Error(
+      `wrapKey: rawDek must be ${KEY_BYTES} bytes, got ${rawDek.length}`,
+    )
   }
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
   const ciphertext = await crypto.subtle.encrypt(
@@ -169,10 +173,7 @@ export async function unwrapKey(
  * Mirrors src/crypto.mts on the Node side. The val recognizes the
  * prefix when serving blobs and decrypts before responding.
  */
-export function packEnvelope(
-  ciphertext: string,
-  wrappedDek: string,
-): string {
+export function packEnvelope(ciphertext: string, wrappedDek: string): string {
   return `ENVELOPE:1:${wrappedDek}:${ciphertext}`
 }
 

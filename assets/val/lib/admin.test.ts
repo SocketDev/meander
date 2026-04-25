@@ -127,7 +127,9 @@ function makeSqlite(initial: Row[]) {
       const text = typeof arg === 'string' ? arg : arg.sql
       const args = typeof arg === 'string' ? {} : (arg.args ?? {})
       const sql = text.replace(/\s+/g, ' ').trim()
-      if (sql.startsWith('SELECT key_generation, COUNT(*) AS n FROM comments')) {
+      if (
+        sql.startsWith('SELECT key_generation, COUNT(*) AS n FROM comments')
+      ) {
         const counts = new Map<number, number>()
         for (const r of rows) {
           counts.set(r.key_generation, (counts.get(r.key_generation) ?? 0) + 1)
@@ -137,7 +139,11 @@ function makeSqlite(initial: Row[]) {
           .map(([key_generation, n]) => ({ key_generation, n }))
         return { rows: out }
       }
-      if (sql.startsWith('SELECT id, dek_wrapped FROM comments WHERE key_generation = :gen LIMIT :n')) {
+      if (
+        sql.startsWith(
+          'SELECT id, dek_wrapped FROM comments WHERE key_generation = :gen LIMIT :n',
+        )
+      ) {
         const gen = Number(args['gen'])
         const limit = Number(args['n'])
         return {
@@ -147,7 +153,11 @@ function makeSqlite(initial: Row[]) {
             .map(r => ({ id: r.id, dek_wrapped: r.dek_wrapped })),
         }
       }
-      if (sql.startsWith('UPDATE comments SET dek_wrapped = :wrapped, key_generation = :gen WHERE id = :id')) {
+      if (
+        sql.startsWith(
+          'UPDATE comments SET dek_wrapped = :wrapped, key_generation = :gen WHERE id = :id',
+        )
+      ) {
         const id = String(args['id'])
         const wrapped = String(args['wrapped'])
         const gen = Number(args['gen'])
@@ -158,7 +168,11 @@ function makeSqlite(initial: Row[]) {
         }
         return { rows: [] }
       }
-      if (sql.startsWith('SELECT COUNT(*) AS n FROM comments WHERE key_generation = :gen')) {
+      if (
+        sql.startsWith(
+          'SELECT COUNT(*) AS n FROM comments WHERE key_generation = :gen',
+        )
+      ) {
         const gen = Number(args['gen'])
         const n = rows.filter(r => r.key_generation === gen).length
         return { rows: [{ n }] }
@@ -200,7 +214,10 @@ async function makeKeyContext(
 
 function setupApp(deps: AdminDeps) {
   const app = makeApp()
-  registerAdminRoutes(app as unknown as Parameters<typeof registerAdminRoutes>[0], deps)
+  registerAdminRoutes(
+    app as unknown as Parameters<typeof registerAdminRoutes>[0],
+    deps,
+  )
   return app
 }
 

@@ -152,13 +152,11 @@ function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
  * CeremonyDeps. Used by both `db key` and `blob key` dispatchers.
  */
 async function buildCeremonyDeps(args: CeremonyParsedArgs) {
-  const { resolveValTownToken, missingTokenMessage } = await import(
-    './valtown-token.mts'
-  )
+  const { resolveValTownToken, missingTokenMessage } =
+    await import('./valtown-token.mts')
   const { resolveVal } = await import('./valtown-env.mts')
-  const { createDefaultDeps, createEnvClient } = await import(
-    './ceremony-deps.mts'
-  )
+  const { createDefaultDeps, createEnvClient } =
+    await import('./ceremony-deps.mts')
   const { envName, token } = resolveValTownToken(args.tokenEnv)
   if (!token) {
     throw new Error(missingTokenMessage(envName))

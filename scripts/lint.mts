@@ -5,7 +5,7 @@
 import { spawn } from '@socketsecurity/lib/spawn'
 
 try {
-  await spawn('pnpm', ['exec', 'oxlint', 'src', 'scripts'], {
+  await spawn('pnpm', ['exec', 'oxlint', 'assets', 'src', 'scripts'], {
     stdio: 'inherit',
   })
 } catch (e) {

@@ -87,7 +87,8 @@ export function loadDbKeyContext(): WrappingKeyContext | undefined {
  * a plain undefined-valued slot can't.
  */
 const NOT_LOADED = Symbol('blob-key-not-loaded')
-let blobKeyCache: Promise<CryptoKey> | undefined | typeof NOT_LOADED = NOT_LOADED
+let blobKeyCache: Promise<CryptoKey> | undefined | typeof NOT_LOADED =
+  NOT_LOADED
 export function loadBlobKey(): Promise<CryptoKey> | undefined {
   if (blobKeyCache !== NOT_LOADED) {
     return blobKeyCache

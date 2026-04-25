@@ -57,7 +57,6 @@
     "**/*.d.ts",
     "**/*.d.mts",
     "**/*.d.ts.map",
-    "**/*.tsbuildinfo",
-    "assets/**/*.js"
+    "**/*.tsbuildinfo"
   ]
 }

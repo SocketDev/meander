@@ -34,7 +34,10 @@ test('randomDataKeyBytes: returns 32 bytes', () => {
 test('randomDataKeyBytes: produces distinct keys per call', () => {
   const a = randomDataKeyBytes()
   const b = randomDataKeyBytes()
-  assert.notEqual(Buffer.from(a).toString('hex'), Buffer.from(b).toString('hex'))
+  assert.notEqual(
+    Buffer.from(a).toString('hex'),
+    Buffer.from(b).toString('hex'),
+  )
 })
 
 test('encrypt/decrypt: round-trip ASCII', async () => {
@@ -181,7 +184,10 @@ test('packEnvelope/unpackEnvelope: round-trips a wrapped blob', async () => {
   /* End-to-end: reader unwraps the DEK and decrypts the body. */
   const recoveredDek = await unwrapKey(parsed!.wrappedDek, wrapping)
   const recoveredCrypto = await importKey(recoveredDek)
-  assert.equal(await decrypt(parsed!.ciphertext, recoveredCrypto), 'walkthrough HTML')
+  assert.equal(
+    await decrypt(parsed!.ciphertext, recoveredCrypto),
+    'walkthrough HTML',
+  )
 })
 
 test('unpackEnvelope: returns undefined for plaintext blobs (no prefix)', () => {
@@ -200,7 +206,10 @@ test('decodeHexKey: parses 64-char hex into 32 bytes', () => {
   const hex = '00'.repeat(32)
   const bytes = decodeHexKey(hex)
   assert.equal(bytes.length, 32)
-  assert.equal(Buffer.from(bytes).every(b => b === 0), true)
+  assert.equal(
+    Buffer.from(bytes).every(b => b === 0),
+    true,
+  )
 })
 
 test('decodeHexKey: rejects wrong length', () => {

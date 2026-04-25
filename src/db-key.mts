@@ -156,7 +156,9 @@ export async function dbKeyRotate(
   deps.io.printLine(`  Set ${DB_KEY_PREFIX}${toGen}`)
 
   /* Drive /admin/rewrap until the val reports remaining = 0. */
-  deps.io.printLine(`  Rewrapping rows from generation ${fromGen} to ${toGen}...`)
+  deps.io.printLine(
+    `  Rewrapping rows from generation ${fromGen} to ${toGen}...`,
+  )
   let totalRewrapped = 0
   while (true) {
     const body = await deps.admin.rewrap({
@@ -231,9 +233,7 @@ export async function dbKeyRestore(
    * planting back. Use the lowest-numbered missing generation
    * (typically 1 if everything is gone). */
   const planTarget =
-    snapshot.generations.length > 0
-      ? Math.max(...snapshot.generations) + 1
-      : 1
+    snapshot.generations.length > 0 ? Math.max(...snapshot.generations) + 1 : 1
   await deps.env.setEnvVar(`${DB_KEY_PREFIX}${planTarget}`, recoveredHex)
   deps.io.printLine(`  Set ${DB_KEY_PREFIX}${planTarget}`)
   if (snapshot.currentGeneration === undefined) {
@@ -248,7 +248,9 @@ export async function dbKeyRestore(
 
 export async function dbKeyAudit(deps: CeremonyDeps): Promise<void> {
   const body = await deps.admin.keyAudit()
-  deps.io.printLine(`Visible generations: ${body.visibleGenerations.join(', ')}`)
+  deps.io.printLine(
+    `Visible generations: ${body.visibleGenerations.join(', ')}`,
+  )
   deps.io.printLine(`Current (used for new writes): ${body.currentGeneration}`)
   deps.io.printLine('Row counts by generation:')
   const sortedGens = Object.keys(body.rowCounts)

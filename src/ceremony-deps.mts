@@ -161,9 +161,7 @@ export function createAdminClient(
  * queue first, then falls through to interactive readline once
  * the queue empties.
  */
-export function createIoChannel(
-  shareFiles: readonly string[] = [],
-): IoChannel {
+export function createIoChannel(shareFiles: readonly string[] = []): IoChannel {
   const queue: string[] = []
   for (const path of shareFiles) {
     if (!existsSync(path)) {

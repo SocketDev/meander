@@ -102,10 +102,7 @@ function noKeyContextResponse(c: Context, deps: AdminDeps): Response {
  * Register both admin routes on the Hono app. Returns the same app
  * for chainability — matches Hono's idiom.
  */
-export function registerAdminRoutes(
-  app: Hono,
-  deps: AdminDeps,
-): Hono {
+export function registerAdminRoutes(app: Hono, deps: AdminDeps): Hono {
   app.get('/admin/key-audit', async c => {
     const denied = adminAuth(c, deps.adminToken)
     if (denied) {

@@ -1,44 +1,46 @@
-(function () {
-  "use strict";
+;(function () {
+  'use strict'
 
   // Guard: only run on documents page
-  var pageType = document.body.getAttribute("data-page-type");
-  if (pageType !== "documents") return;
+  const pageType = document.body.getAttribute('data-page-type')
+  if (pageType !== 'documents') {return}
 
   /* ------------------------------------------------------------------ */
   /*  Tab Switching                                                      */
   /* ------------------------------------------------------------------ */
 
   function switchToTab(index, updateHash) {
-    var tabs = document.querySelectorAll(".doc-tab-btn");
-    var panes = document.querySelectorAll(".doc-tab-pane");
+    const tabs = document.querySelectorAll('.doc-tab-btn')
+    const panes = document.querySelectorAll('.doc-tab-pane')
 
-    for (var i = 0; i < tabs.length; i++) {
-      var isActive = i === index;
-      tabs[i].classList.toggle("active", isActive);
-      panes[i].classList.toggle("active", isActive);
-      panes[i].style.display = isActive ? "block" : "none";
+    for (let i = 0; i < tabs.length; i++) {
+      const isActive = i === index
+      tabs[i].classList.toggle('active', isActive)
+      panes[i].classList.toggle('active', isActive)
+      panes[i].style.display = isActive ? 'block' : 'none'
     }
 
     // Update URL hash
     if (updateHash !== false) {
-      var pane = panes[index];
+      const pane = panes[index]
       if (pane) {
-        var filePath = pane.getAttribute("data-doc-file");
+        const filePath = pane.getAttribute('data-doc-file')
         if (filePath && history.replaceState) {
-          history.replaceState(null, "", "#" + encodeURIComponent(filePath));
+          history.replaceState(null, '', '#' + encodeURIComponent(filePath))
         }
       }
     }
 
     // Fire custom event for TOC to listen to
-    document.dispatchEvent(new CustomEvent("doctabchange", { detail: { index: index } }));
+    document.dispatchEvent(
+      new CustomEvent('doctabchange', { detail: { index: index } }),
+    )
   }
 
   // Expose for programmatic tab switching
   window.switchDocTab = function (index) {
-    switchToTab(index, true);
-  };
+    switchToTab(index, true)
+  }
 
   /* ------------------------------------------------------------------ */
   /*  Hash Parsing                                                       */
@@ -50,45 +52,45 @@
   // #<encoded-file-path>:B<n>              - tab + scroll to block
   // #<encoded-file-path>:B<n>-B<m>         - tab + block range selection
   function parseHash() {
-    var hash = window.location.hash;
-    if (!hash || hash.length < 2) return null;
+    let hash = window.location.hash
+    if (!hash || hash.length < 2) {return null}
 
     // Remove leading #
-    hash = hash.substring(1);
+    hash = hash.substring(1)
 
     // Find the colon separator (if any)
-    var colonIdx = hash.lastIndexOf(":");
+    const colonIdx = hash.lastIndexOf(':')
 
-    var filePath;
-    var anchor = "";
+    let filePath
+    let anchor = ''
 
     if (colonIdx > 0) {
       // Has anchor part
-      filePath = hash.substring(0, colonIdx);
-      anchor = hash.substring(colonIdx + 1);
+      filePath = hash.substring(0, colonIdx)
+      anchor = hash.substring(colonIdx + 1)
     } else {
       // No anchor, just file path
-      filePath = hash;
+      filePath = hash
     }
 
     // Decode the file path
     try {
-      filePath = decodeURIComponent(filePath);
+      filePath = decodeURIComponent(filePath)
     } catch (e) {
-      return null;
+      return null
     }
 
-    return { filePath: filePath, anchor: anchor };
+    return { filePath: filePath, anchor: anchor }
   }
 
   function findTabIndexByFilePath(filePath) {
-    var panes = document.querySelectorAll(".doc-tab-pane");
-    for (var i = 0; i < panes.length; i++) {
-      if (panes[i].getAttribute("data-doc-file") === filePath) {
-        return i;
+    const panes = document.querySelectorAll('.doc-tab-pane')
+    for (let i = 0; i < panes.length; i++) {
+      if (panes[i].getAttribute('data-doc-file') === filePath) {
+        return i
       }
     }
-    return -1;
+    return -1
   }
 
   /* ------------------------------------------------------------------ */
@@ -97,32 +99,36 @@
 
   // Scroll an element into view below the sticky topbar.
   function scrollBelowTopbar(el) {
-    var topbar = document.querySelector(".topbar");
-    var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
-    var y = el.getBoundingClientRect().top + window.scrollY - offset;
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
+    const topbar = document.querySelector('.topbar')
+    const offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16
+    const y = el.getBoundingClientRect().top + window.scrollY - offset
+    const reduce =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' })
   }
 
   function scrollToTarget(anchor) {
-    if (!anchor) return;
+    if (!anchor) {return}
 
     // Check if it's a heading ID (not starting with B)
-    if (!anchor.startsWith("B")) {
-      var heading = document.getElementById(anchor);
+    if (!anchor.startsWith('B')) {
+      const heading = document.getElementById(anchor)
       if (heading) {
-        scrollBelowTopbar(heading);
+        scrollBelowTopbar(heading)
       }
-      return;
+      return
     }
 
     // Check for block ID: B<n> or B<n>-B<m>
-    var blockMatch = anchor.match(/^B(\d+)(?:-B(\d+))?$/);
+    const blockMatch = anchor.match(/^B(\d+)(?:-B(\d+))?$/)
     if (blockMatch) {
-      var blockId = blockMatch[1];
-      var block = document.querySelector('.doc-tab-pane.active .doc-block[data-block-id="' + blockId + '"]');
+      const blockId = blockMatch[1]
+      const block = document.querySelector(
+        '.doc-tab-pane.active .doc-block[data-block-id="' + blockId + '"]',
+      )
       if (block) {
-        scrollBelowTopbar(block);
+        scrollBelowTopbar(block)
       }
     }
   }
@@ -132,21 +138,21 @@
   /* ------------------------------------------------------------------ */
 
   function applyHash() {
-    var parsed = parseHash();
-    if (!parsed) return;
+    const parsed = parseHash()
+    if (!parsed) {return}
 
-    var index = findTabIndexByFilePath(parsed.filePath);
-    if (index < 0) return;
+    const index = findTabIndexByFilePath(parsed.filePath)
+    if (index < 0) {return}
 
     // Switch to the tab without updating hash (we're reading from hash)
-    switchToTab(index, false);
+    switchToTab(index, false)
 
     // Scroll to anchor if present
     if (parsed.anchor) {
       // Small delay to allow DOM to settle after tab switch
       setTimeout(function () {
-        scrollToTarget(parsed.anchor);
-      }, 50);
+        scrollToTarget(parsed.anchor)
+      }, 50)
     }
   }
 
@@ -155,60 +161,60 @@
   /* ------------------------------------------------------------------ */
 
   // Tab button click handler
-  document.addEventListener("click", function (e) {
-    var btn = e.target.closest(".doc-tab-btn");
-    if (!btn) return;
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.doc-tab-btn')
+    if (!btn) {return}
 
-    var index = parseInt(btn.getAttribute("data-doc-index"), 10);
+    const index = parseInt(btn.getAttribute('data-doc-index'), 10)
     if (!isNaN(index)) {
-      e.preventDefault();
-      switchToTab(index, true);
+      e.preventDefault()
+      switchToTab(index, true)
     }
-  });
+  })
 
   // Cross-reference link click handler
-  document.addEventListener("click", function (e) {
-    var link = e.target.closest("[data-doc-ref]");
-    if (!link) return;
+  document.addEventListener('click', function (e) {
+    const link = e.target.closest('[data-doc-ref]')
+    if (!link) {return}
 
-    var index = parseInt(link.getAttribute("data-doc-ref"), 10);
-    var anchor = link.getAttribute("data-doc-anchor") || "";
+    const index = parseInt(link.getAttribute('data-doc-ref'), 10)
+    const anchor = link.getAttribute('data-doc-anchor') || ''
 
     if (!isNaN(index)) {
-      e.preventDefault();
+      e.preventDefault()
 
       // Update URL hash with file path and anchor
-      var panes = document.querySelectorAll(".doc-tab-pane");
-      var pane = panes[index];
+      const panes = document.querySelectorAll('.doc-tab-pane')
+      const pane = panes[index]
       if (pane) {
-        var filePath = pane.getAttribute("data-doc-file");
+        const filePath = pane.getAttribute('data-doc-file')
         if (filePath) {
-          var hash = "#" + encodeURIComponent(filePath);
+          let hash = '#' + encodeURIComponent(filePath)
           if (anchor) {
-            hash += ":" + anchor;
+            hash += ':' + anchor
           }
           if (history.pushState) {
-            history.pushState(null, "", hash);
+            history.pushState(null, '', hash)
           }
         }
       }
 
       // Switch to the tab
-      switchToTab(index, false);
+      switchToTab(index, false)
 
       // Scroll to anchor if present
       if (anchor) {
         setTimeout(function () {
-          scrollToTarget(anchor);
-        }, 50);
+          scrollToTarget(anchor)
+        }, 50)
       }
     }
-  });
+  })
 
   // Hash change handler
-  window.addEventListener("hashchange", function () {
-    applyHash();
-  });
+  window.addEventListener('hashchange', function () {
+    applyHash()
+  })
 
   /* ------------------------------------------------------------------ */
   /*  Initialization                                                     */
@@ -217,15 +223,15 @@
   function init() {
     // Apply hash on load if present.
     // Skip block-reference hashes (e.g. #file.md:B5) — block-select.js owns those.
-    var hash = window.location.hash;
+    const hash = window.location.hash
     if (hash && hash.length > 1 && !/:[Bb]\d/.test(hash)) {
-      applyHash();
+      applyHash()
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init)
   } else {
-    init();
+    init()
   }
-})();
+})()

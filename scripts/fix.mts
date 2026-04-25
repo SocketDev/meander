@@ -18,8 +18,8 @@ async function run(cmd: string, args: string[]): Promise<boolean> {
 }
 
 for (const [cmd, args] of [
-  ['pnpm', ['exec', 'oxfmt', 'src', 'scripts']],
-  ['pnpm', ['exec', 'oxlint', '--fix', 'src', 'scripts']],
+  ['pnpm', ['exec', 'oxfmt', 'assets', 'src', 'scripts']],
+  ['pnpm', ['exec', 'oxlint', '--fix', 'assets', 'src', 'scripts']],
 ] as const) {
   if (!(await run(cmd, [...args]))) {
     break

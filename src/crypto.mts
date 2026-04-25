@@ -1,8 +1,4 @@
-import {
-  randomBytes,
-  createCipheriv,
-  createDecipheriv,
-} from 'node:crypto'
+import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 
 /**
  * AES-256-GCM with envelope-key wrapping for the comment store.
@@ -86,14 +82,18 @@ export function decrypt(ciphertext: string, dataKey: Buffer): string {
     throw new Error('decrypt: ciphertext too short')
   }
   if (combined[0] !== BODY_VERSION) {
-    throw new Error(`decrypt: unsupported body version 0x${combined[0]!.toString(16)}`)
+    throw new Error(
+      `decrypt: unsupported body version 0x${combined[0]!.toString(16)}`,
+    )
   }
   const iv = combined.subarray(1, 1 + IV_BYTES)
   const tag = combined.subarray(combined.length - TAG_BYTES)
   const ct = combined.subarray(1 + IV_BYTES, combined.length - TAG_BYTES)
   const decipher = createDecipheriv('aes-256-gcm', dataKey, iv)
   decipher.setAuthTag(tag)
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf-8')
+  return Buffer.concat([decipher.update(ct), decipher.final()]).toString(
+    'utf-8',
+  )
 }
 
 /**
@@ -133,10 +133,7 @@ export function wrapKey(dataKey: Buffer, wrappingKey: Buffer): string {
  * older readers' version checks. Blobs without the prefix are
  * treated as plaintext by readers, so this format is opt-in.
  */
-export function packEnvelope(
-  ciphertext: string,
-  wrappedDek: string,
-): string {
+export function packEnvelope(ciphertext: string, wrappedDek: string): string {
   return `ENVELOPE:1:${wrappedDek}:${ciphertext}`
 }
 
@@ -175,7 +172,9 @@ export function unwrapKey(wrapped: string, wrappingKey: Buffer): Buffer {
     )
   }
   if (combined[0] !== WRAP_VERSION) {
-    throw new Error(`unwrapKey: unsupported wrap version 0x${combined[0]!.toString(16)}`)
+    throw new Error(
+      `unwrapKey: unsupported wrap version 0x${combined[0]!.toString(16)}`,
+    )
   }
   const iv = combined.subarray(1, 1 + IV_BYTES)
   const ct = combined.subarray(1 + IV_BYTES, 1 + IV_BYTES + KEY_BYTES)

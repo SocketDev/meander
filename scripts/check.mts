@@ -28,7 +28,7 @@ async function run(
 }
 
 const steps: Array<[string, string[], string]> = [
-  ['pnpm', ['exec', 'oxlint', 'src', 'scripts'], 'lint'],
+  ['pnpm', ['exec', 'oxlint', 'assets', 'src', 'scripts'], 'lint'],
   ['pnpm', ['exec', 'tsc', '--noEmit'], 'type-check'],
   ['node', ['scripts/validate-tools.mts'], 'validate external-tools.json'],
 ]

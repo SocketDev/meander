@@ -64,7 +64,10 @@ test('sixDigitCode: varies across calls', () => {
   }
   /* 20 draws from 1e6 should give well under 1% collision odds
    * — if we're seeing only 1 unique value, the RNG is broken. */
-  assert.ok(seen.size > 10, `sixDigitCode not random enough: ${seen.size} unique`)
+  assert.ok(
+    seen.size > 10,
+    `sixDigitCode not random enough: ${seen.size} unique`,
+  )
 })
 
 test('hashCode: deterministic for same (code, email)', async () => {
