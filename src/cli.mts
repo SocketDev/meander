@@ -51,27 +51,16 @@ function usage(cmd: 'generate' | 'publish' | 'serve'): string {
   }
 }
 
-/**
- * Parse + dispatch `meander db <subcommand>`. Today only the
- * `db key <verb>` subtree is implemented; future commands like
- * `db backup` / `db restore` slot in here.
- */
-async function dispatchDb(args: readonly string[]): Promise<void> {
-  const sub = args[0]
-  if (sub !== 'key') {
-    console.error(`Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`)
-    process.exitCode = 1
-    return
-  }
-  const verb = args[1]
-  if (!verb) {
-    console.error(
-      `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
-    )
-    process.exitCode = 1
-    return
-  }
-  const rest = args.slice(2)
+type CeremonyParsedArgs = {
+  valName: string
+  tokenEnv: string | undefined
+  threshold: number | undefined
+  shares: number | undefined
+  shareFiles: readonly string[]
+  generation: number | undefined
+}
+
+function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
   const { values, positionals } = parseArgs({
     args: rest as string[],
     options: {
@@ -84,46 +73,116 @@ async function dispatchDb(args: readonly string[]): Promise<void> {
     strict: false,
     allowPositionals: true,
   })
-  const valName = positionals[0] ?? 'walkthrough'
-  const opts: {
-    tokenEnv?: string | undefined
-    threshold?: number | undefined
-    shares?: number | undefined
-    shareFiles?: readonly string[] | undefined
-    generation?: number | undefined
-  } = {}
+  const out: CeremonyParsedArgs = {
+    valName: positionals[0] ?? 'walkthrough',
+    tokenEnv: undefined,
+    threshold: undefined,
+    shares: undefined,
+    shareFiles: [],
+    generation: undefined,
+  }
   if (typeof values['token-env'] === 'string') {
-    opts.tokenEnv = values['token-env']
+    out.tokenEnv = values['token-env']
   }
   if (typeof values['threshold'] === 'string') {
-    opts.threshold = Number(values['threshold'])
+    out.threshold = Number(values['threshold'])
   }
   if (typeof values['shares'] === 'string') {
-    opts.shares = Number(values['shares'])
+    out.shares = Number(values['shares'])
   }
   if (Array.isArray(values['share-file'])) {
-    opts.shareFiles = values['share-file'] as string[]
+    out.shareFiles = values['share-file'] as string[]
   }
   if (typeof values['generation'] === 'string') {
-    opts.generation = Number(values['generation'])
+    out.generation = Number(values['generation'])
   }
+  return out
+}
+
+/**
+ * Resolve the val + admin token + build the production
+ * CeremonyDeps. Used by both `db key` and `blob key` dispatchers.
+ */
+async function buildCeremonyDeps(args: CeremonyParsedArgs) {
+  const { resolveValTownToken, missingTokenMessage } = await import(
+    './valtown-token.mts'
+  )
+  const { resolveVal } = await import('./valtown-env.mts')
+  const { createDefaultDeps, createEnvClient } = await import(
+    './ceremony-deps.mts'
+  )
+  const { envName, token } = resolveValTownToken(args.tokenEnv)
+  if (!token) {
+    throw new Error(missingTokenMessage(envName))
+  }
+  const val = await resolveVal(token, args.valName)
+  /* The admin token lives on the val itself — fetch it via the env
+   * API so the ceremony can authenticate to /admin/* endpoints. */
+  const env = createEnvClient(token, val.id)
+  const adminToken = await env.getEnvVar('MEANDER_ADMIN_TOKEN')
+  if (!adminToken) {
+    throw new Error(
+      'MEANDER_ADMIN_TOKEN not set on val — run `meander deploy-val` first to mint it',
+    )
+  }
+  return createDefaultDeps(token, val, adminToken, args.shareFiles)
+}
+
+/**
+ * Parse + dispatch `meander db <subcommand>`. Today only the
+ * `db key <verb>` subtree is implemented; future commands like
+ * `db backup` / `db restore` slot in here.
+ */
+async function dispatchDb(args: readonly string[]): Promise<void> {
+  const sub = args[0]
+  if (sub !== 'key') {
+    console.error(
+      `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
+    )
+    process.exitCode = 1
+    return
+  }
+  const verb = args[1]
+  if (!verb) {
+    console.error(
+      `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
+    )
+    process.exitCode = 1
+    return
+  }
+  const parsed = parseCeremonyArgs(args.slice(2))
   const dbKey = await import('./db-key.mts')
+  const opts = {
+    threshold: parsed.threshold,
+    shares: parsed.shares,
+    generation: parsed.generation,
+  }
   switch (verb) {
-    case 'init':
-      await dbKey.dbKeyInit(valName, opts)
+    case 'init': {
+      const deps = await buildCeremonyDeps(parsed)
+      await dbKey.dbKeyInit(opts, deps)
       break
-    case 'rotate':
-      await dbKey.dbKeyRotate(valName, opts)
+    }
+    case 'rotate': {
+      const deps = await buildCeremonyDeps(parsed)
+      await dbKey.dbKeyRotate(opts, deps)
       break
-    case 'restore':
-      await dbKey.dbKeyRestore(valName, opts)
+    }
+    case 'restore': {
+      const deps = await buildCeremonyDeps(parsed)
+      await dbKey.dbKeyRestore(opts, deps)
       break
-    case 'audit':
-      await dbKey.dbKeyAudit(valName, opts)
+    }
+    case 'audit': {
+      const deps = await buildCeremonyDeps(parsed)
+      await dbKey.dbKeyAudit(deps)
       break
-    case 'retire':
-      await dbKey.dbKeyRetire(valName, opts)
+    }
+    case 'retire': {
+      const deps = await buildCeremonyDeps(parsed)
+      await dbKey.dbKeyRetire(opts, deps)
       break
+    }
     default:
       console.error(
         `Unknown subcommand: meander db key ${verb}\n` +
@@ -154,51 +213,30 @@ async function dispatchBlob(args: readonly string[]): Promise<void> {
     process.exitCode = 1
     return
   }
-  const rest = args.slice(2)
-  const { values, positionals } = parseArgs({
-    args: rest as string[],
-    options: {
-      'token-env': { type: 'string' },
-      threshold: { type: 'string' },
-      shares: { type: 'string' },
-      'share-file': { type: 'string', multiple: true },
-    },
-    strict: false,
-    allowPositionals: true,
-  })
-  const valName = positionals[0] ?? 'walkthrough'
-  const opts: {
-    tokenEnv?: string | undefined
-    threshold?: number | undefined
-    shares?: number | undefined
-    shareFiles?: readonly string[] | undefined
-  } = {}
-  if (typeof values['token-env'] === 'string') {
-    opts.tokenEnv = values['token-env']
-  }
-  if (typeof values['threshold'] === 'string') {
-    opts.threshold = Number(values['threshold'])
-  }
-  if (typeof values['shares'] === 'string') {
-    opts.shares = Number(values['shares'])
-  }
-  if (Array.isArray(values['share-file'])) {
-    opts.shareFiles = values['share-file'] as string[]
-  }
+  const parsed = parseCeremonyArgs(args.slice(2))
   const blobKey = await import('./blob-key.mts')
+  const opts = { threshold: parsed.threshold, shares: parsed.shares }
   switch (verb) {
-    case 'init':
-      await blobKey.blobKeyInit(valName, opts)
+    case 'init': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyInit(opts, deps)
       break
-    case 'rotate':
-      await blobKey.blobKeyRotate(valName, opts)
+    }
+    case 'rotate': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyRotate(opts, deps)
       break
-    case 'restore':
-      await blobKey.blobKeyRestore(valName, opts)
+    }
+    case 'restore': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyRestore(opts, deps)
       break
-    case 'show':
-      await blobKey.blobKeyShow(valName, opts)
+    }
+    case 'show': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyShow(deps)
       break
+    }
     default:
       console.error(
         `Unknown subcommand: meander blob key ${verb}\n` +
