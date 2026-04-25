@@ -51,6 +51,88 @@ function usage(cmd: 'generate' | 'publish' | 'serve'): string {
   }
 }
 
+/**
+ * Parse + dispatch `meander db <subcommand>`. Today only the
+ * `db key <verb>` subtree is implemented; future commands like
+ * `db backup` / `db restore` slot in here.
+ */
+async function dispatchDb(args: readonly string[]): Promise<void> {
+  const sub = args[0]
+  if (sub !== 'key') {
+    console.error(`Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`)
+    process.exitCode = 1
+    return
+  }
+  const verb = args[1]
+  if (!verb) {
+    console.error(
+      `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
+    )
+    process.exitCode = 1
+    return
+  }
+  const rest = args.slice(2)
+  const { values, positionals } = parseArgs({
+    args: rest as string[],
+    options: {
+      'token-env': { type: 'string' },
+      threshold: { type: 'string' },
+      shares: { type: 'string' },
+      'share-file': { type: 'string', multiple: true },
+      generation: { type: 'string' },
+    },
+    strict: false,
+    allowPositionals: true,
+  })
+  const valName = positionals[0] ?? 'walkthrough'
+  const opts: {
+    tokenEnv?: string | undefined
+    threshold?: number | undefined
+    shares?: number | undefined
+    shareFiles?: readonly string[] | undefined
+    generation?: number | undefined
+  } = {}
+  if (typeof values['token-env'] === 'string') {
+    opts.tokenEnv = values['token-env']
+  }
+  if (typeof values['threshold'] === 'string') {
+    opts.threshold = Number(values['threshold'])
+  }
+  if (typeof values['shares'] === 'string') {
+    opts.shares = Number(values['shares'])
+  }
+  if (Array.isArray(values['share-file'])) {
+    opts.shareFiles = values['share-file'] as string[]
+  }
+  if (typeof values['generation'] === 'string') {
+    opts.generation = Number(values['generation'])
+  }
+  const dbKey = await import('./db-key.mts')
+  switch (verb) {
+    case 'init':
+      await dbKey.dbKeyInit(valName, opts)
+      break
+    case 'rotate':
+      await dbKey.dbKeyRotate(valName, opts)
+      break
+    case 'restore':
+      await dbKey.dbKeyRestore(valName, opts)
+      break
+    case 'audit':
+      await dbKey.dbKeyAudit(valName, opts)
+      break
+    case 'retire':
+      await dbKey.dbKeyRetire(valName, opts)
+      break
+    default:
+      console.error(
+        `Unknown subcommand: meander db key ${verb}\n` +
+          `Usage: meander db key <init|rotate|restore|audit|retire> [val-name]`,
+      )
+      process.exitCode = 1
+  }
+}
+
 async function main() {
   switch (command) {
     case 'generate': {
@@ -125,6 +207,10 @@ async function main() {
       await doctor()
       break
     }
+    case 'db': {
+      await dispatchDb(commandArgs)
+      break
+    }
     case 'serve': {
       /* Local preview server. Generates first so the output
        * reflects the latest source, then serves. --port 0 picks
@@ -169,6 +255,8 @@ Commands:
   meander serve <meander.config.json>      Generate + start local preview
   meander publish <meander.config.json>    Publish HTML to Val Town blob storage
   meander deploy-val [val-name]            Deploy or update the Val Town val
+  meander db key <verb> [val-name]         Manage the comment-store wrapping key
+                                           (init / rotate / restore / audit / retire)
   meander doctor                           Report system + peer-dep status
 
 Flags (publish, deploy-val):
@@ -186,6 +274,13 @@ Flags (deploy-val only):
                                are refused — the safe starting posture.
   --demo-mode                  Deploy the val in demo mode: comment UI renders
                                a banner and writes return 403.
+
+Flags (db key):
+  --threshold <N>              Shamir threshold (init/rotate/restore). Default: 2.
+  --shares <N>                 Shamir total share count (init/rotate). Default: 3.
+  --share-file <path>          Read a share from a file (repeatable, rotate/restore).
+                               Otherwise prompts interactively.
+  --generation <N>             Generation to operate on (retire only).
 
 Environment variables:
   VALTOWN_TOKEN              Val Town API bearer token (default env name).

@@ -1,12 +1,14 @@
-import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import ValTown from '@valtown/sdk'
 
+import {
+  generateSecret,
+  getEnvVar,
+  setEnvVar,
+} from './valtown-env.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
-
-const API_BASE = 'https://api.val.town'
 
 function getValSourcePath(): string {
   const thisFile = fileURLToPath(import.meta.url)
@@ -60,17 +62,6 @@ export type DeployValOptions = {
   demoMode?: boolean | undefined
 }
 
-/**
- * Generate a URL-safe random secret. Used to default
- * MEANDER_JWT_SECRET on first deploy so operators don't have to
- * hand-craft one. Subsequent deploys preserve the existing
- * value (we never overwrite a JWT secret — that would log
- * everyone out).
- */
-function generateSecret(): string {
-  return randomBytes(48).toString('base64url')
-}
-
 export async function deployVal(
   valName: string,
   options: DeployValOptions = { __proto__: null } as DeployValOptions,
@@ -101,12 +92,12 @@ export async function deployVal(
   console.log(`Logged in as: ${username}`)
   console.log(`Looking for existing val "${valName}"...`)
 
-  let valId: string | null = null
+  let valId: string | undefined
   try {
     const val = await client.alias.username.valName.retrieve(username, valName)
     valId = val.id
   } catch {
-    valId = null
+    valId = undefined
   }
 
   if (valId) {
@@ -139,20 +130,25 @@ export async function deployVal(
     console.log('Created index.ts')
   }
 
-  /* Env var list. MEANDER_JWT_SECRET is minted once + preserved
-   * across deploys — we only write it when missing. Wrapping keys
-   * (MEANDER_DB_KEY_<n>, MEANDER_BLOB_KEY) are *not* set here:
-   * those are managed by the `meander db key` and `meander blob
-   * key` ceremonies, which control share distribution and the
-   * generation pointer. deploy-val only handles the val's
-   * non-key configuration. */
+  /* Env var list. MEANDER_JWT_SECRET + MEANDER_ADMIN_TOKEN are
+   * minted once + preserved across deploys — we only write them
+   * when missing. Wrapping keys (MEANDER_DB_KEY_<n>,
+   * MEANDER_BLOB_KEY) are *not* set here: those are managed by
+   * the `meander db key` and `meander blob key` ceremonies, which
+   * control share distribution and the generation pointer.
+   * deploy-val only handles the val's non-key configuration. */
   const envVars: Array<{ key: string; value: string; preserveIfSet?: true }> = [
     { key: 'MEANDER_OUT_DIR', value: outDir },
     { key: 'MEANDER_ALLOWED_EMAIL_DOMAINS', value: allowedEmailDomains },
     { key: 'MEANDER_DEMO_MODE', value: demoMode ? 'true' : 'false' },
     {
       key: 'MEANDER_JWT_SECRET',
-      value: generateSecret(),
+      value: generateSecret(48),
+      preserveIfSet: true,
+    },
+    {
+      key: 'MEANDER_ADMIN_TOKEN',
+      value: generateSecret(32),
       preserveIfSet: true,
     },
   ]
@@ -160,51 +156,14 @@ export async function deployVal(
   console.log('Setting environment variables...')
   for (const { key, value, preserveIfSet } of envVars) {
     if (preserveIfSet) {
-      const exists = await fetch(
-        `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-      if (exists.ok) {
+      const existing = await getEnvVar(token, valId, key)
+      if (existing) {
         console.log(`  Preserved ${key} (already set)`)
         continue
       }
     }
-
-    const updateRes = await fetch(
-      `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ value }),
-      },
-    )
-    if (updateRes.ok) {
-      console.log(`  Updated ${key}`)
-      continue
-    }
-
-    const createRes = await fetch(
-      `${API_BASE}/v2/vals/${valId}/environment_variables`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ key, value }),
-      },
-    )
-    if (createRes.ok) {
-      console.log(`  Created ${key}`)
-      continue
-    }
-
-    throw new Error(
-      `Failed to set env var ${key}: ${createRes.status} ${await createRes.text()}`,
-    )
+    await setEnvVar(token, valId, key, value)
+    console.log(`  Set ${key}`)
   }
 
   const val = await client.vals.retrieve(valId)

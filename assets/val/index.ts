@@ -95,6 +95,7 @@ const app = new Hono()
 
 const OUT_DIR = (Deno.env.get('MEANDER_OUT_DIR') || 'pages').replace(/\/$/, '')
 const JWT_SECRET = Deno.env.get('MEANDER_JWT_SECRET') || ''
+const ADMIN_TOKEN = Deno.env.get('MEANDER_ADMIN_TOKEN') || ''
 const ALLOWED_EMAIL_DOMAINS = parseAllowedDomains(
   Deno.env.get('MEANDER_ALLOWED_EMAIL_DOMAINS'),
 )
@@ -602,6 +603,157 @@ app.get('/:slug/api/comments/export', async c => {
     `attachment; filename="${slug}-comments.json"`,
   )
   return c.json(exportedComments)
+})
+
+/* ------------------------------------------------------------------ */
+/*  Admin endpoints — wrapping-key ceremony support                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Authorize an admin request via MEANDER_ADMIN_TOKEN. The token is
+ * checked in constant time (a naive `=== ` comparison leaks length).
+ * The admin token is planted by `deploy-val` (preserved across
+ * deploys) and read by the `meander db key` / `meander blob key`
+ * ceremonies on the operator's machine.
+ *
+ * Returns undefined when authorized, an error response when not.
+ */
+function adminAuth(c: Context): Response | undefined {
+  if (!ADMIN_TOKEN) {
+    return c.json(
+      { error: 'admin disabled — MEANDER_ADMIN_TOKEN not set on val' },
+      503,
+    )
+  }
+  const auth = c.req.header('authorization') || ''
+  const m = auth.match(/^Bearer\s+(.+)$/i)
+  if (!m) {
+    return c.json({ error: 'admin auth required' }, 401)
+  }
+  const presented = m[1]!
+  if (!constantTimeEqual(presented, ADMIN_TOKEN)) {
+    return c.json({ error: 'admin auth failed' }, 401)
+  }
+  return undefined
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  /* Compare full strings of the longer length so the loop count
+   * doesn't depend on whichever input the caller provided. A
+   * mismatch in length still rejects, but the loop runs the same
+   * number of iterations either way. */
+  const len = Math.max(a.length, b.length)
+  let diff = a.length ^ b.length
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
+  }
+  return diff === 0
+}
+
+/**
+ * GET /admin/key-audit
+ *
+ * Returns the current key context plus per-generation row counts.
+ * Used by `meander db key audit` and as a pre-flight by `retire`
+ * (refuses to delete a generation that still has rows).
+ */
+app.get('/admin/key-audit', async c => {
+  const denied = adminAuth(c)
+  if (denied) {
+    return denied
+  }
+  await ensureDb()
+  if (!dbKeyContext) {
+    return c.json({ error: serverMissingDbKeyMessage() }, 500)
+  }
+  const result = await sqlite.execute(`
+    SELECT key_generation, COUNT(*) AS n FROM comments GROUP BY key_generation ORDER BY key_generation ASC
+  `)
+  const counts: Record<string, number> = Object.create(null)
+  for (const row of result.rows as Array<{ key_generation: number; n: number }>) {
+    counts[String(row.key_generation)] = Number(row.n)
+  }
+  return c.json({
+    visibleGenerations: dbKeyContext.visibleGenerations(),
+    currentGeneration: dbKeyContext.currentGeneration,
+    rowCounts: counts,
+  })
+})
+
+/**
+ * POST /admin/rewrap
+ *
+ * Body: { fromGeneration: number, toGeneration: number, batchSize?: number }
+ *
+ * Walks comment rows tagged `key_generation = fromGeneration`,
+ * unwraps each row's DEK with the old wrapping key, re-wraps with
+ * the new wrapping key, and writes back with the new generation
+ * tag. Comment ciphertext (body, author) is NEVER touched —
+ * envelope encryption's whole point is that rotation only moves
+ * small DEKs around.
+ *
+ * Idempotent + cursor-driven: each call processes up to `batchSize`
+ * rows. Returns `{ rewrapped: N, remaining: M }`. The CLI loops
+ * until remaining = 0.
+ */
+app.post('/admin/rewrap', async c => {
+  const denied = adminAuth(c)
+  if (denied) {
+    return denied
+  }
+  await ensureDb()
+  if (!dbKeyContext) {
+    return c.json({ error: serverMissingDbKeyMessage() }, 500)
+  }
+  const body = await c.req.json().catch(() => ({}))
+  const fromGen = Number(body.fromGeneration)
+  const toGen = Number(body.toGeneration)
+  const batchSize = Number(body.batchSize ?? 100)
+  if (
+    !Number.isInteger(fromGen) ||
+    !Number.isInteger(toGen) ||
+    fromGen <= 0 ||
+    toGen <= 0 ||
+    fromGen === toGen
+  ) {
+    return c.json(
+      { error: 'fromGeneration and toGeneration must be distinct positive integers' },
+      400,
+    )
+  }
+  if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > 1000) {
+    return c.json({ error: 'batchSize must be in [1, 1000]' }, 400)
+  }
+
+  const fromKey = await dbKeyContext.getKey(fromGen)
+  const toKey = await dbKeyContext.getKey(toGen)
+
+  const result = await sqlite.execute({
+    sql: 'SELECT id, dek_wrapped FROM comments WHERE key_generation = :gen LIMIT :n',
+    args: { gen: fromGen, n: batchSize },
+  })
+  const rows = result.rows as Array<{ id: string; dek_wrapped: string }>
+
+  let rewrapped = 0
+  for (const row of rows) {
+    const dekBytes = await unwrapKey(row.dek_wrapped, fromKey)
+    const newWrapped = await wrapKey(dekBytes, toKey)
+    await sqlite.execute({
+      sql: 'UPDATE comments SET dek_wrapped = :wrapped, key_generation = :gen WHERE id = :id',
+      args: { wrapped: newWrapped, gen: toGen, id: row.id },
+    })
+    rewrapped++
+  }
+
+  const remainingResult = await sqlite.execute({
+    sql: 'SELECT COUNT(*) AS n FROM comments WHERE key_generation = :gen',
+    args: { gen: fromGen },
+  })
+  const remaining = Number(
+    (remainingResult.rows as Array<{ n: number }>)[0]?.n ?? 0,
+  )
+
+  return c.json({ rewrapped, remaining })
 })
 
 /* ------------------------------------------------------------------ */
