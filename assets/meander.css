@@ -893,13 +893,6 @@ html:not([data-ua='safari']) .comment-card {
 .unresolved-list {
   overflow-y: auto;
   max-height: calc(70vh - 50px);
-  /* Pre-reserve the height a 3-row skeleton occupies so the
-   * dropdown doesn't pop-resize between fetch states (skeleton →
-   * loaded comments → "Failed to load" → empty). Each
-   * .unresolved-skel-row + .unresolved-item is ~76px; reserving
-   * 3 rows of headroom keeps the panel dimensions stable across
-   * every state. */
-  min-height: 228px;
 }
 
 .unresolved-group-header {
