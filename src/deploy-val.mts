@@ -93,17 +93,6 @@ export async function deployVal(
     throw new Error(msg)
   }
 
-  const encryptionKey = process.env['MEANDER_ENCRYPTION_KEY'] ?? ''
-  if (!encryptionKey) {
-    const msg =
-      'MEANDER_ENCRYPTION_KEY environment variable is required for deploy-val. This password derives the AES-256-GCM key that encrypts walkthrough content at rest.'
-    if (graceful) {
-      console.log(`[deploy-val] skipped — ${msg}`)
-      return
-    }
-    throw new Error(msg)
-  }
-
   const client = new ValTown({ bearerToken: token })
   const valSource = await bundleValSource(getValSourcePath())
 
@@ -151,10 +140,13 @@ export async function deployVal(
   }
 
   /* Env var list. MEANDER_JWT_SECRET is minted once + preserved
-   * across deploys — we only write it when missing. The other
-   * vars are always pushed from the local env + CLI options. */
+   * across deploys — we only write it when missing. Wrapping keys
+   * (MEANDER_DB_KEY_<n>, MEANDER_BLOB_KEY) are *not* set here:
+   * those are managed by the `meander db key` and `meander blob
+   * key` ceremonies, which control share distribution and the
+   * generation pointer. deploy-val only handles the val's
+   * non-key configuration. */
   const envVars: Array<{ key: string; value: string; preserveIfSet?: true }> = [
-    { key: 'MEANDER_ENCRYPTION_KEY', value: encryptionKey },
     { key: 'MEANDER_OUT_DIR', value: outDir },
     { key: 'MEANDER_ALLOWED_EMAIL_DOMAINS', value: allowedEmailDomains },
     { key: 'MEANDER_DEMO_MODE', value: demoMode ? 'true' : 'false' },

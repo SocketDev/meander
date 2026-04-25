@@ -170,7 +170,7 @@ describe('packEnvelope / unpackEnvelope', () => {
     const wrappedDek = wrapKey(dataKey, wrappingKey)
     const blob = packEnvelope(ciphertext, wrappedDek)
     const parsed = unpackEnvelope(blob)
-    expect(parsed).not.toBeNull()
+    expect(parsed).toBeDefined()
     expect(parsed!.ciphertext).toBe(ciphertext)
     expect(parsed!.wrappedDek).toBe(wrappedDek)
     /* End-to-end: reader unwraps the DEK and decrypts the body. */
@@ -178,10 +178,10 @@ describe('packEnvelope / unpackEnvelope', () => {
     expect(decrypt(parsed!.ciphertext, recovered)).toBe('walkthrough HTML')
   })
 
-  it('returns null for plaintext blobs (no envelope prefix)', () => {
-    expect(unpackEnvelope('<html>hello</html>')).toBeNull()
-    expect(unpackEnvelope('')).toBeNull()
-    expect(unpackEnvelope('ENVE')).toBeNull()
+  it('returns undefined for plaintext blobs (no envelope prefix)', () => {
+    expect(unpackEnvelope('<html>hello</html>')).toBeUndefined()
+    expect(unpackEnvelope('')).toBeUndefined()
+    expect(unpackEnvelope('ENVE')).toBeUndefined()
   })
 
   it('throws on malformed envelope header', () => {

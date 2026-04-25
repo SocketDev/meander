@@ -141,15 +141,15 @@ export function packEnvelope(
 }
 
 /**
- * Recognize and parse an envelope-wrapped blob. Returns null if the
- * input lacks the prefix (caller treats as plaintext). Throws if the
- * prefix is present but malformed.
+ * Recognize and parse an envelope-wrapped blob. Returns undefined
+ * if the input lacks the prefix (caller treats as plaintext).
+ * Throws if the prefix is present but malformed.
  */
 export function unpackEnvelope(
   blob: string,
-): { wrappedDek: string; ciphertext: string } | null {
+): { wrappedDek: string; ciphertext: string } | undefined {
   if (!blob.startsWith('ENVELOPE:')) {
-    return null
+    return undefined
   }
   const parts = blob.split(':')
   if (parts.length !== 4 || parts[1] !== '1') {

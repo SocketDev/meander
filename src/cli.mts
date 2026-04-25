@@ -189,15 +189,15 @@ Flags (deploy-val only):
 
 Environment variables:
   VALTOWN_TOKEN              Val Town API bearer token (default env name).
-                             See docs/publishing.md for scopes.
+                             See docs/deploying.md for scopes.
   MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
                              token from. Set to e.g. "MY_VT_TOKEN" if your
                              GitHub secret has a different name.
-  MEANDER_ENCRYPTION_KEY     Password that derives the AES-256-GCM key for
-                             at-rest encryption of walkthrough HTML + comment
-                             bodies. Required by publish + deploy-val.
-                             Rotating means re-publishing every encrypted
-                             HTML file.`)
+  MEANDER_BLOB_KEY           Hex-encoded 32-byte wrapping key for envelope
+                             blob encryption. Required by publish only when
+                             encryptBlobs: true in meander.config.json.
+                             Generate with \`meander blob key init\`. See
+                             docs/encryption.md for the envelope scheme.`)
       if (command) {
         console.error(`\nUnknown command: ${command}`)
       }

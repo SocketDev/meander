@@ -14,17 +14,24 @@ name: 🌐 Deploy (Val Town)
 #        Name:  VALTOWN_TOKEN
 #        Value: the token from step 1.
 #
-#   3. Also add MEANDER_ENCRYPTION_KEY — the password that derives
-#      the AES-256-GCM key for at-rest encryption of walkthrough
-#      content. Rotating means re-publishing every encrypted
-#      HTML file (the old ciphertext becomes undecryptable).
+#   3. Initialize the comment-store wrapping key:
+#        meander db key init
+#      This generates the wrapping key, Shamir-splits it across
+#      custodians, and plants MEANDER_DB_KEY_1 +
+#      MEANDER_DB_KEY_CURRENT directly on the val. deploy-val
+#      does not touch wrapping keys.
 #
-#   4. Optional: set MEANDER_ALLOWED_EMAIL_DOMAINS as a repo
+#   4. Optional: if encryptBlobs: true in meander.config.json,
+#      run `meander blob key init` to plant MEANDER_BLOB_KEY on
+#      the val. Otherwise blobs are served plaintext.
+#
+#   5. Optional: set MEANDER_ALLOWED_EMAIL_DOMAINS as a repo
 #      variable (not a secret — it's a non-sensitive comma-
 #      separated list). Without it, the val refuses every write.
 #
-#   5. Rotate by repeating 1-2 and deleting the old token in
-#      Val Town.
+#   6. Rotate the API token by repeating 1-2 and deleting the
+#      old token in Val Town. Wrapping keys rotate independently
+#      via `meander db key rotate` / `meander blob key rotate`.
 #
 # The workflow never logs the token. Job-level env scope means
 # only the deploy job sees it; fork PRs are excluded (secrets
@@ -64,27 +71,20 @@ jobs:
       # Job-level scope — only this job sees the secrets. Anything
       # we add later runs without them unless explicitly granted.
       VALTOWN_TOKEN: ${{ secrets.VALTOWN_TOKEN }}
-      MEANDER_ENCRYPTION_KEY: ${{ secrets.MEANDER_ENCRYPTION_KEY }}
       # Non-secret — allowed-domains is not sensitive. Stored as a
       # repo *variable*, not a secret, so it shows up in CI logs
       # (you WANT to see which domains the deploy enabled).
       MEANDER_ALLOWED_EMAIL_DOMAINS: ${{ vars.MEANDER_ALLOWED_EMAIL_DOMAINS }}
     steps:
-      - name: Preflight — verify secrets are configured
-        # Fail fast with a clear message if any secret is missing.
+      - name: Preflight — verify VALTOWN_TOKEN is configured
+        # Fail fast with a clear message if the token is missing.
         # Runs BEFORE any setup so a misconfigured repo doesn't
-        # waste install time. Never echoes secret values.
+        # waste install time. Wrapping keys aren't checked here —
+        # they're managed via `meander db key init` / `meander
+        # blob key init`, run once by an operator, not per-deploy.
         run: |
-          MISSING=0
           if [ -z "$VALTOWN_TOKEN" ]; then
             echo "::error::VALTOWN_TOKEN secret is not configured."
-            MISSING=1
-          fi
-          if [ -z "$MEANDER_ENCRYPTION_KEY" ]; then
-            echo "::error::MEANDER_ENCRYPTION_KEY secret is required for deploy-val."
-            MISSING=1
-          fi
-          if [ "$MISSING" = "1" ]; then
             echo "::error::See .github/workflows/valtown.yml header for setup steps."
             exit 1
           fi

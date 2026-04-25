@@ -49,10 +49,10 @@ async function uploadBlob(
  * caller supplies the wrong length, AES-256-GCM rejects later with
  * a clear error, which is fine for ops debugging.
  */
-function loadBlobWrappingKey(): Buffer | null {
+function loadBlobWrappingKey(): Buffer | undefined {
   const hex = process.env['MEANDER_BLOB_KEY']
   if (!hex) {
-    return null
+    return undefined
   }
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error(
@@ -103,7 +103,7 @@ export async function publish(
   }
 
   const encryptBlobsEnabled = config.encryptBlobs === true
-  let wrappingKey: Buffer | null = null
+  let wrappingKey: Buffer | undefined
   if (encryptBlobsEnabled) {
     wrappingKey = loadBlobWrappingKey()
     if (!wrappingKey) {
