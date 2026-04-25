@@ -64,7 +64,6 @@
   function createButton() {
     const btn = document.createElement('button')
     btn.className = 'unresolved-btn'
-    btn.title = 'View unresolved comments'
     btn.type = 'button'
     btn.setAttribute('aria-label', 'View unresolved comments')
     btn.setAttribute('aria-haspopup', 'menu')

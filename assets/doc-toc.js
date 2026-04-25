@@ -56,7 +56,6 @@
   function createTocButton() {
     const button = document.createElement('button')
     button.className = 'doc-toc-btn'
-    button.title = 'Table of Contents'
     button.type = 'button'
     button.setAttribute('aria-label', 'Table of Contents')
     button.setAttribute('aria-haspopup', 'menu')

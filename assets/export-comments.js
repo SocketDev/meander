@@ -50,7 +50,6 @@
   function createButton() {
     const btn = document.createElement('button')
     btn.className = 'export-btn'
-    btn.title = 'Export comments'
     btn.type = 'button'
     btn.setAttribute('aria-label', 'Export comments')
     btn.setAttribute('aria-haspopup', 'menu')
