@@ -6,7 +6,7 @@
 }
 
 :root,
-html[data-theme="light"] {
+html[data-theme='light'] {
   --bg: #ffffff;
   --bg-elev: #f5f6f8;
   --bg-card: #ffffff;
@@ -21,6 +21,28 @@ html[data-theme="light"] {
   /* Column split ratio (percent) the splitter handle writes back
    * via inline style on :root. 50 = balanced. */
   --col-split: 50;
+  /* Spacing scale — every padding/gap/margin in this stylesheet
+   * should snap to one of these. Modular 4px scale with 12/14/24
+   * intermediate stops for the in-between visual rhythm the
+   * original ad-hoc spacing landed on. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  /* Sticky topbar height — used by scroll-padding-top so anchor
+   * jumps land below the chrome instead of behind it. Matches
+   * the topbar's actual rendered height (12 + 12 padding +
+   * ~32 content); kept conservative so cross-part navigation
+   * doesn't undershoot. */
+  --topbar-offset: 88px;
+  /* Native UA palette signal — picks the right scrollbar /
+   * form-control styling automatically, and short-circuits the
+   * brief light flash some browsers paint before our CSS loads. */
+  color-scheme: light;
 }
 
 /* Follow OS preference when no explicit data-theme pick. Script
@@ -38,12 +60,13 @@ html[data-theme="light"] {
     --border: #262626;
     --border-strong: #404040;
     --code-bg: #0d1117;
+    color-scheme: dark;
   }
 }
 
 /* Explicit dark pick — matches the @media fallback so the user's
  * choice and the system preference land in the same palette. */
-html[data-theme="dark"] {
+html[data-theme='dark'] {
   --bg: #0a0a0a;
   --bg-elev: #121212;
   --bg-card: #141414;
@@ -54,13 +77,14 @@ html[data-theme="dark"] {
   --border: #262626;
   --border-strong: #404040;
   --code-bg: #0d1117;
+  color-scheme: dark;
 }
 
 /* Neo-Kijū — retro mech-beast palette. Deep purple background
  * with electric-violet accent. Not a light/dark variant; own
  * coherent palette. Named internally as neo-kiju (ASCII, macron-
  * free) so CSS selectors and localStorage keys stay plain. */
-html[data-theme="neo-kiju"] {
+html[data-theme='neo-kiju'] {
   --bg: #1a0830;
   --bg-elev: #2a1044;
   --bg-card: #2a1044;
@@ -71,10 +95,18 @@ html[data-theme="neo-kiju"] {
   --border: #3d2a5a;
   --border-strong: #5a3d7a;
   --code-bg: #22143a;
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  /* Anchor jumps land below the sticky topbar instead of being
+   * occluded by it. Browsers respect this for both fragment
+   * navigation and CSS-driven `scroll-margin`. */
+  scroll-padding-top: var(--topbar-offset);
 }
 
 html,
@@ -83,7 +115,41 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+/* Themed scrollbars — Firefox + Chromium honor the standard
+ * `scrollbar-color` / `scrollbar-width` properties; Safari does
+ * not yet, so the ::-webkit-scrollbar block below covers it.
+ * Both render a thin track-aware thumb that tracks the active
+ * theme via color-mix. */
+@supports (scrollbar-color: auto) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent)
+      transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text) 38%, transparent);
+  background-clip: padding-box;
 }
 
 a {
@@ -95,15 +161,50 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Unified keyboard-focus ring — visible only for keyboard users
+ * (mouse clicks suppress it via :focus-visible UA heuristics).
+ * Component-specific overrides win on selector specificity, so
+ * existing custom rings (col-splitter, demo-dismiss, etc.) keep
+ * their bespoke treatment. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .topbar {
   position: sticky;
   top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 92%, var(--bg-elev));
-  backdrop-filter: blur(4px);
+  /* Subtle vertical fade keyed off the elevated tint so the
+   * topbar separates from the page without a hard edge. */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg-elev) 92%, transparent),
+    color-mix(in srgb, var(--bg-elev) 76%, transparent)
+  );
+  /* Glassy blur — saturate boost rescues colour through the blur
+   * (Safari otherwise washes accents to grey behind the chrome). */
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  /* Soft ambient shadow tinted from the accent rather than black,
+   * so it reads as theme-aware in dark mode without a hard halo. */
+  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--accent) 18%, transparent);
   padding: 12px 16px;
-  padding-right: 96px; /* Space for action buttons */
+  /* Names the topbar so cross-part view transitions hold it stable
+   * while the body cross-fades. Browsers without view-transition
+   * support ignore the property. */
+  view-transition-name: mdr-topbar;
+}
+
+/* Reserve space for the absolutely-positioned .topbar-actions
+ * stack only on the rows where it actually overlaps — the title
+ * + objective sit at the same vertical band as the actions, so
+ * they need the right inset. The .part-nav row sits below the
+ * actions and gets the full topbar width. */
+.topbar h1,
+.topbar p {
+  padding-right: 96px;
 }
 
 .topbar-actions {
@@ -198,6 +299,14 @@ a:hover {
   background: var(--bg-elev);
 }
 
+/* When the section-chip dropdown is open the file-block must
+ * stop clipping so the menu can extend over the right edge.
+ * Browsers without :has() fall back to the default overflow:
+ * hidden and the panel is visually trimmed — same as before. */
+.file-block:has(.mdr-sections-menu[open]) {
+  overflow: visible;
+}
+
 .file-head {
   display: flex;
   align-items: center;
@@ -210,7 +319,7 @@ a:hover {
 
 .file-head .path {
   color: var(--text);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 13px;
 }
 
@@ -221,15 +330,14 @@ a:hover {
 
 .file-grid {
   padding: 12px;
-  background:
-    linear-gradient(
-      to right,
-      transparent 0,
-      transparent calc(var(--col-split) * 1%),
-      transparent calc(var(--col-split) * 1% + 12px),
-      var(--code-bg) calc(var(--col-split) * 1% + 12px),
-      var(--code-bg) 100%
-    );
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--col-split) * 1%),
+    transparent calc(var(--col-split) * 1% + 12px),
+    var(--code-bg) calc(var(--col-split) * 1% + 12px),
+    var(--code-bg) 100%
+  );
   align-items: stretch;
 }
 
@@ -376,7 +484,7 @@ a:hover {
 }
 
 .annotation-md code {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -411,7 +519,7 @@ pre {
   margin: 0;
   padding: 12px;
   overflow: auto;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 13px;
   line-height: 1.45;
   background: var(--code-bg);
@@ -448,6 +556,14 @@ pre code {
   border-radius: 8px;
   background: var(--bg-elev);
   font-size: 13px;
+}
+
+/* Long threads (dozens of cards below the fold on a populated
+ * walkthrough) skip layout cost until they enter the viewport.
+ * Safari excluded for the same reason as .unresolved-item. */
+html:not([data-ua='safari']) .comment-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
 }
 
 .comment-card + .comment-card {
@@ -549,7 +665,7 @@ pre code {
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 6px;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
 .comment-form-textarea {
@@ -566,8 +682,11 @@ pre code {
 }
 
 .comment-form-textarea:focus {
-  outline: none;
   border-color: var(--accent);
+}
+
+.comment-form-textarea:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .comment-form-actions {
@@ -635,7 +754,7 @@ pre code {
 }
 
 .def-tooltip-location {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   color: var(--muted);
   margin-top: 2px;
 }
@@ -661,6 +780,10 @@ pre code {
   cursor: pointer;
   color: var(--muted);
   gap: 4px;
+  /* Pre-reserved width so the async badge can't push neighbouring
+   * topbar items when the count fetch resolves. Sized for the icon
+   * + a 2-digit badge; longer counts wrap inside the button. */
+  min-width: 52px;
 }
 
 .unresolved-btn:hover {
@@ -733,6 +856,17 @@ pre code {
   color: inherit;
 }
 
+/* Skip layout/paint cost for offscreen list items. Safari's
+ * content-visibility implementation has find-in-page + :target
+ * glitches as of 18.x, so the rule is gated on the boot.js UA
+ * flag — non-Safari browsers get the perf win, Safari renders
+ * the list normally. The intrinsic size mirrors the rendered
+ * height so the scroll thumb doesn't jump as items realise. */
+html:not([data-ua='safari']) .unresolved-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
+}
+
 .unresolved-item:last-child {
   border-bottom: none;
 }
@@ -742,7 +876,7 @@ pre code {
 }
 
 .unresolved-item-file {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   color: var(--accent);
   margin-bottom: 4px;
@@ -782,6 +916,71 @@ pre code {
 
 .unresolved-error {
   color: #dc2626;
+}
+
+/* Skeleton placeholder rows sized to mirror real .unresolved-item
+ * geometry so the dropdown doesn't pop-resize when the fetch lands.
+ * The shimmer animation is a slow background-position sweep — a
+ * single transform-cheap repaint that respects reduced motion via
+ * the global @media block at the bottom of this file. */
+.unresolved-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.unresolved-skel-row {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.unresolved-skel-line {
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text) 6%, transparent) 0%,
+    color-mix(in srgb, var(--text) 14%, transparent) 50%,
+    color-mix(in srgb, var(--text) 6%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: mdr-skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.unresolved-skel-line.skel-1 {
+  width: 70%;
+}
+
+.unresolved-skel-line.skel-2 {
+  width: 45%;
+  height: 8px;
+  opacity: 0.7;
+}
+
+@keyframes mdr-skel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Standard accessibility helper — visually hides text from sighted
+ * users while keeping it in the accessibility tree (the skeleton's
+ * aria-live status announcement, etc.). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1011,7 +1210,7 @@ pre code {
 
 /* Inline code */
 .doc-content code {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 13px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1026,7 +1225,7 @@ pre code {
   border-radius: 8px;
   overflow: auto;
   background: var(--code-bg);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -1057,8 +1256,16 @@ pre code {
   /* Fade the right edge to hint that the bar is horizontally scrollable.
      The mask is applied only on the inline-end side so the left edge stays
      sharp; the gradient fades from fully opaque to transparent over 48px. */
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
-          mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    black calc(100% - 48px),
+    transparent 100%
+  );
   /* Hide the scrollbar track to keep the UI clean while retaining scroll. */
   scrollbar-width: none;
 }
@@ -1070,7 +1277,7 @@ pre code {
 .doc-tab-btn {
   padding: 10px 16px;
   font-size: 13px;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -1088,7 +1295,6 @@ pre code {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
-
 
 /* ------------------------------------------------------------------ */
 /*  Document Block Gutter and Selection                                */
@@ -1122,7 +1328,7 @@ pre code {
 }
 
 .doc-block.block-selected {
-  background: rgba(37, 99, 235, 0.10);
+  background: rgba(37, 99, 235, 0.1);
   border-radius: 4px;
 }
 
@@ -1184,6 +1390,17 @@ pre code {
 
 .doc-content details > *:not(summary) {
   padding: 0 14px;
+}
+
+/* Lists need their bullet/number gutter on top of the container
+ * inset, otherwise the marker hangs against the rounded edge.
+ * Override the padding-left set by the rule above; the inline
+ * padding from the container shorthand still applies on the
+ * right via padding-right inheritance. */
+.doc-content details > ul,
+.doc-content details > ol {
+  padding-left: 38px;
+  padding-right: 14px;
 }
 
 .doc-content details > *:not(summary):first-of-type {
@@ -1294,11 +1511,21 @@ pre code {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
-.doc-toc-h2 { padding-left: 28px; }
-.doc-toc-h3 { padding-left: 42px; }
-.doc-toc-h4 { padding-left: 56px; }
-.doc-toc-h5 { padding-left: 70px; }
-.doc-toc-h6 { padding-left: 84px; }
+.doc-toc-h2 {
+  padding-left: 28px;
+}
+.doc-toc-h3 {
+  padding-left: 42px;
+}
+.doc-toc-h4 {
+  padding-left: 56px;
+}
+.doc-toc-h5 {
+  padding-left: 70px;
+}
+.doc-toc-h6 {
+  padding-left: 84px;
+}
 
 /* ── Column splitter ─────────────────────────────────────────── */
 
@@ -1340,7 +1567,7 @@ pre code {
 /* Visible rail — 1px centered in the 6px hit zone. Faint until
  * hover / focus, hidden while dragging (the hotspot takes over). */
 .col-splitter::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 8px;
   bottom: 8px;
@@ -1442,7 +1669,7 @@ body.col-resizing * {
 
 /* Suppress the native disclosure marker in every browser. */
 .mdr-files-menu > summary::marker {
-  content: "";
+  content: '';
   display: none;
 }
 
@@ -1478,7 +1705,7 @@ body.col-resizing * {
 .mdr-files-panel a {
   display: block;
   padding: 6px 10px;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   color: var(--text);
   background: transparent;
@@ -1497,7 +1724,7 @@ body.col-resizing * {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
-html[data-theme="dark"] .mdr-files-panel a:nth-child(even) {
+html[data-theme='dark'] .mdr-files-panel a:nth-child(even) {
   background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
@@ -1547,7 +1774,7 @@ html[data-theme="dark"] .mdr-files-panel a:nth-child(even) {
 }
 
 .mdr-sections-menu > summary::marker {
-  content: "";
+  content: '';
   display: none;
 }
 
@@ -1586,7 +1813,7 @@ html[data-theme="dark"] .mdr-files-panel a:nth-child(even) {
   justify-content: space-between;
   gap: 12px;
   padding: 6px 10px;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   color: var(--text);
   background: transparent;
@@ -1611,7 +1838,7 @@ html[data-theme="dark"] .mdr-files-panel a:nth-child(even) {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
-html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
+html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
   background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
@@ -1644,7 +1871,7 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
 }
 
 .mdr-section-chip > summary {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 11px;
   color: #8b949e;
   text-decoration-color: color-mix(in srgb, #8b949e 50%, transparent);
@@ -1691,7 +1918,7 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
   color: var(--text);
 }
 
-.theme-toggle[aria-expanded="true"] {
+.theme-toggle[aria-expanded='true'] {
   background: var(--bg-tint);
   border-color: var(--border-strong);
   color: var(--text);
@@ -1712,10 +1939,10 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
   transition: opacity 180ms ease;
 }
 
-.theme-toggle-wrapper[data-pref="system"] .theme-icon-system,
-.theme-toggle-wrapper[data-pref="light"] .theme-icon-light,
-.theme-toggle-wrapper[data-pref="dark"] .theme-icon-dark,
-.theme-toggle-wrapper[data-pref="neo-kiju"] .theme-icon-neo-kiju {
+.theme-toggle-wrapper[data-pref='system'] .theme-icon-system,
+.theme-toggle-wrapper[data-pref='light'] .theme-icon-light,
+.theme-toggle-wrapper[data-pref='dark'] .theme-icon-dark,
+.theme-toggle-wrapper[data-pref='neo-kiju'] .theme-icon-neo-kiju {
   opacity: 1;
 }
 
@@ -1763,12 +1990,12 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
   color: var(--text);
 }
 
-.theme-menu-item[aria-checked="true"] {
+.theme-menu-item[aria-checked='true'] {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--text);
 }
 
-.theme-menu-item[aria-checked="true"] .theme-menu-check {
+.theme-menu-item[aria-checked='true'] .theme-menu-check {
   opacity: 1;
 }
 
@@ -1795,7 +2022,7 @@ html[data-theme="dark"] .mdr-sections-panel a:nth-child(even) {
   height: 100%;
 }
 
-.theme-menu-item[aria-checked="true"] .theme-menu-icon,
+.theme-menu-item[aria-checked='true'] .theme-menu-icon,
 .theme-menu-item:hover .theme-menu-icon {
   color: var(--text);
 }
@@ -1874,7 +2101,7 @@ body.mdr-mod-pressed .mdr-src-link:hover {
 pre.mdr-repo-tree {
   /* Re-assert mono so we don't inherit a proportional font from
    * any surrounding prose container. */
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
 pre.mdr-repo-tree code {
@@ -1918,8 +2145,8 @@ pre.mdr-repo-tree code {
  * annotation-md fade — those are one-shot entrance effects,
  * so stripping them leaves the final rest state intact. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme="neo-kiju"].mdr-theme-toggle-fired .theme-icon-neo-kiju,
-  html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+  html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju,
+  html[data-theme='neo-kiju'].mdr-theme-toggle-fired
     .theme-toggle
     .theme-icon-neo-kiju
     .mdr-spark {
@@ -1927,6 +2154,9 @@ pre.mdr-repo-tree code {
   }
   .annotation-md {
     transition: none;
+  }
+  .unresolved-skel-line {
+    animation: none;
   }
 }
 
@@ -1940,7 +2170,7 @@ pre.mdr-repo-tree code {
   border-radius: 4px;
   color: var(--muted);
   background: var(--bg-tint);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1956,7 +2186,7 @@ pre.mdr-repo-tree code {
   border-radius: 4px;
   background: var(--bg-tint);
   color: var(--text);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
 }
 
@@ -2067,7 +2297,7 @@ pre.mdr-repo-tree code {
 }
 
 .mdr-hero-desc code {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 14px;
   padding: 1px 6px;
   background: var(--bg-tint);
@@ -2124,7 +2354,7 @@ pre.mdr-repo-tree code {
 }
 
 .mdr-toc-card-num {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
@@ -2148,7 +2378,7 @@ pre.mdr-repo-tree code {
   padding-top: 6px;
   font-size: 11px;
   color: var(--muted);
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
 .mdr-toc-card-docs {
@@ -2205,7 +2435,7 @@ pre.mdr-repo-tree code {
   }
 }
 
-html[data-theme="neo-kiju"].mdr-theme-toggle-fired .theme-icon-neo-kiju {
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju {
   transform-origin: center;
   animation: mdr-bolt-strike 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
 }
@@ -2284,21 +2514,21 @@ html[data-theme="neo-kiju"].mdr-theme-toggle-fired .theme-icon-neo-kiju {
 /* Spark-1 is the top-right spark on the bolt SVG path. Each
  * spark has its own keyframe set so the 3-beat sequence reads
  * distinctly instead of all three flickering at the same offset. */
-html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
   .theme-toggle
   .theme-icon-neo-kiju
   .mdr-spark-1 {
   animation: mdr-spark-top 1.5s ease 0.55s 1 forwards;
 }
 
-html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
   .theme-toggle
   .theme-icon-neo-kiju
   .mdr-spark-2 {
   animation: mdr-spark-middle 1.5s ease 0.55s 1 forwards;
 }
 
-html[data-theme="neo-kiju"].mdr-theme-toggle-fired
+html[data-theme='neo-kiju'].mdr-theme-toggle-fired
   .theme-toggle
   .theme-icon-neo-kiju
   .mdr-spark-3 {
@@ -2357,8 +2587,8 @@ html[data-theme="neo-kiju"].mdr-theme-toggle-fired
   font-size: 13px;
 }
 
-[data-theme="dark"] .mdr-demo-banner,
-[data-theme="neo-kiju"] .mdr-demo-banner {
+[data-theme='dark'] .mdr-demo-banner,
+[data-theme='neo-kiju'] .mdr-demo-banner {
   background: var(--demo-banner-bg, rgba(255, 196, 0, 0.15));
   color: var(--demo-banner-fg, #ffd54f);
   border-bottom-color: var(--demo-banner-border, rgba(255, 196, 0, 0.35));

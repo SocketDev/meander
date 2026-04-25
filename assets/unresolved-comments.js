@@ -134,7 +134,13 @@
   function fetchAndRenderComments() {
     var list = dropdown.querySelector(".unresolved-list");
     var empty = dropdown.querySelector(".unresolved-empty");
-    list.innerHTML = '<div class="unresolved-loading">Loading...</div>';
+    list.innerHTML =
+      '<div class="unresolved-skeleton" aria-hidden="true">' +
+      '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
+      '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
+      '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
+      '</div>' +
+      '<span class="visually-hidden" role="status">Loading unresolved comments…</span>';
     empty.style.display = "none";
 
     fetch(apiBase, { signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined })

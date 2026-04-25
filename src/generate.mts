@@ -94,6 +94,22 @@ const HLJS_SCRIPT_JS =
   `<script src="${HLJS_CDN.tsGrammar}" ` +
   `integrity="${HLJS_CDN.tsGrammarSri}" crossorigin="anonymous"></script>`
 
+/* Preconnect + preload hints for the hljs CDN. Preconnect opens
+ * the TCP+TLS handshake before the parser hits the <script> tag;
+ * preload tells the UA "fetch this with high priority" so the
+ * core bundle and the TypeScript grammar download in parallel
+ * with the stylesheet rather than after it. SRI must match the
+ * eventual <script>/<link> use, so the hashes are repeated. */
+const HLJS_PRELOAD_HINTS = [
+  `<link rel="preconnect" href="https://unpkg.com" crossorigin="anonymous" />`,
+  `<link rel="preload" as="style" href="${HLJS_CDN.css}" ` +
+    `integrity="${HLJS_CDN.cssSri}" crossorigin="anonymous" />`,
+  `<link rel="preload" as="script" href="${HLJS_CDN.js}" ` +
+    `integrity="${HLJS_CDN.jsSri}" crossorigin="anonymous" />`,
+  `<link rel="preload" as="script" href="${HLJS_CDN.tsGrammar}" ` +
+    `integrity="${HLJS_CDN.tsGrammarSri}" crossorigin="anonymous" />`,
+].join('\n  ')
+
 function getAssetsDir(): string {
   const thisFile = fileURLToPath(import.meta.url)
   // In dist/generate.js → assets is at ../assets
@@ -877,6 +893,7 @@ ${sectionRows}
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
+  ${HLJS_PRELOAD_HINTS}
   ${headExtra}
   ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
   ${HLJS_LINK_CSS}
@@ -1048,6 +1065,7 @@ function renderDocumentsHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documents - ${escapeHtml(slug)}</title>
+  ${HLJS_PRELOAD_HINTS}
   ${headExtra}
   ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
   ${HLJS_LINK_CSS}
@@ -1441,7 +1459,7 @@ function renderFooter(
   const text = cfg.text ?? defaultText
   const href = cfg.href ?? defaultHref
   return `<footer class="mdr-footer">
-    <a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>
+    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>
   </footer>`
 }
 
