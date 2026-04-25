@@ -6,10 +6,13 @@ user-invocable: true
 
 # Security Scan
 
+<task>
 Multi-tool security scanning pipeline for the meander walkthrough
 generator. Orchestrates AgentShield + zizmor (already wired into
 `.github/workflows/ci.yml`) and a graded review.
+</task>
 
+<context>
 ## When to Use
 
 - After modifying `.claude/` config, settings, hooks, or agent definitions
@@ -20,7 +23,9 @@ generator. Orchestrates AgentShield + zizmor (already wired into
 ## Prerequisites
 
 See `_shared/security-tools.md` for tool detection paths.
+</context>
 
+<instructions>
 ## Process
 
 ### Phase 1: Environment Check
@@ -95,8 +100,7 @@ chaining.
 
 Update queue: `status: done`, write `findings_count` and final
 grade.
-
----
+</instructions>
 
 ## Reference
 

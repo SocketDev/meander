@@ -1,3 +1,4 @@
+<instructions>
 Run the `/quality-scan` skill and fix the issues it surfaces. Repeat until zero findings remain or 5 iterations complete.
 
 Interactive only — this command makes code changes and commits. Don't use it as an automated pipeline gate.
@@ -21,3 +22,4 @@ Interactive only — this command makes code changes and commits. Don't use it a
 - Track iteration count and report progress between iterations.
 - Don't bypass `min-release-age=7` (`.npmrc`) when bumping deps to satisfy a finding.
 - Don't `git stash`, `git add -A` / `.`, `git checkout <branch>`, or `git reset --hard` in the primary checkout — other Claude sessions may share it. Stage with surgical `git add <path>`.
+</instructions>
