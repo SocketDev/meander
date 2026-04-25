@@ -34,10 +34,6 @@ describe('dbKeyInit', () => {
 
     expect(deps.env.store.get('MEANDER_DB_KEY_1')).toBe(HEX_OF_BYTE(0xab))
     expect(deps.env.store.get('MEANDER_DB_KEY_CURRENT')).toBe('1')
-    /* 3 shares × 3 lines (header + base58 + blank) plus the
-     * 7-line frame around the share block. We assert on substring
-     * presence rather than exact line count to keep the test
-     * resilient to wording tweaks. */
     expect(deps.io.text()).toContain('Share 1 of 3:')
     expect(deps.io.text()).toContain('Share 2 of 3:')
     expect(deps.io.text()).toContain('Share 3 of 3:')

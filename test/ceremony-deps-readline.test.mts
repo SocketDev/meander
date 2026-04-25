@@ -7,22 +7,26 @@
  * the real one. Separating gives each side a clean mock state.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+/* The mock has to live at module scope (vi.mock is hoisted), and
+ * `answers` has to be reachable from inside the mock factory. Each
+ * test resets the queue in beforeEach so a failing test can't
+ * smuggle leftover state into the next one. */
 const answers: string[] = []
-let nextAnswer: string | undefined
 
 vi.mock('node:readline/promises', () => ({
   createInterface: () => ({
-    question: async () => {
-      const a = answers.shift() ?? nextAnswer ?? ''
-      return a
-    },
+    question: async () => answers.shift() ?? '',
     close: () => {},
   }),
 }))
 
 import { createIoChannel } from '../src/ceremony-deps.mts'
+
+beforeEach(() => {
+  answers.length = 0
+})
 
 describe('createIoChannel readline fallback', () => {
   it('reads through readline when no file queue is provided', async () => {
@@ -32,10 +36,9 @@ describe('createIoChannel readline fallback', () => {
   })
 
   it('throws "share entry canceled" on empty interactive answer', async () => {
-    nextAnswer = '   ' // whitespace only → empty after trim
+    answers.push('   ') // whitespace only → empty after trim
     const io = createIoChannel([])
     await expect(io.readShare('Share: ')).rejects.toThrow(/canceled/)
-    nextAnswer = undefined
   })
 
   it('reuses the readline interface across multiple readShare calls', async () => {

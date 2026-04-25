@@ -71,16 +71,13 @@ describe('bytesToHex / hexToBytes', () => {
 })
 
 describe('validateShamirParams', () => {
-  it('accepts the default 2-of-3', () => {
-    expect(() => validateShamirParams(2, 3)).not.toThrow()
-  })
-
-  it('accepts 3-of-5', () => {
-    expect(() => validateShamirParams(3, 5)).not.toThrow()
-  })
-
-  it('accepts 4-of-7', () => {
-    expect(() => validateShamirParams(4, 7)).not.toThrow()
+  it.each([
+    [2, 3],
+    [3, 5],
+    [4, 7],
+    [2, 255],
+  ])('accepts %d-of-%d', (threshold, shares) => {
+    expect(() => validateShamirParams(threshold, shares)).not.toThrow()
   })
 
   it('rejects threshold < 2', () => {

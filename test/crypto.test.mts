@@ -170,12 +170,14 @@ describe('packEnvelope / unpackEnvelope', () => {
     const wrappedDek = wrapKey(dataKey, wrappingKey)
     const blob = packEnvelope(ciphertext, wrappedDek)
     const parsed = unpackEnvelope(blob)
-    expect(parsed).toBeDefined()
-    expect(parsed!.ciphertext).toBe(ciphertext)
-    expect(parsed!.wrappedDek).toBe(wrappedDek)
+    if (!parsed) {
+      throw new Error('unpackEnvelope returned undefined for envelope blob')
+    }
+    expect(parsed.ciphertext).toBe(ciphertext)
+    expect(parsed.wrappedDek).toBe(wrappedDek)
     /* End-to-end: reader unwraps the DEK and decrypts the body. */
-    const recovered = unwrapKey(parsed!.wrappedDek, wrappingKey)
-    expect(decrypt(parsed!.ciphertext, recovered)).toBe('walkthrough HTML')
+    const recovered = unwrapKey(parsed.wrappedDek, wrappingKey)
+    expect(decrypt(parsed.ciphertext, recovered)).toBe('walkthrough HTML')
   })
 
   it('returns undefined for plaintext blobs (no envelope prefix)', () => {
