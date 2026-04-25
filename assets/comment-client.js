@@ -455,8 +455,10 @@
 
     if (!isReply) {
       const resolveBtn = document.createElement('button')
+      resolveBtn.type = 'button'
       resolveBtn.className = 'comment-resolve-btn'
       resolveBtn.textContent = comment.resolved ? 'Unresolve' : 'Resolve'
+      resolveBtn.setAttribute('aria-pressed', comment.resolved ? 'true' : 'false')
       ;(function (cid, currentlyResolved) {
         resolveBtn.addEventListener('click', function () {
           toggleResolved(cid, !currentlyResolved)
@@ -465,6 +467,7 @@
       actions.appendChild(resolveBtn)
 
       const replyBtn = document.createElement('button')
+      replyBtn.type = 'button'
       replyBtn.className = 'comment-reply-btn'
       replyBtn.textContent = 'Reply'
       ;(function (c) {
@@ -476,6 +479,7 @@
     }
 
     const delBtn = document.createElement('button')
+    delBtn.type = 'button'
     delBtn.className = 'comment-delete-btn'
     delBtn.textContent = 'Delete'
     ;(function (cid) {
@@ -520,6 +524,7 @@
     btnRow.className = 'comment-form-actions'
 
     const cancelBtn = document.createElement('button')
+    cancelBtn.type = 'button'
     cancelBtn.className = 'comment-form-cancel'
     cancelBtn.textContent = 'Cancel'
     cancelBtn.addEventListener('click', function () {
@@ -527,6 +532,7 @@
     })
 
     const submitBtn = document.createElement('button')
+    submitBtn.type = 'button'
     submitBtn.className = 'comment-form-submit'
     submitBtn.textContent = 'Reply'
     submitBtn.addEventListener('click', function () {
@@ -595,11 +601,22 @@
         dot.className =
           'comment-indicator' +
           (allResolved ? ' comment-indicator-resolved' : '')
-        dot.title =
+        const indicatorLabel =
           totalCount +
           ' comment' +
           (totalCount === 1 ? '' : 's') +
           (allResolved ? ' (resolved)' : '')
+        dot.title = indicatorLabel
+        /* The dot toggles a comments panel below the row. AT
+         * users need a button affordance + keyboard activation;
+         * sighted users still see the same dot. tabindex=0 makes
+         * it focusable, role=button announces it correctly, and
+         * aria-expanded reflects the panel state (toggled below
+         * by the click handler). */
+        dot.setAttribute('role', 'button')
+        dot.setAttribute('tabindex', '0')
+        dot.setAttribute('aria-label', indicatorLabel)
+        dot.setAttribute('aria-expanded', startExpanded ? 'true' : 'false')
         gutter.appendChild(dot)
       }
 
@@ -643,19 +660,31 @@
         const indicator = gutter.querySelector('.comment-indicator')
         if (indicator) {
           ;(function (container, gFile, gFrom, gTo) {
-            indicator.addEventListener('click', function (e) {
-              e.stopPropagation()
+            const toggle = function () {
               const visible = container.style.display !== 'none'
               if (visible) {
                 container.style.display = 'none'
+                indicator.setAttribute('aria-expanded', 'false')
               } else {
                 container.style.display = ''
+                indicator.setAttribute('aria-expanded', 'true')
                 const pane = document.querySelector(
                   '.doc-tab-pane[data-doc-file="' + CSS.escape(gFile) + '"]',
                 )
                 if (pane && window.walkthroughSelectRange) {
                   window.walkthroughSelectRange(pane, gFrom, gTo)
                 }
+              }
+            }
+            indicator.addEventListener('click', function (e) {
+              e.stopPropagation()
+              toggle()
+            })
+            indicator.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                toggle()
               }
             })
           })(commentContainer, group.file, group.lineFrom, group.lineTo)
@@ -677,11 +706,16 @@
         dot.className =
           'comment-indicator' +
           (allResolved ? ' comment-indicator-resolved' : '')
-        dot.title =
+        const indicatorLabel =
           totalCount +
           ' comment' +
           (totalCount === 1 ? '' : 's') +
           (allResolved ? ' (resolved)' : '')
+        dot.title = indicatorLabel
+        dot.setAttribute('role', 'button')
+        dot.setAttribute('tabindex', '0')
+        dot.setAttribute('aria-label', indicatorLabel)
+        dot.setAttribute('aria-expanded', startExpanded ? 'true' : 'false')
         numCell.insertBefore(dot, numCell.firstChild)
       }
 
@@ -725,17 +759,29 @@
         const indicator = numCell.querySelector('.comment-indicator')
         if (indicator) {
           ;(function (row, gFile, gFrom, gTo) {
-            indicator.addEventListener('click', function (e) {
-              e.stopPropagation()
+            const toggle = function () {
               const visible = row.style.display !== 'none'
               if (visible) {
                 row.style.display = 'none'
+                indicator.setAttribute('aria-expanded', 'false')
               } else {
                 row.style.display = ''
+                indicator.setAttribute('aria-expanded', 'true')
                 const table = numCell.closest('.code-table')
                 if (table && window.walkthroughSelectRange) {
                   window.walkthroughSelectRange(table, gFrom, gTo)
                 }
+              }
+            }
+            indicator.addEventListener('click', function (e) {
+              e.stopPropagation()
+              toggle()
+            })
+            indicator.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                toggle()
               }
             })
           })(commentRow, group.file, group.lineFrom, group.lineTo)
@@ -802,8 +848,10 @@
 
   function createAddButton() {
     const btn = document.createElement('button')
+    btn.type = 'button'
     btn.className = 'comment-add-btn'
     btn.textContent = '+ Comment'
+    btn.setAttribute('aria-label', 'Add a comment on the selected lines')
     btn.style.display = 'none'
     document.body.appendChild(btn)
     return btn
@@ -881,6 +929,7 @@
     btnRow.className = 'comment-form-actions'
 
     const cancelBtn = document.createElement('button')
+    cancelBtn.type = 'button'
     cancelBtn.className = 'comment-form-cancel'
     cancelBtn.textContent = 'Cancel'
     cancelBtn.addEventListener('click', function () {
@@ -894,6 +943,7 @@
     })
 
     const submitBtn = document.createElement('button')
+    submitBtn.type = 'button'
     submitBtn.className = 'comment-form-submit'
     submitBtn.textContent = 'Submit'
     submitBtn.addEventListener('click', function () {

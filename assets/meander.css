@@ -389,6 +389,12 @@ a:hover {
   border-collapse: collapse;
   width: 100%;
   border-spacing: 0;
+  /* Paint the whole table area in --code-bg so wrapped lines and
+   * non-cell gaps inherit the panel's dark fill. Without this,
+   * wrapped continuation rows leave ghost gaps where the rounded
+   * corner clip bites into the table, producing a stairstep on
+   * the left edge. */
+  background: var(--code-bg);
 }
 
 .code-table tr {
@@ -770,39 +776,68 @@ html:not([data-ua='safari']) .comment-card {
 /* ------------------------------------------------------------------ */
 
 .unresolved-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 8px;
+  /* Transparent resting border matches .theme-toggle so the three
+   * topbar action buttons read as one set. Hover reveals tint;
+   * the open state borrows the border-strong outline. */
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--muted);
-  gap: 4px;
-  /* Pre-reserved width so the async badge can't push neighbouring
-   * topbar items when the count fetch resolves. Sized for the icon
-   * + a 2-digit badge; longer counts wrap inside the button. */
-  min-width: 52px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.unresolved-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+/* Lock the icon to a 16px footprint — same as .theme-toggle's
+ * stacked icons — so all three topbar action buttons render with
+ * the same visual weight. The badge is positioned absolutely so
+ * it doesn't push the icon. */
+.unresolved-btn > svg {
+  width: 16px;
+  height: 16px;
 }
 
+.unresolved-btn:hover,
+.unresolved-btn[aria-expanded='true'] {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.unresolved-btn[aria-expanded='true'] {
+  border-color: var(--border-strong);
+}
+
+/* Floating count chip on the icon — top-right corner of the
+ * 30×30 button. Absolute so it doesn't push the icon, sized for
+ * a single digit (auto-grows for two), hidden by default and
+ * toggled via inline display by JS when count > 0. */
 .unresolved-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 11px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 10px;
   font-weight: 600;
+  line-height: 1;
   color: #fff;
   background: #eab308;
-  border-radius: 9px;
+  border: 1.5px solid var(--bg);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ */
@@ -834,6 +869,13 @@ html:not([data-ua='safari']) .comment-card {
 .unresolved-list {
   overflow-y: auto;
   max-height: calc(70vh - 50px);
+  /* Pre-reserve the height a 3-row skeleton occupies so the
+   * dropdown doesn't pop-resize between fetch states (skeleton →
+   * loaded comments → "Failed to load" → empty). Each
+   * .unresolved-skel-row + .unresolved-item is ~76px; reserving
+   * 3 rows of headroom keeps the panel dimensions stable across
+   * every state. */
+  min-height: 228px;
 }
 
 .unresolved-group-header {
@@ -991,17 +1033,35 @@ html:not([data-ua='safari']) .unresolved-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 8px;
+  /* Transparent resting border matches .theme-toggle and
+   * .unresolved-btn so the topbar action set reads as one row. */
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--muted);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.export-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.export-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.export-btn:hover,
+.export-btn[aria-expanded='true'] {
+  background: var(--bg-tint);
+  color: var(--text);
+}
+
+.export-btn[aria-expanded='true'] {
+  border-color: var(--border-strong);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1456,7 +1516,8 @@ html:not([data-ua='safari']) .unresolved-item {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-.doc-toc-btn:hover {
+.doc-toc-btn:hover,
+.doc-toc-btn[aria-expanded='true'] {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -1863,6 +1924,15 @@ html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
   position: relative;
 }
 
+/* Same overflow-trick as .file-block above: when the chip's
+ * dropdown is open, allow the panel to extend past the
+ * .code-section's rounded edges. Browsers without :has() fall
+ * back to overflow: hidden — the dropdown clips on top, same as
+ * before this rule. */
+.code-section:has(.mdr-sections-menu[open]) {
+  overflow: visible;
+}
+
 .mdr-section-chip {
   position: absolute;
   top: 10px;
@@ -1877,7 +1947,12 @@ html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
   text-decoration-color: color-mix(in srgb, #8b949e 50%, transparent);
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.25);
+  /* Opaque fill matched to the code panel's bg so wrapped lines
+   * sliding under the chip don't read through it. The 1px ring
+   * via box-shadow nudges contrast against the dark code panel
+   * without adding a hard border. */
+  background: var(--code-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #8b949e 30%, transparent);
 }
 
 .mdr-section-chip[open] > summary {
@@ -2383,6 +2458,274 @@ pre.mdr-repo-tree code {
 
 .mdr-toc-card-docs {
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-card));
+}
+
+/* ── Trail (row) layout ──────────────────────────────────────── */
+
+/* OKLCH-based size-tier ramp for the row layout. Cool→amber→clay
+ * across five steps, all at constant perceived lightness so the
+ * progression reads as one signal type. Pulled back from the
+ * card-grid ramp's saturated red on x-large — clay (oklch hue 30)
+ * is warm without screaming "danger". */
+:root {
+  --mdr-trail-tier-1: oklch(72% 0.06 240);
+  --mdr-trail-tier-2: oklch(72% 0.06 195);
+  --mdr-trail-tier-3: oklch(72% 0.07 90);
+  --mdr-trail-tier-4: oklch(70% 0.09 60);
+  --mdr-trail-tier-5: oklch(66% 0.1 30);
+}
+
+.mdr-trail {
+  margin-top: var(--space-5);
+}
+
+.mdr-trail h2 {
+  margin: 0 0 var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Filter toolbar — only emitted when the trail has 24+ rows.
+ * Sticky once the user scrolls past the hero so the search stays
+ * reachable while the eye walks the list. */
+.mdr-trail-toolbar {
+  position: sticky;
+  top: var(--topbar-offset);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-2);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.mdr-trail-filter {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 120ms ease;
+}
+
+.mdr-trail-filter:focus {
+  border-color: var(--accent);
+}
+
+.mdr-trail-filter:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.mdr-trail-count {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--bg-tint);
+  border-radius: 999px;
+}
+
+/* The list itself — semantic <ol> so screen-readers announce
+ * position. Visible numbering comes from .mdr-trail-num so we
+ * disable the native marker. */
+.mdr-trail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.mdr-trail-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mdr-trail-row[hidden] {
+  display: none;
+}
+
+/* Suppress the kind glyph column when every row is the same kind
+ * — the column reads as visual noise when it's repetitive. */
+.mdr-trail-single .mdr-trail-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.mdr-trail-single .mdr-trail-kind {
+  display: none;
+}
+
+.mdr-trail-num {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  align-self: start;
+  padding-top: 2px;
+}
+
+/* Kind glyph — small, muted, decorative-but-meaningful. The aria-
+ * label on the parent carries the textual signal for assistive
+ * tech; the glyph is just the visual cue. */
+.mdr-trail-kind {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 14px;
+  color: var(--muted);
+  align-self: start;
+  padding-top: 1px;
+  user-select: none;
+}
+
+.mdr-trail-row[data-kind='code'] .mdr-trail-kind {
+  color: color-mix(in srgb, var(--mdr-trail-tier-1) 60%, var(--muted));
+}
+
+.mdr-trail-row[data-kind='article'] .mdr-trail-kind {
+  color: color-mix(in srgb, var(--mdr-trail-tier-2) 60%, var(--muted));
+}
+
+.mdr-trail-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mdr-trail-link:hover .mdr-trail-title {
+  color: var(--accent);
+}
+
+.mdr-trail-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  transition: color 120ms ease;
+}
+
+.mdr-trail-summary {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.mdr-trail-meta {
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  color: var(--muted);
+}
+
+/* Trailing size pill — the only pill on the row. Muted fill, body
+ * text color so the hue does the work without screaming. */
+.mdr-trail-size {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg-tint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.mdr-trail-size-x-small {
+  background: color-mix(in srgb, var(--mdr-trail-tier-1) 14%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-1) 32%, var(--border));
+}
+
+.mdr-trail-size-small {
+  background: color-mix(in srgb, var(--mdr-trail-tier-2) 14%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-2) 32%, var(--border));
+}
+
+.mdr-trail-size-medium {
+  background: color-mix(in srgb, var(--mdr-trail-tier-3) 16%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-3) 34%, var(--border));
+}
+
+.mdr-trail-size-large {
+  background: color-mix(in srgb, var(--mdr-trail-tier-4) 18%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-4) 36%, var(--border));
+}
+
+.mdr-trail-size-x-large {
+  background: color-mix(in srgb, var(--mdr-trail-tier-5) 20%, var(--bg-tint));
+  border-color: color-mix(in srgb, var(--mdr-trail-tier-5) 40%, var(--border));
+}
+
+/* Mobile — collapse the trailing size pill to a 4px leading bar
+ * on the left edge of each row. The hue is the same; the label
+ * and pill chrome go away. Numbering stays as the navigation
+ * anchor. */
+@media (max-width: 600px) {
+  .mdr-trail-row {
+    position: relative;
+    padding-left: var(--space-4);
+  }
+
+  .mdr-trail-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: var(--space-3);
+    bottom: var(--space-3);
+    width: 3px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  .mdr-trail-row:has(.mdr-trail-size-x-small)::before {
+    background: var(--mdr-trail-tier-1);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-small)::before {
+    background: var(--mdr-trail-tier-2);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-medium)::before {
+    background: var(--mdr-trail-tier-3);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-large)::before {
+    background: var(--mdr-trail-tier-4);
+  }
+  .mdr-trail-row:has(.mdr-trail-size-x-large)::before {
+    background: var(--mdr-trail-tier-5);
+  }
+
+  .mdr-trail-size {
+    display: none;
+  }
+
+  .mdr-trail-title {
+    font-size: 16px;
+  }
+
+  .mdr-trail-summary {
+    font-size: 13px;
+  }
 }
 
 /* ── Footer ──────────────────────────────────────────────────── */

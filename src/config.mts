@@ -21,6 +21,17 @@ import { Value } from '@sinclair/typebox/value'
 /*  Content sub-schemas                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Marker kind. Defaults to `code` for parts (interactive
+ * walkthroughs with line-numbered, comment-able source) and
+ * `article` for documents (prose-only reference). Surfaced
+ * on the index row layout via a leading glyph + kind label.
+ */
+export const MarkerKindSchema = Type.Union([
+  Type.Literal('code'),
+  Type.Literal('article'),
+])
+
 export const WalkthroughPartSchema = Type.Object({
   id: Type.Integer({ minimum: 1 }),
   title: Type.String({ minLength: 1 }),
@@ -37,6 +48,12 @@ export const WalkthroughPartSchema = Type.Object({
   filename: Type.Optional(
     Type.String({ pattern: '^[a-z0-9][a-z0-9-]*$', minLength: 1 }),
   ),
+  /**
+   * Override the default `code` kind. Most parts are code
+   * walkthroughs; set this to `article` only when a part is
+   * really prose with no companion source.
+   */
+  kind: Type.Optional(MarkerKindSchema),
 })
 
 /**
@@ -91,6 +108,11 @@ export const DocEntrySchema = Type.Union([
     ),
     title: Type.Optional(Type.String({ minLength: 1 })),
     summary: Type.Optional(Type.String({ minLength: 1 })),
+    /**
+     * Override the default `article` kind. Almost never set —
+     * here for symmetry with the parts schema.
+     */
+    kind: Type.Optional(MarkerKindSchema),
   }),
 ])
 
@@ -276,10 +298,16 @@ export const MeanderConfigSchema = Type.Object({
 
   /**
    * Footer control. Defaults to `true` — meander emits a small
-   * attribution footer on every page. Set `false` to omit.
+   * attribution footer with a rotating tagline on every page.
+   * Set `false` to omit.
    *
-   * Pass an object to customize text / link:
+   * Object form:
    *   { footer: { text: "Built with meander", href: "https://..." } }
+   *     — `text` pins the tagline; rotation is disabled.
+   *
+   *   { footer: { taglines: ["A with meander", "B with meander"] } }
+   *     — replaces meander's default tagline pool. Picked at page
+   *       load via JS; first entry is the no-JS fallback.
    */
   footer: Type.Optional(
     Type.Union([
@@ -287,6 +315,9 @@ export const MeanderConfigSchema = Type.Object({
       Type.Object({
         text: Type.Optional(Type.String({ minLength: 1 })),
         href: Type.Optional(Type.String({ minLength: 1 })),
+        taglines: Type.Optional(
+          Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+        ),
       }),
     ]),
   ),
@@ -334,6 +365,25 @@ export const MeanderConfigSchema = Type.Object({
    * at a glance which parts are large vs. small.
    */
   sizeTiers: Type.Optional(Type.Boolean()),
+
+  /**
+   * Index page layout for the marker list.
+   *
+   *   'cards' — vertical card grid (legacy default; reads well
+   *             at ≤8 markers, breaks down past that)
+   *   'rows'  — horizontal trail-row list (scales to 32+; gets
+   *             a search filter automatically at 24+)
+   *   'auto'  — pick by count: 'cards' below 12, 'rows' at 12+
+   *
+   * Default: 'auto'.
+   */
+  layout: Type.Optional(
+    Type.Union([
+      Type.Literal('cards'),
+      Type.Literal('rows'),
+      Type.Literal('auto'),
+    ]),
+  ),
 
   /**
    * Emit llms.txt + llms-full.txt for LLM agents following the

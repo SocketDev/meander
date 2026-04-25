@@ -57,7 +57,11 @@
     const button = document.createElement('button')
     button.className = 'doc-toc-btn'
     button.title = 'Table of Contents'
+    button.type = 'button'
     button.setAttribute('aria-label', 'Table of Contents')
+    button.setAttribute('aria-haspopup', 'menu')
+    button.setAttribute('aria-expanded', 'false')
+    button.setAttribute('aria-controls', 'mdr-doc-toc-dropdown')
     button.appendChild(createIcon())
     button.addEventListener('click', function (e) {
       e.stopPropagation()
@@ -74,6 +78,9 @@
   function createTocDropdown() {
     const el = document.createElement('div')
     el.className = 'doc-toc-dropdown'
+    el.id = 'mdr-doc-toc-dropdown'
+    el.setAttribute('role', 'menu')
+    el.setAttribute('aria-label', 'Table of contents')
     el.style.display = 'none'
 
     // Header
@@ -95,26 +102,43 @@
   /*  Dropdown Visibility                                                */
   /* ------------------------------------------------------------------ */
 
-  function toggleTocDropdown() {
+  function isDropdownOpen() {
+    return !!(dropdown && dropdown.style.display !== 'none')
+  }
+
+  function openTocDropdown() {
     if (!dropdown) {
       dropdown = createTocDropdown()
     }
-
-    const visible = dropdown.style.display !== 'none'
-    if (visible) {
-      dropdown.style.display = 'none'
-    } else {
-      if (ns && ns.popovers) {ns.popovers.openExclusive(closeTocDropdown)}
-      populateToc()
-      dropdown.style.display = 'flex'
+    if (ns && ns.popovers) {
+      ns.popovers.openExclusive(closeTocDropdown)
     }
+    populateToc()
+    dropdown.style.display = 'flex'
+    setExpanded(true)
+  }
+
+  function toggleTocDropdown() {
+    if (isDropdownOpen()) {
+      closeTocDropdown()
+      return
+    }
+    openTocDropdown()
   }
 
   function closeTocDropdown() {
     if (dropdown) {
       dropdown.style.display = 'none'
     }
+    setExpanded(false)
   }
+
+  function setExpanded(value) {
+    if (btn) {
+      btn.setAttribute('aria-expanded', value ? 'true' : 'false')
+    }
+  }
+
   if (ns && ns.popovers) {ns.popovers.register(closeTocDropdown)}
 
   /* ------------------------------------------------------------------ */
@@ -140,6 +164,7 @@
       const h = docData.headings[i]
       const item = document.createElement('a')
       item.className = 'doc-toc-item doc-toc-h' + h.level
+      item.setAttribute('role', 'menuitem')
       item.href = '#' + h.id
       item.textContent = h.text
 
@@ -230,6 +255,24 @@
   function init() {
     btn = createTocButton()
     updateButtonVisibility()
+
+    /* Pre-create the dropdown so keyboard binding has a panel to
+     * attach to before the user's first click. populateToc()
+     * still runs lazily on each open so heading lists stay
+     * fresh across tab changes. */
+    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+      if (!dropdown) {
+        dropdown = createTocDropdown()
+      }
+      ns.popovers.bindKeyboard({
+        trigger: btn,
+        panel: dropdown,
+        itemSelector: '.doc-toc-item',
+        isOpen: isDropdownOpen,
+        open: openTocDropdown,
+        close: closeTocDropdown,
+      })
+    }
 
     // Listen for tab changes to repopulate TOC and update button visibility
     document.addEventListener('doctabchange', function () {

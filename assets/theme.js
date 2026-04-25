@@ -190,12 +190,20 @@
         closeMenu()
       }
     })
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && !menu.hidden) {
-        closeMenu()
-        btn.focus()
-      }
-    })
+
+    /* Standard menu-button keyboard bindings (ArrowUp/Down, Home,
+     * End, Esc, Tab) via the boot.js helper. Replaces the local
+     * Escape-only handler above. */
+    if (ns.popovers && ns.popovers.bindKeyboard) {
+      ns.popovers.bindKeyboard({
+        trigger: btn,
+        panel: menu,
+        itemSelector: '.theme-menu-item',
+        isOpen: () => !menu.hidden,
+        open: openMenu,
+        close: closeMenu,
+      })
+    }
 
     /* Flag a user-initiated switch so one-shot animations (neo-kiju
      * bolt strike + sparks) fire only on a live click, not on every

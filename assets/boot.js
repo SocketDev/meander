@@ -99,6 +99,145 @@
     },
   }
 
+  /* WAI-ARIA Authoring Practices "menu button" keyboard pattern.
+   * Wires Esc / ArrowUp / ArrowDown / Home / End / Tab on the
+   * trigger button + panel pair, plus aria-expanded sync on every
+   * open/close. The caller still owns the open/close mechanics —
+   * this just layers keyboard behavior on top.
+   *
+   *   ns.popovers.bindKeyboard({
+   *     trigger:  buttonEl,
+   *     panel:    panelEl,
+   *     itemSelector: '.menu-item, [role="menuitem"]',
+   *     isOpen:   () => boolean,
+   *     open:     () => void,
+   *     close:    () => void,
+   *   })
+   *
+   * The `itemSelector` query runs at every keystroke so dropdowns
+   * with async-loaded items (e.g. unresolved-comments fetch) keep
+   * working as the list materialises. */
+  ns.popovers.bindKeyboard = ({
+    trigger,
+    panel,
+    itemSelector,
+    isOpen,
+    open,
+    close,
+  }) => {
+    if (!trigger || !panel) {
+      return
+    }
+    trigger.setAttribute('aria-haspopup', 'menu')
+    trigger.setAttribute('aria-expanded', 'false')
+
+    const items = () => Array.from(panel.querySelectorAll(itemSelector))
+    const focusFirst = () => {
+      const list = items()
+      if (list.length > 0) {
+        list[0].focus()
+      }
+    }
+    const focusLast = () => {
+      const list = items()
+      if (list.length > 0) {
+        list[list.length - 1].focus()
+      }
+    }
+    const focusRelative = step => {
+      const list = items()
+      if (list.length === 0) {
+        return
+      }
+      const idx = list.indexOf(document.activeElement)
+      const next = (idx + step + list.length) % list.length
+      list[next].focus()
+    }
+
+    /* Trigger keys — ArrowDown opens + focuses first item; ArrowUp
+     * opens + focuses last (matches macOS menu convention). */
+    trigger.addEventListener('keydown', e => {
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'Down':
+          e.preventDefault()
+          if (!isOpen()) {
+            open()
+          }
+          focusFirst()
+          break
+        case 'ArrowUp':
+        case 'Up':
+          e.preventDefault()
+          if (!isOpen()) {
+            open()
+          }
+          focusLast()
+          break
+        case 'Escape':
+        case 'Esc':
+          if (isOpen()) {
+            e.preventDefault()
+            close()
+          }
+          break
+        default:
+          break
+      }
+    })
+
+    /* Panel keys — only fire when the panel has focus (i.e. an
+     * item inside it is the active element). */
+    panel.addEventListener('keydown', e => {
+      if (!isOpen()) {
+        return
+      }
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'Down':
+          e.preventDefault()
+          focusRelative(1)
+          break
+        case 'ArrowUp':
+        case 'Up':
+          e.preventDefault()
+          focusRelative(-1)
+          break
+        case 'Home':
+          e.preventDefault()
+          focusFirst()
+          break
+        case 'End':
+          e.preventDefault()
+          focusLast()
+          break
+        case 'Escape':
+        case 'Esc':
+          e.preventDefault()
+          close()
+          trigger.focus()
+          break
+        case 'Tab':
+          /* APG menu pattern: Tab closes the menu and lets focus
+           * fall through to the next focusable element after the
+           * trigger. Don't preventDefault — the browser's natural
+           * tab order takes over. */
+          close()
+          break
+        default:
+          break
+      }
+    })
+  }
+
+  /* Helper for callers to keep the trigger's aria-expanded in
+   * sync without re-implementing the toggle dance. */
+  ns.popovers.setExpanded = (trigger, value) => {
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', value ? 'true' : 'false')
+    }
+  }
+
   /* Run `fn` once hljs has tokenized the first `.line-code code`
    * block. hljs splits text nodes when it runs, so any module
    * that walks the tokenized tree (hotlinks, inline-tokenizer)

@@ -924,26 +924,129 @@ ${sectionRows}
 </html>`
 }
 
+/**
+ * Resolve `config.layout` (plus an `auto` count threshold) to a
+ * concrete layout. 12 markers is where the card grid starts to
+ * read as a wall instead of a curated set; auto promotes to rows
+ * at that count. Documents (articles) count toward the threshold
+ * when the rows path will fold them into the same list.
+ */
+function resolveIndexLayout(
+  layout: 'cards' | 'rows' | 'auto' | undefined,
+  markerCount: number,
+): 'cards' | 'rows' {
+  if (layout === 'cards' || layout === 'rows') {
+    return layout
+  }
+  return markerCount >= 12 ? 'rows' : 'cards'
+}
+
 function renderIndexHtml(
   slug: string,
   title: string,
   parts: readonly WalkthroughPart[],
+  partKinds: Map<number, 'code' | 'article'>,
   partCounts: Map<number, number>,
   hasDocuments: boolean,
+  documents: readonly NormalizedDocEntry[],
   basePath: string,
   cssHref: string,
   headExtra: string,
   partLineCounts: Map<number, number>,
   sizeTiersEnabled: boolean,
+  layout: 'cards' | 'rows' | 'auto' | undefined,
   hero: { subtitle?: string; description?: string } | undefined,
   footerHtml: string,
   bodyAttrs: string,
+  trailFilterJs: string,
 ): string {
-  /* Parts render as a card grid. Each card shows number + title,
-   * the part's own objective as the card description, section
-   * count, and an optional size-tier badge. Plain <ul> fallback
-   * goes away — the card layout collapses gracefully on mobile
-   * via CSS grid auto-fit, so no separate mobile branch. */
+  /* Document rows merge into the trail at row layout — count them
+   * for the auto-promote threshold. Card layout keeps the legacy
+   * "Docs" tile so the threshold ignores them there. */
+  const effectiveLayout = resolveIndexLayout(
+    layout,
+    parts.length + (layout === 'cards' ? 0 : documents.length),
+  )
+  const totalRowCount = parts.length + documents.length
+  const filterScriptTag =
+    effectiveLayout === 'rows' && totalRowCount >= 24 && trailFilterJs
+      ? `<script>${trailFilterJs}</script>`
+      : ''
+
+  /* Hero is optional; consumer provides subtitle + description.
+   * Inline markdown (bold, italic, code, links) is supported in
+   * description via marked.parseInline. Subtitle is plain text.
+   * Hero description runs through polishProse like every other
+   * prose surface — number highlighting + parenthetical italics
+   * stay consistent across pages. The description markdown is
+   * inline (no headings), so anchorifyHeadings is a no-op here. */
+  const heroHtml = hero
+    ? `<section class="mdr-hero">
+    ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ''}
+    ${hero.description ? `<p class="mdr-hero-desc">${polishProse(marked.parseInline(hero.description) as string)}</p>` : ''}
+  </section>`
+    : ''
+
+  const tocSection =
+    effectiveLayout === 'rows'
+      ? renderTrailList(
+          slug,
+          parts,
+          partKinds,
+          partCounts,
+          documents,
+          basePath,
+          partLineCounts,
+          sizeTiersEnabled,
+        )
+      : renderCardGrid(
+          slug,
+          parts,
+          partCounts,
+          hasDocuments,
+          basePath,
+          partLineCounts,
+          sizeTiersEnabled,
+        )
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  ${headExtra}
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
+</head>
+<body${bodyAttrs}>
+  <header class="topbar">
+    <h1>${escapeHtml(title)}</h1>
+  </header>
+  <main class="mdr-index">
+    ${heroHtml}
+    ${tocSection}
+  </main>
+  ${footerHtml}
+  ${filterScriptTag}
+</body>
+</html>`
+}
+
+/**
+ * Legacy card-grid layout. Each marker becomes a vertical card
+ * with number, title, summary, and section count. Documents (if
+ * any) get a single "Docs" card linking to /<slug>/documents.
+ * Reads well at ≤8 markers; degrades past that.
+ */
+function renderCardGrid(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  partCounts: Map<number, number>,
+  hasDocuments: boolean,
+  basePath: string,
+  partLineCounts: Map<number, number>,
+  sizeTiersEnabled: boolean,
+): string {
   const partCards = parts
     .map(part => {
       const count = partCounts.get(part.id) ?? 0
@@ -975,46 +1078,149 @@ function renderIndexHtml(
         </a>`
     : ''
 
-  /* Hero is optional; consumer provides subtitle + description.
-   * Inline markdown (bold, italic, code, links) is supported in
-   * description via marked.parseInline. Subtitle is plain text. */
-  /* Hero description runs through polishProse like every other
-   * prose surface — number highlighting + parenthetical italics
-   * stay consistent across pages. The description markdown is
-   * inline (no headings), so anchorifyHeadings is a no-op here. */
-  const heroHtml = hero
-    ? `<section class="mdr-hero">
-    ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ''}
-    ${hero.description ? `<p class="mdr-hero-desc">${polishProse(marked.parseInline(hero.description) as string)}</p>` : ''}
-  </section>`
-    : ''
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(title)}</title>
-  ${headExtra}
-  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
-</head>
-<body${bodyAttrs}>
-  <header class="topbar">
-    <h1>${escapeHtml(title)}</h1>
-  </header>
-  <main class="mdr-index">
-    ${heroHtml}
-    <section class="mdr-toc">
+  return `<section class="mdr-toc">
       <h2>Markers</h2>
       <div class="mdr-toc-grid">
         ${partCards}
         ${docsCard}
       </div>
-    </section>
-  </main>
-  ${footerHtml}
-</body>
-</html>`
+    </section>`
+}
+
+/**
+ * Row-list layout — the "trail" view. Each marker is a row with
+ * a leading tabular-num index, an optional kind glyph (only
+ * shown when the trail mixes code + article kinds), a title +
+ * summary block, and a trailing size pill. Documents fold into
+ * the same list as additional rows. At 24+ rows we prepend a
+ * search filter input that the inline trail-filter.js wires up.
+ */
+function renderTrailList(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  partKinds: Map<number, 'code' | 'article'>,
+  partCounts: Map<number, number>,
+  documents: readonly NormalizedDocEntry[],
+  basePath: string,
+  partLineCounts: Map<number, number>,
+  sizeTiersEnabled: boolean,
+): string {
+  const partRows = parts.map((part, idx) => {
+    const num = String(idx + 1).padStart(2, '0')
+    const kind = partKinds.get(part.id) ?? 'code'
+    const count = partCounts.get(part.id) ?? 0
+    const tier = sizeTiersEnabled
+      ? sizeTier(partLineCounts.get(part.id) ?? 0)
+      : null
+    return {
+      kind,
+      html: trailRowHtml(
+        partUrl(slug, part, basePath),
+        num,
+        kind,
+        part.title,
+        part.objective,
+        tier,
+        partLineCounts.get(part.id),
+        count,
+        (part.keywords ?? []).join(' '),
+      ),
+    }
+  })
+
+  const docsBaseHref = `${basePath}/${slug}/documents`
+  const docRows = documents.map((doc, idx) => {
+    const num = String(parts.length + idx + 1).padStart(2, '0')
+    const title = doc.title ?? doc.source.replace(/^.*\//, '')
+    const summary = doc.summary ?? ''
+    return {
+      kind: doc.kind,
+      html: trailRowHtml(
+        docsBaseHref,
+        num,
+        doc.kind,
+        title,
+        summary,
+        null,
+        undefined,
+        0,
+        '',
+      ),
+    }
+  })
+
+  const allRows = [...partRows, ...docRows]
+  const totalCount = allRows.length
+
+  /* Hide the kind glyph when every row is the same kind — at that
+   * point the column reads as visual noise. The class on .mdr-trail
+   * lets the CSS suppress display without re-rendering. */
+  const kinds = new Set(allRows.map(r => r.kind))
+  const mixedKinds = kinds.size > 1
+  const trailClasses =
+    'mdr-trail' + (mixedKinds ? ' mdr-trail-mixed' : ' mdr-trail-single')
+
+  /* Filter input only when the list is long enough to warrant
+   * one. Below 24 rows the user can scan; above, search earns
+   * its keep. */
+  const filterUi =
+    totalCount >= 24
+      ? `<div class="mdr-trail-toolbar">
+          <input class="mdr-trail-filter" type="search" placeholder="Filter markers…" aria-label="Filter markers" autocomplete="off" />
+          <span class="mdr-trail-count" aria-live="polite" aria-atomic="true" aria-label="Markers visible">${totalCount}</span>
+        </div>`
+      : ''
+
+  return `<section class="${trailClasses}" data-count="${totalCount}">
+      <h2>Markers</h2>
+      ${filterUi}
+      <ol class="mdr-trail-list">
+        ${allRows.map(r => r.html).join('\n        ')}
+      </ol>
+    </section>`
+}
+
+/**
+ * Render one trail row. `tier` may be null when sizeTiers is
+ * disabled (suppresses the trailing pill); `lines` is used only
+ * for the pill's hover title. `searchHaystack` is concatenated
+ * onto a data-attribute the filter script reads to match against
+ * keywords without re-tokenising the visible text.
+ */
+function trailRowHtml(
+  href: string,
+  num: string,
+  kind: 'code' | 'article',
+  title: string,
+  summary: string,
+  tier: ReturnType<typeof sizeTier> | null,
+  lines: number | undefined,
+  sectionCount: number,
+  searchHaystack: string,
+): string {
+  const kindGlyph = kind === 'code' ? '⌘' : '❡'
+  const sizePill = tier
+    ? `<span class="mdr-trail-size mdr-trail-size-${tier}"${lines ? ` title="~${lines} lines"` : ''}>${tier}</span>`
+    : ''
+  const summaryHtml = summary
+    ? `<span class="mdr-trail-summary">${polishProse(escapeHtml(summary))}</span>`
+    : ''
+  const meta =
+    sectionCount > 0
+      ? ` <span class="mdr-trail-meta">${sectionCount} section${sectionCount === 1 ? '' : 's'}</span>`
+      : ''
+  const haystackAttr = searchHaystack
+    ? ` data-keywords="${escapeHtml(searchHaystack)}"`
+    : ''
+  return `<li class="mdr-trail-row" data-kind="${kind}"${haystackAttr}>
+          <span class="mdr-trail-num">${num}</span>
+          <span class="mdr-trail-kind" aria-label="${kind}">${kindGlyph}</span>
+          <a class="mdr-trail-link" href="${href}">
+            <span class="mdr-trail-title">${escapeHtml(title)}</span>
+            ${summaryHtml}${meta}
+          </a>
+          ${sizePill}
+        </li>`
 }
 
 type RenderedDocData = {
@@ -1447,19 +1653,49 @@ async function renderMarkdownDocument(
  * attribution by default; consumers can override the text and
  * link or disable entirely via config.footer.
  */
+/* Curated rotating taglines. Two registers — trail / walking /
+ * exploration AND reading / articles / walkthroughs — since
+ * meander serves both. All end "…with meander" so the brand
+ * sits at the end of the eye's path. JS picks one per page
+ * load via the data-taglines attr; the first entry is the
+ * no-JS fallback. */
+const DEFAULT_TAGLINES: readonly string[] = [
+  'Begin your journey with meander',
+  'Chart your course with meander',
+  'Find your way with meander',
+  'Trust the path with meander',
+  'Follow the thread with meander',
+  'Nestle between the lines with meander',
+  'Savor the moment with meander',
+]
+
 function renderFooter(
-  footer: boolean | { text?: string; href?: string } | undefined,
+  footer:
+    | boolean
+    | { text?: string; href?: string; taglines?: readonly string[] }
+    | undefined,
 ): string {
   if (footer === false) {
     return ''
   }
-  const defaultText = 'Go wander with meander'
   const defaultHref = 'https://github.com/divmain/meander'
   const cfg = typeof footer === 'object' ? footer : {}
-  const text = cfg.text ?? defaultText
   const href = cfg.href ?? defaultHref
+  /* Three modes:
+   *   1. cfg.text       — explicit override, no rotation
+   *   2. cfg.taglines   — consumer-supplied rotation pool
+   *   3. (default)      — DEFAULT_TAGLINES, JS rotates per load
+   */
+  if (cfg.text) {
+    return `<footer class="mdr-footer">
+    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.text)}</a>
+  </footer>`
+  }
+  const pool = cfg.taglines && cfg.taglines.length > 0 ? cfg.taglines : DEFAULT_TAGLINES
+  const fallback = pool[0]!
+  const taglineData = JSON.stringify(pool)
   return `<footer class="mdr-footer">
-    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>
+    <a class="mdr-footer-tagline" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-taglines='${escapeHtml(taglineData)}'>${escapeHtml(fallback)}</a>
   </footer>`
 }
 
@@ -1472,6 +1708,7 @@ type NormalizedDocEntry = {
   filename: string | undefined
   title: string | undefined
   summary: string | undefined
+  kind: 'code' | 'article'
 }
 
 function normalizeDocs(
@@ -1487,6 +1724,7 @@ function normalizeDocs(
         filename: undefined,
         title: undefined,
         summary: undefined,
+        kind: 'article',
       }
     }
     return {
@@ -1494,6 +1732,7 @@ function normalizeDocs(
       filename: d.filename,
       title: d.title,
       summary: d.summary,
+      kind: d.kind ?? 'article',
     }
   })
 }
@@ -1771,6 +2010,20 @@ export async function generate(
     path.join(bundledAssetsDir, 'hotlinks.js'),
     'utf-8',
   )
+  const trailFilterJs = readFileSync(
+    path.join(bundledAssetsDir, 'trail-filter.js'),
+    'utf-8',
+  )
+  /* Footer tagline rotator runs on every page (footer is global)
+   * so it lives in headJs alongside boot + theme. ~30 lines of
+   * inlined JS — cheaper than a separate <script> request. */
+  const footerTaglineJs =
+    config.footer === false
+      ? ''
+      : readFileSync(
+          path.join(bundledAssetsDir, 'footer-tagline.js'),
+          'utf-8',
+        )
   const jsdocWrapJs = readFileSync(
     path.join(bundledAssetsDir, 'jsdoc-wrap.js'),
     'utf-8',
@@ -1827,7 +2080,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
 }`
   }
 
-  const headJs = [bootJs, themeJs, swRegisterJs].filter(Boolean).join('\n')
+  const headJs = [bootJs, themeJs, swRegisterJs, footerTaglineJs]
+    .filter(Boolean)
+    .join('\n')
   /* Comment-client bundle — only inlined when comments are
    * enabled. Consumers shipping their own system (e.g. encrypted
    * or SSO-gated) can set `comments: false` in
@@ -2136,20 +2391,33 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     writeFileSync(partOut, await finalizeHtml(html))
   }
 
+  /* Build a part-id → kind map. Default is 'code' (most parts
+   * are code walkthroughs); per-part `kind` in the config wins
+   * when set. The row layout uses this to render the leading
+   * kind glyph and to decide whether the trail is mixed-kind. */
+  const partKinds = new Map<number, 'code' | 'article'>()
+  for (const part of parts) {
+    partKinds.set(part.id, part.kind ?? 'code')
+  }
+
   const indexHtml = renderIndexHtml(
     slug,
     title,
     parts,
+    partKinds,
     counts,
     hasDocuments,
+    documents,
     basePath,
     emitStyles ? assetHref('meander.css') : '',
     headExtra,
     lineCounts,
     !!config.sizeTiers,
+    config.layout,
     config.hero,
     footerHtml,
     bodyAttrs,
+    trailFilterJs,
   )
   writeFileSync(path.join(outDir, 'index.html'), await finalizeHtml(indexHtml))
 

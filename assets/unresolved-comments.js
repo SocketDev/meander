@@ -65,7 +65,11 @@
     const btn = document.createElement('button')
     btn.className = 'unresolved-btn'
     btn.title = 'View unresolved comments'
+    btn.type = 'button'
     btn.setAttribute('aria-label', 'View unresolved comments')
+    btn.setAttribute('aria-haspopup', 'menu')
+    btn.setAttribute('aria-expanded', 'false')
+    btn.setAttribute('aria-controls', 'mdr-unresolved-dropdown')
 
     btn.appendChild(createIcon())
 
@@ -101,6 +105,9 @@
   function createDropdown() {
     const el = document.createElement('div')
     el.className = 'unresolved-dropdown'
+    el.id = 'mdr-unresolved-dropdown'
+    el.setAttribute('role', 'menu')
+    el.setAttribute('aria-label', 'Unresolved comments')
     el.style.display = 'none'
 
     const header = document.createElement('div')
@@ -132,28 +139,45 @@
     dropdown.style.right = window.innerWidth - rect.right + 'px'
   }
 
-  function toggleDropdown() {
+  function isDropdownOpen() {
+    return !!(dropdown && dropdown.style.display !== 'none')
+  }
+
+  function openDropdown() {
     if (!dropdown) {
       dropdown = createDropdown()
     }
-
-    const visible = dropdown.style.display !== 'none'
-    if (visible) {
-      dropdown.style.display = 'none'
-      return
+    if (ns && ns.popovers) {
+      ns.popovers.openExclusive(closeDropdown)
     }
-
-    if (ns && ns.popovers) {ns.popovers.openExclusive(closeDropdown)}
     positionDropdown()
     dropdown.style.display = 'block'
+    setExpanded(true)
     fetchAndRenderComments()
+  }
+
+  function toggleDropdown() {
+    if (isDropdownOpen()) {
+      closeDropdown()
+      return
+    }
+    openDropdown()
   }
 
   function closeDropdown() {
     if (dropdown) {
       dropdown.style.display = 'none'
     }
+    setExpanded(false)
   }
+
+  function setExpanded(value) {
+    const btn = document.querySelector('.unresolved-btn')
+    if (btn) {
+      btn.setAttribute('aria-expanded', value ? 'true' : 'false')
+    }
+  }
+
   if (ns && ns.popovers) {ns.popovers.register(closeDropdown)}
 
   /* ------------------------------------------------------------------ */
@@ -235,6 +259,7 @@
   function createCommentItem(comment) {
     const item = document.createElement('a')
     item.className = 'unresolved-item'
+    item.setAttribute('role', 'menuitem')
     let range
     if (comment.part === 0) {
       range =
@@ -335,6 +360,27 @@
 
     const btn = createButton()
     actions.appendChild(btn)
+
+    /* Lazily wire keyboard once the dropdown DOM exists. The
+     * panel is created on first open, so we bind on the next
+     * tick after the click handler creates it. The trigger key
+     * bindings live on the button regardless. */
+    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+      const lazyBind = () => {
+        if (!dropdown) {
+          dropdown = createDropdown()
+        }
+        ns.popovers.bindKeyboard({
+          trigger: btn,
+          panel: dropdown,
+          itemSelector: '.unresolved-item',
+          isOpen: isDropdownOpen,
+          open: openDropdown,
+          close: closeDropdown,
+        })
+      }
+      lazyBind()
+    }
 
     // Load unresolved comments count
     loadUnresolved()

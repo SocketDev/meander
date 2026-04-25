@@ -51,7 +51,11 @@
     const btn = document.createElement('button')
     btn.className = 'export-btn'
     btn.title = 'Export comments'
+    btn.type = 'button'
     btn.setAttribute('aria-label', 'Export comments')
+    btn.setAttribute('aria-haspopup', 'menu')
+    btn.setAttribute('aria-expanded', 'false')
+    btn.setAttribute('aria-controls', 'mdr-export-dropdown')
     btn.appendChild(createIcon())
 
     btn.addEventListener('click', function (e) {
@@ -69,6 +73,9 @@
   function createDropdown() {
     const el = document.createElement('div')
     el.className = 'export-dropdown'
+    el.id = 'mdr-export-dropdown'
+    el.setAttribute('role', 'menu')
+    el.setAttribute('aria-label', 'Export comments')
     el.style.display = 'none'
 
     const header = document.createElement('div')
@@ -78,6 +85,7 @@
 
     const exportAll = document.createElement('a')
     exportAll.className = 'export-option'
+    exportAll.setAttribute('role', 'menuitem')
     exportAll.href = '/' + slug + '/api/comments/export'
     exportAll.setAttribute('download', slug + '-comments-all.json')
     exportAll.textContent = 'Export All'
@@ -85,6 +93,7 @@
 
     const exportUnresolved = document.createElement('a')
     exportUnresolved.className = 'export-option'
+    exportUnresolved.setAttribute('role', 'menuitem')
     exportUnresolved.href = '/' + slug + '/api/comments/export?unresolved=true'
     exportUnresolved.setAttribute(
       'download',
@@ -112,25 +121,44 @@
     dropdown.style.width = dropdownWidth + 'px'
   }
 
-  function toggleDropdown() {
+  function isDropdownOpen() {
+    return !!(dropdown && dropdown.style.display !== 'none')
+  }
+
+  function showDropdown() {
     if (!dropdown) {
       dropdown = createDropdown()
     }
-    const isHidden = dropdown.style.display === 'none'
-    if (isHidden) {
-      if (ns && ns.popovers) {ns.popovers.openExclusive(hideDropdown)}
-      positionDropdown()
-      dropdown.style.display = 'block'
-    } else {
-      dropdown.style.display = 'none'
+    if (ns && ns.popovers) {
+      ns.popovers.openExclusive(hideDropdown)
     }
+    positionDropdown()
+    dropdown.style.display = 'block'
+    setExpanded(true)
+  }
+
+  function toggleDropdown() {
+    if (isDropdownOpen()) {
+      hideDropdown()
+      return
+    }
+    showDropdown()
   }
 
   function hideDropdown() {
     if (dropdown) {
       dropdown.style.display = 'none'
     }
+    setExpanded(false)
   }
+
+  function setExpanded(value) {
+    const btn = document.querySelector('.export-btn')
+    if (btn) {
+      btn.setAttribute('aria-expanded', value ? 'true' : 'false')
+    }
+  }
+
   if (ns && ns.popovers) {ns.popovers.register(hideDropdown)}
 
   /* ------------------------------------------------------------------ */
@@ -155,6 +183,23 @@
       actions.insertBefore(btn, unresolvedBtn)
     } else {
       actions.appendChild(btn)
+    }
+
+    /* Bind keyboard once — pre-create the dropdown so the panel
+     * exists for the keydown listener (binding to a null panel
+     * would no-op the menu keys until first click). */
+    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+      if (!dropdown) {
+        dropdown = createDropdown()
+      }
+      ns.popovers.bindKeyboard({
+        trigger: btn,
+        panel: dropdown,
+        itemSelector: '.export-option',
+        isOpen: isDropdownOpen,
+        open: showDropdown,
+        close: hideDropdown,
+      })
     }
   }
 
