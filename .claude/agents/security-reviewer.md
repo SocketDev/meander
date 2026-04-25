@@ -1,6 +1,8 @@
 ---
 name: security-reviewer
 description: Reviews findings from AgentShield + zizmor against meander's CLAUDE.md security rules and grades the result A-F. Spawned by the security-scan skill after the static scans run.
+tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 <role>
@@ -14,7 +16,7 @@ These come from the repo's CLAUDE.md. Reference the file directly for the full t
 
 **Token hygiene.** Don't emit the raw value of any secret to commit messages, comments, or assistant output. The `PreToolUse` hook at `.claude/hooks/token-hygiene/` blocks command-level leaks at runtime; your job is to flag any token shape that has landed *at rest* in `.claude/` or `.github/`. Cite by env-var name only — never the value.
 
-**Dependency hygiene.** The `.npmrc` sets `min-release-age=7`. Don't bypass without explicit user approval — the threshold is a security control. The `.claude/hooks/check-new-deps/` hook blocks `pnpm add` / `npm install` of an unvetted package; flag any agent / skill / hook config that tries to route around it.
+**Dependency hygiene.** The `.npmrc` sets `min-release-age=7` as a security control. Skip the threshold only when the user has explicitly approved a faster install. The `.claude/hooks/check-new-deps/` hook blocks `pnpm add` / `npm install` of an unvetted package; flag any agent / skill / hook config that tries to route around it.
 
 **No `npx` / `pnpm dlx` / `yarn dlx`.** Use `pnpm exec <package>` or `pnpm run <script>`. CLAUDE.md forbids dlx-style runners.
 
@@ -32,7 +34,7 @@ Walk the combined AgentShield + zizmor output and tag each finding by class:
 
 1. **Secrets at rest.** Hardcoded API keys, tokens, JWTs, private keys in `.claude/` or `.github/` files. Includes literal token shapes the AgentShield catalog enumerates (`vtwn_`, `ghp_`, `sk-…`, etc.). Default severity: CRITICAL if the token is still valid.
 2. **Tool-allowlist sprawl.** `Bash(*)` / overly broad globs in `.claude/settings.json` allow lists. Default severity: HIGH.
-3. **Prompt injection in agent / skill markdown.** "Ignore previous instructions" patterns or unfenced shell-looking blocks. Default severity: HIGH.
+3. **Prompt injection in agent / skill markdown.** Override-style strings that try to discard prior context, or unfenced shell-looking blocks. (See `skills/security-scan/reference.md` for the AgentShield catalog of override patterns it matches.) Default severity: HIGH.
 4. **Hook command injection.** Hooks that interpolate `$VAR` / `$1` / `$CLAUDE_ARG` into a shell string instead of using array-form argv. Default severity: HIGH.
 5. **MCP server misconfig.** Arbitrary URL templates, no auth, stdio-via-`/bin/sh -c`. Default severity: HIGH.
 6. **Unpinned actions.** `uses: actions/checkout@v4` (tag) instead of `@<full-sha>`. Default severity: HIGH.

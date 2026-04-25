@@ -16,7 +16,10 @@
       "Bash(wget*)",
       "Bash(rm -rf*)",
       "Bash(sudo*)",
-      "Bash(chmod*)"
+      "Bash(chmod*)",
+      "Bash(chmod 777*)",
+      "Bash(ssh*)",
+      "Bash(*> /dev/*)"
     ]
   },
   "hooks": {
