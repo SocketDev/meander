@@ -1,25 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm*)",
-      "Bash(node*)",
-      "Bash(git*)",
-      "Bash(ls*)",
-      "Bash(grep*)",
       "Bash(cat*)",
-      "Bash(mkdir*)",
       "Bash(cp*)",
-      "Bash(mv*)"
+      "Bash(git*)",
+      "Bash(grep*)",
+      "Bash(ls*)",
+      "Bash(mkdir*)",
+      "Bash(mv*)",
+      "Bash(node*)",
+      "Bash(pnpm*)"
     ],
     "deny": [
-      "Bash(curl*)",
-      "Bash(wget*)",
-      "Bash(rm -rf*)",
-      "Bash(sudo*)",
-      "Bash(chmod*)",
+      "Bash(*> /dev/*)",
       "Bash(chmod 777*)",
+      "Bash(chmod*)",
+      "Bash(curl*)",
+      "Bash(rm -rf*)",
       "Bash(ssh*)",
-      "Bash(*> /dev/*)"
+      "Bash(sudo*)",
+      "Bash(wget*)"
     ]
   },
   "hooks": {

@@ -56,6 +56,18 @@ The umbrella rule: never run a git command that mutates state belonging to a pat
 - `fs` cherry-pick: `import { existsSync, promises as fs, readFileSync, writeFileSync } from "node:fs"`. `path`/`os`/`url`/`crypto` use default imports (`import path from "node:path"`). Exception: `fileURLToPath` is cherry-picked from `node:url`.
 - ALWAYS use the Edit tool for code modifications, NEVER sed/awk.
 
+### Sorting
+
+Sort lists alphanumerically (literal byte order, ASCII before letters). Apply this to:
+
+- **Config lists** — `permissions.allow` / `permissions.deny` in `.claude/settings.json`, `external-tools.json` checksum keys, the `keywords` array in `meander.config.json` parts, allowlists in workflow YAML.
+- **Object key entries** — sort keys in plain JSON config + return-shape literals + internal-state objects. (Exception: `__proto__: null` always comes first, ahead of any data keys.)
+- **Import specifiers** — sort named imports inside a single statement: `import { encrypt, randomDataKey, wrapKey } from './crypto.mts'`. Imports that say `import type` follow the same rule. Statement *order* is the project's existing convention (`node:` → external → local → types) — that's separate from specifier order *within* a statement.
+- **Method / function source placement** — within a module, sort top-level functions alphabetically. Convention: private functions (lowercase / un-exported) sort first, exported functions second. The first-line `export` keyword is the divider.
+- **Array literals** — when the array is a config list, allowlist, or set-like collection. Position-bearing arrays (e.g. argv, the `parts[]` walkthrough order, anything where index matters semantically) keep their meaningful order.
+
+When in doubt, sort. The cost of a sorted list that didn't need to be is approximately zero; the cost of an unsorted list that did need to be is a merge conflict.
+
 ### `use strict`
 
 - `.mts` / `.mjs` are ES modules — **always strict, never add `"use strict"`** (it's an error in strict ESM).
