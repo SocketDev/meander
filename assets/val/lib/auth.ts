@@ -6,7 +6,7 @@
 
 import { b64urlEncode } from './jwt.ts'
 
-export function parseAllowedDomains(raw: string | undefined | null): string[] {
+export function parseAllowedDomains(raw: string | undefined): string[] {
   return (raw || '')
     .split(',')
     .map(s => s.trim().toLowerCase())

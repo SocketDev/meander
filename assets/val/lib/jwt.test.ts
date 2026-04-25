@@ -33,13 +33,13 @@ test('verifyJwt: rejects bad signature', async () => {
   const now = Math.floor(Date.now() / 1000)
   const token = await signJwt({ email: 'alice@example.com', exp: now + 60 }, SECRET)
   const payload = await verifyJwt(token, 'different-secret-of-equal-length', now)
-  assert.equal(payload, null)
+  assert.equal(payload, undefined)
 })
 
 test('verifyJwt: rejects expired token (exp < now)', async () => {
   const now = Math.floor(Date.now() / 1000)
   const token = await signJwt({ email: 'alice@example.com', exp: now - 1 }, SECRET)
-  assert.equal(await verifyJwt(token, SECRET, now), null)
+  assert.equal(await verifyJwt(token, SECRET, now), undefined)
 })
 
 test('verifyJwt: accepts token with no exp claim (non-expiring)', async () => {
@@ -50,8 +50,8 @@ test('verifyJwt: accepts token with no exp claim (non-expiring)', async () => {
 })
 
 test('verifyJwt: rejects malformed token (wrong segment count)', async () => {
-  assert.equal(await verifyJwt('not.enough', SECRET), null)
-  assert.equal(await verifyJwt('way.too.many.parts.here', SECRET), null)
+  assert.equal(await verifyJwt('not.enough', SECRET), undefined)
+  assert.equal(await verifyJwt('way.too.many.parts.here', SECRET), undefined)
 })
 
 test('verifyJwt: rejects non-JSON body', async () => {
@@ -73,5 +73,5 @@ test('verifyJwt: rejects non-JSON body', async () => {
     new TextEncoder().encode(`${head}.${body}`),
   )
   const token = `${head}.${body}.${b64urlEncode(new Uint8Array(sig))}`
-  assert.equal(await verifyJwt(token, SECRET), null)
+  assert.equal(await verifyJwt(token, SECRET), undefined)
 })

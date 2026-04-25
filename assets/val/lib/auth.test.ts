@@ -15,7 +15,6 @@ import {
 test('parseAllowedDomains: empty → empty array', () => {
   assert.deepEqual(parseAllowedDomains(''), [])
   assert.deepEqual(parseAllowedDomains(undefined), [])
-  assert.deepEqual(parseAllowedDomains(null), [])
 })
 
 test('parseAllowedDomains: splits + trims + lowercases', () => {

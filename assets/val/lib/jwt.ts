@@ -54,18 +54,18 @@ export async function signJwt(
 }
 
 /**
- * Verify a JWT. Returns the decoded payload on success or null
- * (bad signature, expired, malformed). `now` is injectable so
- * tests can drive clock-skew scenarios.
+ * Verify a JWT. Returns the decoded payload on success or
+ * undefined (bad signature, expired, malformed). `now` is
+ * injectable so tests can drive clock-skew scenarios.
  */
 export async function verifyJwt(
   token: string,
   secret: string,
   now: number = Math.floor(Date.now() / 1000),
-): Promise<Record<string, unknown> | null> {
+): Promise<Record<string, unknown> | undefined> {
   const parts = token.split('.')
   if (parts.length !== 3) {
-    return null
+    return undefined
   }
   const [head, body, sig] = parts as [string, string, string]
   const key = await hmacKey(secret)
@@ -76,17 +76,17 @@ export async function verifyJwt(
     new TextEncoder().encode(`${head}.${body}`),
   )
   if (!ok) {
-    return null
+    return undefined
   }
   try {
     const payload = JSON.parse(
       new TextDecoder().decode(b64urlDecode(body)),
     ) as Record<string, unknown>
     if (typeof payload['exp'] === 'number' && payload['exp'] < now) {
-      return null
+      return undefined
     }
     return payload
   } catch {
-    return null
+    return undefined
   }
 }

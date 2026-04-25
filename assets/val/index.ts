@@ -123,11 +123,11 @@ async function mintSession(email: string): Promise<string> {
   return signJwt({ email, iat: now, exp: now + 60 * 60 * 24 * 30 }, JWT_SECRET)
 }
 
-/** Verify a token and return the email claim, or null. */
-async function readSession(token: string): Promise<string | null> {
+/** Verify a token and return the email claim, or undefined. */
+async function readSession(token: string): Promise<string | undefined> {
   const payload = await verifyJwt(token, JWT_SECRET)
   if (!payload || typeof payload['email'] !== 'string') {
-    return null
+    return undefined
   }
   return payload['email']
 }
@@ -198,23 +198,23 @@ async function sendMagicCode(email: string, code: string): Promise<void> {
 
 /**
  * Read the bearer token from `Authorization: Bearer <jwt>` and
- * verify it. Returns the email, or null (no token / bad token).
+ * verify it. Returns the email, or undefined (no token / bad token).
  */
-async function currentUser(c: Context): Promise<string | null> {
+async function currentUser(c: Context): Promise<string | undefined> {
   if (!JWT_SECRET) {
-    return null
+    return undefined
   }
   const auth = c.req.header('authorization') || ''
   const m = auth.match(/^Bearer\s+(.+)$/i)
   if (!m) {
-    return null
+    return undefined
   }
   return readSession(m[1]!)
 }
 
 function authRequired(
-  email: string | null,
-): { error: string; status: 401 | 403 } | null {
+  email: string | undefined,
+): { error: string; status: 401 | 403 } | undefined {
   if (DEMO_MODE) {
     return { error: 'demo mode — writes disabled', status: 403 }
   }
@@ -230,7 +230,7 @@ function authRequired(
   if (!emailDomainAllowed(email, ALLOWED_EMAIL_DOMAINS)) {
     return { error: 'email domain not allowed', status: 403 }
   }
-  return null
+  return undefined
 }
 
 /* ------------------------------------------------------------------ */
