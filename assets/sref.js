@@ -1,5 +1,5 @@
-(function () {
-  "use strict";
+;(function () {
+  'use strict'
 
   /* Symbol table: window[Symbol.for("meander:syms")] maps each
    * exported name to an array of locations. Each location is a
@@ -9,33 +9,39 @@
    * one file) and cross-file duplicates (e.g. a `parse` func
    * in several ecosystem-specific files) instead of silently
    * dropping them like the old singleton shape did. */
-  var symbols = window[Symbol.for("meander:syms")];
-  if (!symbols || typeof symbols !== "object") return;
+  const symbols = window[Symbol.for('meander:syms')]
+  if (!symbols || typeof symbols !== 'object') {return}
 
-  var slug = document.body.getAttribute("data-slug");
-  if (!slug) return;
+  const slug = document.body.getAttribute('data-slug')
+  if (!slug) {return}
 
-  var names = Object.keys(symbols).sort(function (a, b) {
-    return b.length - a.length; // longest first to avoid partial matches
-  });
-  if (names.length === 0) return;
+  const names = Object.keys(symbols).sort(function (a, b) {
+    return b.length - a.length // longest first to avoid partial matches
+  })
+  if (names.length === 0) {return}
 
   // Build a regex that matches any definition name as a whole word
-  var escaped = names.map(function (n) {
-    return n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  });
-  var pattern = new RegExp("\\b(" + escaped.join("|") + ")\\b", "g");
+  const escaped = names.map(function (n) {
+    return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  })
+  const pattern = new RegExp('\\b(' + escaped.join('|') + ')\\b', 'g')
 
   // Tuple field accessors — one place to change if the shape evolves.
-  function locFile(loc) { return loc[0]; }
-  function locLine(loc) { return loc[1]; }
-  function locPart(loc) { return loc[2]; }
+  function locFile(loc) {
+    return loc[0]
+  }
+  function locLine(loc) {
+    return loc[1]
+  }
+  function locPart(loc) {
+    return loc[2]
+  }
 
   // Process all highlighted code elements — runs after highlight.js
   function processCodeElements() {
-    var codeEls = document.querySelectorAll(".line-code code");
-    for (var i = 0; i < codeEls.length; i++) {
-      processNode(codeEls[i]);
+    const codeEls = document.querySelectorAll('.line-code code')
+    for (let i = 0; i < codeEls.length; i++) {
+      processNode(codeEls[i])
     }
   }
 
@@ -43,91 +49,100 @@
    * line/file — we don't wrap those (a symbol shouldn't link
    * to itself). Checks against every location in `locs`. */
   function isSelfReference(textNode, locs) {
-    var table = textNode.closest ? textNode.closest(".code-table") : null;
+    let table = textNode.closest ? textNode.closest('.code-table') : null
     if (!table) {
-      var el = textNode.parentElement;
-      while (el && !el.classList.contains("code-table")) el = el.parentElement;
-      table = el;
+      let el = textNode.parentElement
+      while (el && !el.classList.contains('code-table')) {el = el.parentElement}
+      table = el
     }
-    if (!table) return false;
-    var currentFile = table.getAttribute("data-file");
-    var row = textNode.parentElement;
-    while (row && row.tagName !== "TR") row = row.parentElement;
-    if (!row) return false;
-    var lineCell = row.querySelector(".line-num");
-    if (!lineCell) return false;
-    var currentLine = parseInt(lineCell.textContent, 10);
-    for (var i = 0; i < locs.length; i++) {
-      if (locFile(locs[i]) === currentFile && locLine(locs[i]) === currentLine) {
-        return true;
+    if (!table) {return false}
+    const currentFile = table.getAttribute('data-file')
+    let row = textNode.parentElement
+    while (row && row.tagName !== 'TR') {row = row.parentElement}
+    if (!row) {return false}
+    const lineCell = row.querySelector('.line-num')
+    if (!lineCell) {return false}
+    const currentLine = parseInt(lineCell.textContent, 10)
+    for (let i = 0; i < locs.length; i++) {
+      if (
+        locFile(locs[i]) === currentFile &&
+        locLine(locs[i]) === currentLine
+      ) {
+        return true
       }
     }
-    return false;
+    return false
   }
 
   function processNode(node) {
-    var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
-    var textNodes = [];
-    var current;
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null)
+    const textNodes = []
+    let current
     while ((current = walker.nextNode())) {
-      textNodes.push(current);
+      textNodes.push(current)
     }
 
-    for (var i = 0; i < textNodes.length; i++) {
-      var textNode = textNodes[i];
-      var text = textNode.textContent;
-      if (!text) continue;
+    for (let i = 0; i < textNodes.length; i++) {
+      const textNode = textNodes[i]
+      const text = textNode.textContent
+      if (!text) {continue}
 
-      if (textNode.parentElement && textNode.parentElement.classList.contains("def-ref")) continue;
+      if (
+        textNode.parentElement &&
+        textNode.parentElement.classList.contains('def-ref')
+      )
+        {continue}
 
-      var parts = [];
-      var lastIndex = 0;
-      var match;
-      pattern.lastIndex = 0;
+      const parts = []
+      let lastIndex = 0
+      let match
+      pattern.lastIndex = 0
 
       while ((match = pattern.exec(text)) !== null) {
-        var name = match[1];
-        var locs = symbols[name];
-        if (!locs || locs.length === 0) continue;
-        if (isSelfReference(textNode, locs)) continue;
+        const name = match[1]
+        const locs = symbols[name]
+        if (!locs || locs.length === 0) {continue}
+        if (isSelfReference(textNode, locs)) {continue}
 
         if (match.index > lastIndex) {
-          parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
+          parts.push(
+            document.createTextNode(text.slice(lastIndex, match.index)),
+          )
         }
 
         /* Stash locs on the span. Single-location uses flat
          * data-* attrs (cheaper to read than JSON.parse). Multi-
          * location packs into one JSON attr so click + tooltip
          * handlers can route without re-reading `symbols`. */
-        var span = document.createElement("span");
-        span.className = "def-ref";
-        span.setAttribute("data-def-name", name);
+        const span = document.createElement('span')
+        span.className = 'def-ref'
+        span.setAttribute('data-def-name', name)
         if (locs.length === 1) {
-          var only = locs[0];
-          span.setAttribute("data-def-file", locFile(only));
-          span.setAttribute("data-def-line", locLine(only));
-          span.setAttribute("data-def-part", locPart(only));
+          const only = locs[0]
+          span.setAttribute('data-def-file', locFile(only))
+          span.setAttribute('data-def-line', locLine(only))
+          span.setAttribute('data-def-part', locPart(only))
         } else {
-          span.setAttribute("data-def-count", locs.length);
-          span.setAttribute("data-def-locs", JSON.stringify(locs));
+          span.setAttribute('data-def-count', locs.length)
+          span.setAttribute('data-def-locs', JSON.stringify(locs))
         }
-        span.textContent = name;
-        parts.push(span);
+        span.textContent = name
+        parts.push(span)
 
-        lastIndex = match.index + match[0].length;
+        lastIndex = match.index + match[0].length
       }
 
-      if (parts.length === 0) continue;
+      if (parts.length === 0) {continue}
 
       if (lastIndex < text.length) {
-        parts.push(document.createTextNode(text.slice(lastIndex)));
+        parts.push(document.createTextNode(text.slice(lastIndex)))
       }
 
-      var parent = textNode.parentNode;
-      for (var j = 0; j < parts.length; j++) {
-        parent.insertBefore(parts[j], textNode);
+      const parent = textNode.parentNode
+      for (let j = 0; j < parts.length; j++) {
+        parent.insertBefore(parts[j], textNode)
       }
-      parent.removeChild(textNode);
+      parent.removeChild(textNode)
     }
   }
 
@@ -135,57 +150,80 @@
   /*  Tooltip                                                            */
   /* ------------------------------------------------------------------ */
 
-  var tooltip = null;
+  let tooltip = null
 
   function createTooltip() {
-    var el = document.createElement("div");
-    el.className = "def-tooltip";
-    el.style.display = "none";
-    document.body.appendChild(el);
-    return el;
+    const el = document.createElement('div')
+    el.className = 'def-tooltip'
+    el.style.display = 'none'
+    document.body.appendChild(el)
+    return el
   }
 
   function locsFromSpan(span) {
-    var packed = span.getAttribute("data-def-locs");
+    const packed = span.getAttribute('data-def-locs')
     if (packed) {
-      try { return JSON.parse(packed); } catch { return []; }
+      try {
+        return JSON.parse(packed)
+      } catch {
+        return []
+      }
     }
-    var file = span.getAttribute("data-def-file");
-    var line = span.getAttribute("data-def-line");
-    var part = span.getAttribute("data-def-part");
-    if (!file) return [];
-    return [[file, parseInt(line, 10), parseInt(part, 10)]];
+    const file = span.getAttribute('data-def-file')
+    const line = span.getAttribute('data-def-line')
+    const part = span.getAttribute('data-def-part')
+    if (!file) {return []}
+    return [[file, parseInt(line, 10), parseInt(part, 10)]]
   }
 
   function showTooltip(span) {
-    if (!tooltip) tooltip = createTooltip();
-    var name = span.getAttribute("data-def-name");
-    var locs = locsFromSpan(span);
+    if (!tooltip) {tooltip = createTooltip()}
+    const name = span.getAttribute('data-def-name')
+    const locs = locsFromSpan(span)
 
-    var header = '<div class="def-tooltip-name">' + name + "</div>";
+    const header = '<div class="def-tooltip-name">' + name + '</div>'
     if (locs.length === 1) {
-      var loc = locs[0];
+      const loc = locs[0]
       tooltip.innerHTML =
         header +
-        '<div class="def-tooltip-location">' + locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')</div>' +
-        '<div class="def-tooltip-hint">Click symbol to go to definition</div>';
+        '<div class="def-tooltip-location">' +
+        locFile(loc) +
+        ':' +
+        locLine(loc) +
+        ' (Part ' +
+        locPart(loc) +
+        ')</div>' +
+        '<div class="def-tooltip-hint">Click symbol to go to definition</div>'
     } else {
-      var items = locs.map(function (loc) {
-        return '<div class="def-tooltip-location">' + locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')</div>';
-      }).join("");
+      const items = locs
+        .map(function (loc) {
+          return (
+            '<div class="def-tooltip-location">' +
+            locFile(loc) +
+            ':' +
+            locLine(loc) +
+            ' (Part ' +
+            locPart(loc) +
+            ')</div>'
+          )
+        })
+        .join('')
       tooltip.innerHTML =
-        header + items +
-        '<div class="def-tooltip-hint">Click to pick a location (' + locs.length + ' defined)</div>';
+        header +
+        items +
+        '<div class="def-tooltip-hint">Click to pick a location (' +
+        locs.length +
+        ' defined)</div>'
     }
 
-    var rect = span.getBoundingClientRect();
-    tooltip.style.display = "block";
-    tooltip.style.left = rect.left + "px";
-    tooltip.style.top = (rect.bottom + 4) + "px";
+    const rect = span.getBoundingClientRect()
+    tooltip.style.display = 'block'
+    tooltip.style.left = rect.left + 'px'
+    tooltip.style.top = rect.bottom + 4 + 'px'
   }
 
   function hideTooltip() {
-    if (tooltip) tooltip.style.display = "none";
+    if (tooltip) {tooltip.style.display = 'none'}
   }
 
   /* ------------------------------------------------------------------ */
@@ -193,12 +231,12 @@
   /* ------------------------------------------------------------------ */
 
   function navigateTo(loc) {
-    var hash = "#" + encodeURIComponent(locFile(loc)) + ":L" + locLine(loc);
-    var currentPart = document.body.getAttribute("data-part");
+    const hash = '#' + encodeURIComponent(locFile(loc)) + ':L' + locLine(loc)
+    const currentPart = document.body.getAttribute('data-part')
     if (String(locPart(loc)) === currentPart) {
-      window.location.hash = hash;
+      window.location.hash = hash
     } else {
-      window.location.href = "/" + slug + "/part/" + locPart(loc) + hash;
+      window.location.href = '/' + slug + '/part/' + locPart(loc) + hash
     }
   }
 
@@ -207,43 +245,53 @@
    * that want a fancier popup can override by listening to the
    * click earlier and calling preventDefault(). */
   function pickLocation(locs) {
-    if (locs.length === 1) return locs[0];
-    var lines = ["Choose a definition:"];
-    for (var i = 0; i < locs.length; i++) {
-      lines.push((i + 1) + ". " + locFile(locs[i]) + ":" + locLine(locs[i]) + " (Part " + locPart(locs[i]) + ")");
+    if (locs.length === 1) {return locs[0]}
+    const lines = ['Choose a definition:']
+    for (let i = 0; i < locs.length; i++) {
+      lines.push(
+        i +
+          1 +
+          '. ' +
+          locFile(locs[i]) +
+          ':' +
+          locLine(locs[i]) +
+          ' (Marker ' +
+          locPart(locs[i]) +
+          ')',
+      )
     }
-    var answer = window.prompt(lines.join("\n"), "1");
-    if (!answer) return null;
-    var n = parseInt(answer, 10);
-    if (!(n >= 1 && n <= locs.length)) return null;
-    return locs[n - 1];
+    const answer = window.prompt(lines.join('\n'), '1')
+    if (!answer) {return null}
+    const n = parseInt(answer, 10)
+    if (!(n >= 1 && n <= locs.length)) {return null}
+    return locs[n - 1]
   }
 
-  document.addEventListener("mouseover", function (e) {
-    var span = e.target.closest ? e.target.closest(".def-ref") : null;
+  document.addEventListener('mouseover', function (e) {
+    const span = e.target.closest ? e.target.closest('.def-ref') : null
     if (span) {
-      showTooltip(span);
+      showTooltip(span)
     } else {
-      hideTooltip();
+      hideTooltip()
     }
-  });
+  })
 
-  document.addEventListener("click", function (e) {
-    var span = e.target.closest ? e.target.closest(".def-ref") : null;
-    if (!span) return;
+  document.addEventListener('click', function (e) {
+    const span = e.target.closest ? e.target.closest('.def-ref') : null
+    if (!span) {return}
 
-    var locs = locsFromSpan(span);
-    if (locs.length === 0) return;
-    var loc = locs.length === 1 ? locs[0] : pickLocation(locs);
-    if (!loc) return;
-    navigateTo(loc);
-  });
+    const locs = locsFromSpan(span)
+    if (locs.length === 0) {return}
+    const loc = locs.length === 1 ? locs[0] : pickLocation(locs)
+    if (!loc) {return}
+    navigateTo(loc)
+  })
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(processCodeElements, 100);
-    });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(processCodeElements, 100)
+    })
   } else {
-    setTimeout(processCodeElements, 100);
+    setTimeout(processCodeElements, 100)
   }
-})();
+})()

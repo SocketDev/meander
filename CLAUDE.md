@@ -175,6 +175,19 @@ Meander is published to npm as `@divmain/meander`. Consumers place `meander.conf
 - `comments: false` — opt out of the inlined comment client
 - `favicon` — object (per-size asset overrides, `themeColor` meta), or `false` to skip favicon emission entirely
 
+### Terminology — "Marker"
+
+User-facing language for numbered walkthrough parts is **Marker** (trail / hike vocabulary, pairing with the "Go wander with meander" footer). The internal type and config key stay `parts[]` / `WalkthroughPart` (changing them would be a breaking config-schema change → major version bump). URL paths stay `/<slug>/part/N` (external bookmarks).
+
+**The rule for when to write "Marker N" vs. just the title:**
+
+> Marker stays only when the surrounding context doesn't already explain what the number labels. Drop it when context is present.
+
+- ✅ Keep "Marker N" — bare number floats without context: card-grid chip on the index page, parenthetical in a sentence (sref's `(Marker 3)`), markdown bullet in `llms.txt`, a comments-dropdown group header.
+- ❌ Drop the prefix — context already disambiguates: page H1 on the part page (you're literally on that part), browser `<title>` (shows the bare title), tooltip on a topic pill (the pill already labels it).
+
+When in doubt, ask: "if a reader arrives at this string with zero surrounding chrome, does the number make sense?" If no → keep "Marker". If yes → drop it.
+
 ### Assets pipeline
 
 - Logos: authored as `assets/logo/logo-black.svg` (master silhouette). Color + bezel variants are regenerated from the master via the scripts in `scripts/` when the master changes.

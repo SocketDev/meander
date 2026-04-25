@@ -1,24 +1,26 @@
-(function () {
-  "use strict";
+;(function () {
+  'use strict'
 
-  var slug = document.body.getAttribute("data-slug");
-  var partId = parseInt(document.body.getAttribute("data-part"), 10);
-  var pageType = document.body.getAttribute("data-page-type");
-  var isDocumentsPage = pageType === "documents";
-  if (!slug || isNaN(partId)) return;
+  const slug = document.body.getAttribute('data-slug')
+  const partId = parseInt(document.body.getAttribute('data-part'), 10)
+  const pageType = document.body.getAttribute('data-page-type')
+  const isDocumentsPage = pageType === 'documents'
+  if (!slug || isNaN(partId)) {return}
 
   /* When meander emits data-comment-backend on <body>, the HTML
    * is hosted off-origin (GH Pages, Cloudflare Pages, etc.) and
    * the comment API lives on a Val Town val at the given URL.
    * Without the attribute we assume same-origin (Val Town
    * serving both HTML + API) and hit /<slug>/api/comments. */
-  var backendBase = (document.body.getAttribute("data-comment-backend") || "").replace(/\/+$/, "");
-  var apiBase = backendBase
-    ? backendBase + "/" + slug + "/api/comments"
-    : "/" + slug + "/api/comments";
-  var comments = [];
-  var addBtn = null;
-  var expandedGroups = {}; // group keys that should render expanded
+  const backendBase = (
+    document.body.getAttribute('data-comment-backend') || ''
+  ).replace(/\/+$/, '')
+  const apiBase = backendBase
+    ? backendBase + '/' + slug + '/api/comments'
+    : '/' + slug + '/api/comments'
+  let comments = []
+  let addBtn = null
+  const expandedGroups = {} // group keys that should render expanded
 
   /* ------------------------------------------------------------------ */
   /*  Auth (email magic-code + JWT bearer)                                */
@@ -26,15 +28,15 @@
 
   /* localStorage keys. Versioned so a schema change can force all
    * sessions to re-sign-in by bumping the suffix. */
-  var TOKEN_KEY = "meander:auth:v1:token";
-  var EMAIL_KEY = "meander:auth:v1:email";
-  var authBase = backendBase ? backendBase + "/api/auth" : "/api/auth";
+  const TOKEN_KEY = 'meander:auth:v1:token'
+  const EMAIL_KEY = 'meander:auth:v1:email'
+  const authBase = backendBase ? backendBase + '/api/auth' : '/api/auth'
   /* Demo-mode flag is set at runtime from GET /api/auth/me. When
    * true, writes fail server-side with 403 — we show a banner +
    * visually dim the composer rather than hiding it. */
-  var demoMode = document.body.getAttribute("data-demo-mode") === "true";
+  const demoMode = document.body.getAttribute('data-demo-mode') === 'true'
 
-  var FETCH_TIMEOUT_MS = 10000;
+  const FETCH_TIMEOUT_MS = 10000
 
   /**
    * Build an AbortSignal that fires after FETCH_TIMEOUT_MS, optionally
@@ -42,26 +44,33 @@
    * Falls back to the timeout-only signal in older runtimes.
    */
   function requestSignal(userSignal) {
-    if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
-      return undefined;
+    if (
+      typeof AbortSignal === 'undefined' ||
+      typeof AbortSignal.timeout !== 'function'
+    ) {
+      return undefined
     }
-    var timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-    if (!userSignal) return timeoutSignal;
-    if (typeof AbortSignal.any === "function") {
-      return AbortSignal.any([timeoutSignal, userSignal]);
+    const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    if (!userSignal) {return timeoutSignal}
+    if (typeof AbortSignal.any === 'function') {
+      return AbortSignal.any([timeoutSignal, userSignal])
     }
-    return timeoutSignal;
+    return timeoutSignal
   }
 
-  function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
-  function getEmail() { return localStorage.getItem(EMAIL_KEY) || ""; }
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY) || ''
+  }
+  function getEmail() {
+    return localStorage.getItem(EMAIL_KEY) || ''
+  }
   function setSession(token, email) {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(EMAIL_KEY, email);
+    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(EMAIL_KEY, email)
   }
   function clearSession() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(EMAIL_KEY);
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(EMAIL_KEY)
   }
 
   /**
@@ -69,78 +78,88 @@
    * stored and auto-clears the session on 401 (expired / rotated).
    */
   function authFetch(url, init) {
-    init = init || {};
-    var headers = {};
+    init = init || {}
+    const headers = {}
     if (init.headers) {
-      for (var k in init.headers) {
+      for (const k in init.headers) {
         if (Object.prototype.hasOwnProperty.call(init.headers, k)) {
-          headers[k] = init.headers[k];
+          headers[k] = init.headers[k]
         }
       }
     }
-    var token = getToken();
-    if (token) { headers["Authorization"] = "Bearer " + token; }
-    init.headers = headers;
-    var signal = requestSignal(init.signal);
-    if (signal) { init.signal = signal; }
+    const token = getToken()
+    if (token) {
+      headers['Authorization'] = 'Bearer ' + token
+    }
+    init.headers = headers
+    const signal = requestSignal(init.signal)
+    if (signal) {
+      init.signal = signal
+    }
     return fetch(url, init).then(function (r) {
       if (r.status === 401 && token) {
-        clearSession();
+        clearSession()
       }
-      return r;
-    });
+      return r
+    })
   }
 
   function requestMagicCode(email) {
-    return fetch(authBase + "/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return fetch(authBase + '/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email }),
-      signal: requestSignal()
+      signal: requestSignal(),
     }).then(function (r) {
       return r.json().then(function (data) {
-        if (!r.ok) { throw new Error(data.error || "request failed"); }
-        return data;
-      });
-    });
+        if (!r.ok) {
+          throw new Error(data.error || 'request failed')
+        }
+        return data
+      })
+    })
   }
 
   function verifyMagicCode(email, code) {
-    return fetch(authBase + "/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return fetch(authBase + '/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, code: code }),
-      signal: requestSignal()
+      signal: requestSignal(),
     }).then(function (r) {
       return r.json().then(function (data) {
-        if (!r.ok) { throw new Error(data.error || "verify failed"); }
-        return data;
-      });
-    });
+        if (!r.ok) {
+          throw new Error(data.error || 'verify failed')
+        }
+        return data
+      })
+    })
   }
 
   function signIn(callback) {
-    var email = prompt("Email address to sign in with:");
-    if (!email || !email.trim()) return;
-    email = email.trim();
+    let email = prompt('Email address to sign in with:')
+    if (!email || !email.trim()) {return}
+    email = email.trim()
     requestMagicCode(email)
       .then(function () {
-        var code = prompt("Check your email for a 6-digit code. Enter it here:");
-        if (!code || !code.trim()) return;
-        return verifyMagicCode(email, code.trim())
-          .then(function (data) {
-            setSession(data.token, data.email);
-            if (callback) callback();
-          });
+        const code = prompt('Check your email for a 6-digit code. Enter it here:')
+        if (!code || !code.trim()) {return}
+        return verifyMagicCode(email, code.trim()).then(function (data) {
+          setSession(data.token, data.email)
+          if (callback) {callback()}
+        })
       })
       .catch(function (err) {
-        alert("Sign-in failed: " + (err && err.message ? err.message : err));
-      });
+        alert('Sign-in failed: ' + (err && err.message ? err.message : err))
+      })
   }
 
   function ensureSignedIn(callback) {
-    if (getToken()) { callback(); return; }
-    signIn(callback);
+    if (getToken()) {
+      callback()
+      return
+    }
+    signIn(callback)
   }
 
   /* ------------------------------------------------------------------ */
@@ -148,148 +167,163 @@
   /* ------------------------------------------------------------------ */
 
   function fetchComments() {
-    authFetch(apiBase + "?part=" + partId)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        comments = data;
-        renderAllComments();
+    authFetch(apiBase + '?part=' + partId)
+      .then(function (r) {
+        return r.json()
       })
-      .catch(function () { /* silently fail */ });
+      .then(function (data) {
+        comments = data
+        renderAllComments()
+      })
+      .catch(function () {
+        /* silently fail */
+      })
   }
 
   function postComment(file, lineFrom, lineTo, body, parentId, callback) {
     if (demoMode) {
-      alert("This is a demo — comments can be composed but aren't saved.");
-      return;
+      alert("This is a demo — comments can be composed but aren't saved.")
+      return
     }
     ensureSignedIn(function () {
-      var payload = {
+      const payload = {
         part: partId,
         file: file,
         lineFrom: lineFrom,
         lineTo: lineTo,
-        body: body
-      };
-      if (parentId) payload.parentId = parentId;
+        body: body,
+      }
+      if (parentId) {payload.parentId = parentId}
       authFetch(apiBase, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
         .then(function (r) {
           return r.json().then(function (data) {
-            if (!r.ok) { throw new Error(data.error || "post failed"); }
-            return data;
-          });
+            if (!r.ok) {
+              throw new Error(data.error || 'post failed')
+            }
+            return data
+          })
         })
         .then(function (comment) {
-          comments.push(comment);
-          expandedGroups[comment.file + ":" + comment.lineFrom] = true;
-          renderAllComments();
-          if (callback) callback();
+          comments.push(comment)
+          expandedGroups[comment.file + ':' + comment.lineFrom] = true
+          renderAllComments()
+          if (callback) {callback()}
         })
         .catch(function (err) {
-          alert("Failed to post: " + (err && err.message ? err.message : err));
-        });
-    });
+          alert('Failed to post: ' + (err && err.message ? err.message : err))
+        })
+    })
   }
 
   function deleteComment(id) {
-    if (demoMode) { return; }
+    if (demoMode) {
+      return
+    }
     ensureSignedIn(function () {
-      authFetch(apiBase + "/" + id, { method: "DELETE" })
+      authFetch(apiBase + '/' + id, { method: 'DELETE' })
         .then(function () {
-          comments = comments.filter(function (c) { return c.id !== id; });
-          renderAllComments();
+          comments = comments.filter(function (c) {
+            return c.id !== id
+          })
+          renderAllComments()
         })
-        .catch(function (err) { console.error("Failed to delete comment:", err); });
-    });
+        .catch(function (err) {
+          console.error('Failed to delete comment:', err)
+        })
+    })
   }
 
   function toggleResolved(id, resolved) {
-    if (demoMode) { return; }
+    if (demoMode) {
+      return
+    }
     ensureSignedIn(function () {
-      authFetch(apiBase + "/" + id, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resolved: resolved })
+      authFetch(apiBase + '/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved: resolved }),
       })
         .then(function () {
-          for (var i = 0; i < comments.length; i++) {
+          for (let i = 0; i < comments.length; i++) {
             if (comments[i].id === id) {
-              comments[i].resolved = resolved;
-              expandedGroups[comments[i].file + ":" + comments[i].lineFrom] = true;
-              break;
+              comments[i].resolved = resolved
+              expandedGroups[comments[i].file + ':' + comments[i].lineFrom] =
+                true
+              break
             }
           }
-          renderAllComments();
+          renderAllComments()
         })
-        .catch(function (err) { console.error("Failed to toggle resolved:", err); });
-    });
+        .catch(function (err) {
+          console.error('Failed to toggle resolved:', err)
+        })
+    })
   }
 
   /* ------------------------------------------------------------------ */
   /*  Sign-in widget + demo-mode banner                                   */
   /* ------------------------------------------------------------------ */
 
+  /* Lazy auth widget — only renders when the user is signed in
+   * (showing their email + a sign-out affordance). When signed
+   * out the widget is absent; the sign-in prompt fires lazily
+   * from "+ Comment" / Reply / Resolve actions instead. */
   function renderAuthUi() {
-    var existing = document.querySelector(".mdr-auth");
-    if (existing) existing.parentNode.removeChild(existing);
-    var el = document.createElement("div");
-    el.className = "mdr-auth";
-    var email = getEmail();
-    if (email) {
-      var span = document.createElement("span");
-      span.className = "mdr-auth-email";
-      span.textContent = email;
-      var signOut = document.createElement("button");
-      signOut.type = "button";
-      signOut.className = "mdr-auth-btn mdr-auth-signout";
-      signOut.textContent = "Sign out";
-      signOut.addEventListener("click", function () {
-        clearSession();
-        renderAuthUi();
-      });
-      el.appendChild(span);
-      el.appendChild(signOut);
+    const existing = document.querySelector('.mdr-auth')
+    if (existing) {existing.parentNode.removeChild(existing)}
+    const email = getEmail()
+    if (!email) {return}
+    const el = document.createElement('div')
+    el.className = 'mdr-auth'
+    const span = document.createElement('span')
+    span.className = 'mdr-auth-email'
+    span.textContent = email
+    const signOut = document.createElement('button')
+    signOut.type = 'button'
+    signOut.className = 'mdr-auth-btn mdr-auth-signout'
+    signOut.textContent = 'Sign out'
+    signOut.addEventListener('click', function () {
+      clearSession()
+      renderAuthUi()
+    })
+    el.appendChild(span)
+    el.appendChild(signOut)
+    const slot = document.querySelector('.topbar-actions')
+    if (slot) {
+      slot.appendChild(el)
     } else {
-      var signIn = document.createElement("button");
-      signIn.type = "button";
-      signIn.className = "mdr-auth-btn mdr-auth-signin";
-      signIn.textContent = "Sign in to comment";
-      signIn.addEventListener("click", function () {
-        signInFlow(renderAuthUi);
-      });
-      el.appendChild(signIn);
+      document.body.appendChild(el)
     }
-    /* Mount into .topbar-actions if present, else append to body. */
-    var slot = document.querySelector(".topbar-actions");
-    if (slot) { slot.appendChild(el); }
-    else { document.body.appendChild(el); }
   }
 
-  function signInFlow(after) { signIn(after); }
+  function signInFlow(after) {
+    signIn(after)
+  }
 
   function renderDemoBanner() {
-    if (!demoMode) return;
-    var key = "meander:demo-banner-dismissed-v1";
-    if (localStorage.getItem(key) === "true") return;
-    var el = document.createElement("div");
-    el.className = "mdr-demo-banner";
-    var msg = document.createElement("span");
-    msg.textContent = "Demo mode — comments you write here aren't saved.";
-    var dismiss = document.createElement("button");
-    dismiss.type = "button";
-    dismiss.className = "mdr-demo-dismiss";
-    dismiss.textContent = "×";
-    dismiss.setAttribute("aria-label", "Dismiss demo banner");
-    dismiss.addEventListener("click", function () {
-      localStorage.setItem(key, "true");
-      el.parentNode.removeChild(el);
-    });
-    el.appendChild(msg);
-    el.appendChild(dismiss);
-    document.body.insertBefore(el, document.body.firstChild);
+    if (!demoMode) {return}
+    const key = 'meander:demo-banner-dismissed-v1'
+    if (localStorage.getItem(key) === 'true') {return}
+    const el = document.createElement('div')
+    el.className = 'mdr-demo-banner'
+    const msg = document.createElement('span')
+    msg.textContent = "Demo mode — comments you write here aren't saved."
+    const dismiss = document.createElement('button')
+    dismiss.type = 'button'
+    dismiss.className = 'mdr-demo-dismiss'
+    dismiss.textContent = '×'
+    dismiss.setAttribute('aria-label', 'Dismiss demo banner')
+    dismiss.addEventListener('click', function () {
+      localStorage.setItem(key, 'true')
+      el.parentNode.removeChild(el)
+    })
+    el.appendChild(msg)
+    el.appendChild(dismiss)
+    document.body.insertBefore(el, document.body.firstChild)
   }
 
   /* ------------------------------------------------------------------ */
@@ -297,363 +331,414 @@
   /* ------------------------------------------------------------------ */
 
   function getActiveDocFile() {
-    if (!isDocumentsPage) return null;
-    var activePane = document.querySelector(".doc-tab-pane.active");
-    return activePane ? activePane.getAttribute("data-doc-file") : null;
+    if (!isDocumentsPage) {return null}
+    const activePane = document.querySelector('.doc-tab-pane.active')
+    return activePane ? activePane.getAttribute('data-doc-file') : null
   }
 
   function renderAllComments() {
     // Remove existing comment rows and indicators
-    var existingRows = document.querySelectorAll(".comment-row, .doc-comment-container");
-    for (var i = 0; i < existingRows.length; i++) {
-      existingRows[i].remove();
+    const existingRows = document.querySelectorAll(
+      '.comment-row, .doc-comment-container',
+    )
+    for (let i = 0; i < existingRows.length; i++) {
+      existingRows[i].remove()
     }
-    var existingDots = document.querySelectorAll(".comment-indicator");
-    for (var i = 0; i < existingDots.length; i++) {
-      existingDots[i].remove();
+    const existingDots = document.querySelectorAll('.comment-indicator')
+    for (let i = 0; i < existingDots.length; i++) {
+      existingDots[i].remove()
     }
 
     // Filter comments by active tab when on documents page
-    var activeDocFile = getActiveDocFile();
-    var commentsToRender = comments;
+    const activeDocFile = getActiveDocFile()
+    let commentsToRender = comments
     if (activeDocFile) {
-      commentsToRender = comments.filter(function (c) { return c.file === activeDocFile; });
+      commentsToRender = comments.filter(function (c) {
+        return c.file === activeDocFile
+      })
     }
 
     // Group root comments by file + lineFrom (indicator anchor point).
     // Replies are grouped with their parent regardless of line range.
-    var groups = {};
-    var parentGroupKey = {};
-    for (var j = 0; j < commentsToRender.length; j++) {
-      var c = commentsToRender[j];
-      if (c.parentId) continue; // handle replies in second pass
-      var key = c.file + ":" + c.lineFrom;
+    const groups = {}
+    const parentGroupKey = {}
+    for (let j = 0; j < commentsToRender.length; j++) {
+      const c = commentsToRender[j]
+      if (c.parentId) {continue} // handle replies in second pass
+      const key = c.file + ':' + c.lineFrom
       if (!groups[key]) {
-        groups[key] = { file: c.file, lineFrom: c.lineFrom, lineTo: c.lineTo, comments: [] };
+        groups[key] = {
+          file: c.file,
+          lineFrom: c.lineFrom,
+          lineTo: c.lineTo,
+          comments: [],
+        }
       }
       // Expand the group's lineTo to cover the widest range
-      if (c.lineTo > groups[key].lineTo) groups[key].lineTo = c.lineTo;
-      groups[key].comments.push(c);
-      parentGroupKey[c.id] = key;
+      if (c.lineTo > groups[key].lineTo) {groups[key].lineTo = c.lineTo}
+      groups[key].comments.push(c)
+      parentGroupKey[c.id] = key
     }
     // Second pass: attach replies to their parent's group
-    for (var j = 0; j < commentsToRender.length; j++) {
-      var c = commentsToRender[j];
-      if (!c.parentId) continue;
-      var gKey = parentGroupKey[c.parentId];
+    for (let j = 0; j < commentsToRender.length; j++) {
+      const c = commentsToRender[j]
+      if (!c.parentId) {continue}
+      const gKey = parentGroupKey[c.parentId]
       if (gKey && groups[gKey]) {
-        groups[gKey].comments.push(c);
+        groups[gKey].comments.push(c)
       }
     }
 
-    var keys = Object.keys(groups);
-    for (var k = 0; k < keys.length; k++) {
-      renderCommentGroup(groups[keys[k]]);
+    const keys = Object.keys(groups)
+    for (let k = 0; k < keys.length; k++) {
+      renderCommentGroup(groups[keys[k]])
     }
   }
 
   function findRowForLine(file, lineNum) {
-    var tables = document.querySelectorAll('.code-table[data-file="' + CSS.escape(file) + '"]');
-    for (var i = 0; i < tables.length; i++) {
-      var rows = tables[i].querySelectorAll("tr:not(.comment-row)");
-      for (var j = 0; j < rows.length; j++) {
-        var numCell = rows[j].querySelector(".line-num");
+    const tables = document.querySelectorAll(
+      '.code-table[data-file="' + CSS.escape(file) + '"]',
+    )
+    for (let i = 0; i < tables.length; i++) {
+      const rows = tables[i].querySelectorAll('tr:not(.comment-row)')
+      for (let j = 0; j < rows.length; j++) {
+        const numCell = rows[j].querySelector('.line-num')
         if (numCell && parseInt(numCell.textContent, 10) === lineNum) {
-          return rows[j];
+          return rows[j]
         }
       }
     }
-    return null;
+    return null
   }
 
   function findBlockElement(file, blockId) {
-    var pane = document.querySelector('.doc-tab-pane[data-doc-file="' + CSS.escape(file) + '"]');
-    if (!pane) return null;
-    return pane.querySelector('.doc-block[data-block-id="' + blockId + '"]');
+    const pane = document.querySelector(
+      '.doc-tab-pane[data-doc-file="' + CSS.escape(file) + '"]',
+    )
+    if (!pane) {return null}
+    return pane.querySelector('.doc-block[data-block-id="' + blockId + '"]')
   }
 
   function buildCommentCard(comment, isReply) {
-    var isResolved = !isReply && comment.resolved;
-    var card = document.createElement("div");
-    card.className = "comment-card" + (isReply ? " comment-reply" : "") + (isResolved ? " comment-resolved" : "");
-    card.setAttribute("data-comment-id", comment.id);
+    const isResolved = !isReply && comment.resolved
+    const card = document.createElement('div')
+    card.className =
+      'comment-card' +
+      (isReply ? ' comment-reply' : '') +
+      (isResolved ? ' comment-resolved' : '')
+    card.setAttribute('data-comment-id', comment.id)
 
-    var meta = document.createElement("div");
-    meta.className = "comment-meta";
-    var prefix = isDocumentsPage ? "B" : "L";
-    var range = comment.lineFrom === comment.lineTo
-      ? prefix + comment.lineFrom
-      : prefix + comment.lineFrom + "-" + prefix + comment.lineTo;
-    var resolvedLabel = isResolved ? " (resolved)" : "";
-    meta.appendChild(document.createTextNode(comment.author + (isReply ? "" : " on " + range) + " \u00b7 "));
-    meta.appendChild(timeElement(comment.createdAt));
+    const meta = document.createElement('div')
+    meta.className = 'comment-meta'
+    const prefix = isDocumentsPage ? 'B' : 'L'
+    const range =
+      comment.lineFrom === comment.lineTo
+        ? prefix + comment.lineFrom
+        : prefix + comment.lineFrom + '-' + prefix + comment.lineTo
+    const resolvedLabel = isResolved ? ' (resolved)' : ''
+    meta.appendChild(
+      document.createTextNode(
+        comment.author + (isReply ? '' : ' on ' + range) + ' \u00b7 ',
+      ),
+    )
+    meta.appendChild(timeElement(comment.createdAt))
     if (resolvedLabel) {
-      meta.appendChild(document.createTextNode(resolvedLabel));
+      meta.appendChild(document.createTextNode(resolvedLabel))
     }
 
-    var body = document.createElement("div");
-    body.className = "comment-body";
-    body.textContent = comment.body;
+    const body = document.createElement('div')
+    body.className = 'comment-body'
+    body.textContent = comment.body
 
-    var actions = document.createElement("div");
-    actions.className = "comment-card-actions";
+    const actions = document.createElement('div')
+    actions.className = 'comment-card-actions'
 
     if (!isReply) {
-      var resolveBtn = document.createElement("button");
-      resolveBtn.className = "comment-resolve-btn";
-      resolveBtn.textContent = comment.resolved ? "Unresolve" : "Resolve";
-      (function (cid, currentlyResolved) {
-        resolveBtn.addEventListener("click", function () {
-          toggleResolved(cid, !currentlyResolved);
-        });
-      })(comment.id, comment.resolved);
-      actions.appendChild(resolveBtn);
+      const resolveBtn = document.createElement('button')
+      resolveBtn.className = 'comment-resolve-btn'
+      resolveBtn.textContent = comment.resolved ? 'Unresolve' : 'Resolve'
+      ;(function (cid, currentlyResolved) {
+        resolveBtn.addEventListener('click', function () {
+          toggleResolved(cid, !currentlyResolved)
+        })
+      })(comment.id, comment.resolved)
+      actions.appendChild(resolveBtn)
 
-      var replyBtn = document.createElement("button");
-      replyBtn.className = "comment-reply-btn";
-      replyBtn.textContent = "Reply";
-      (function (c) {
-        replyBtn.addEventListener("click", function () {
-          showReplyForm(c, card);
-        });
-      })(comment);
-      actions.appendChild(replyBtn);
+      const replyBtn = document.createElement('button')
+      replyBtn.className = 'comment-reply-btn'
+      replyBtn.textContent = 'Reply'
+      ;(function (c) {
+        replyBtn.addEventListener('click', function () {
+          showReplyForm(c, card)
+        })
+      })(comment)
+      actions.appendChild(replyBtn)
     }
 
-    var delBtn = document.createElement("button");
-    delBtn.className = "comment-delete-btn";
-    delBtn.textContent = "Delete";
-    (function (cid) {
-      delBtn.addEventListener("click", function () { deleteComment(cid); });
-    })(comment.id);
-    actions.appendChild(delBtn);
+    const delBtn = document.createElement('button')
+    delBtn.className = 'comment-delete-btn'
+    delBtn.textContent = 'Delete'
+    ;(function (cid) {
+      delBtn.addEventListener('click', function () {
+        deleteComment(cid)
+      })
+    })(comment.id)
+    actions.appendChild(delBtn)
 
-    card.appendChild(meta);
-    card.appendChild(body);
+    card.appendChild(meta)
+    card.appendChild(body)
     if (isReply) {
       // Replies get actions inline immediately
-      card.appendChild(actions);
+      card.appendChild(actions)
     } else {
       // Root cards: store actions for later — caller appends after thread
-      card._actions = actions;
+      card._actions = actions
     }
-    return card;
+    return card
   }
 
   function showReplyForm(parentComment, parentCard) {
     // Remove any existing reply form
-    var existing = parentCard.querySelector(".comment-reply-form");
-    if (existing) { existing.remove(); return; }
+    const existing = parentCard.querySelector('.comment-reply-form')
+    if (existing) {
+      existing.remove()
+      return
+    }
 
-    var author = ensureAuthor();
-    if (!author) return;
+    const author = ensureAuthor()
+    if (!author) {return}
 
-    var form = document.createElement("div");
-    form.className = "comment-reply-form";
+    const form = document.createElement('div')
+    form.className = 'comment-reply-form'
 
-    var textarea = document.createElement("textarea");
-    textarea.className = "comment-form-textarea";
-    textarea.placeholder = "Write a reply...";
-    textarea.rows = 2;
+    const textarea = document.createElement('textarea')
+    textarea.className = 'comment-form-textarea'
+    textarea.placeholder = 'Write a reply...'
+    textarea.rows = 2
 
-    var btnRow = document.createElement("div");
-    btnRow.className = "comment-form-actions";
+    const btnRow = document.createElement('div')
+    btnRow.className = 'comment-form-actions'
 
-    var cancelBtn = document.createElement("button");
-    cancelBtn.className = "comment-form-cancel";
-    cancelBtn.textContent = "Cancel";
-    cancelBtn.addEventListener("click", function () { form.remove(); });
+    const cancelBtn = document.createElement('button')
+    cancelBtn.className = 'comment-form-cancel'
+    cancelBtn.textContent = 'Cancel'
+    cancelBtn.addEventListener('click', function () {
+      form.remove()
+    })
 
-    var submitBtn = document.createElement("button");
-    submitBtn.className = "comment-form-submit";
-    submitBtn.textContent = "Reply";
-    submitBtn.addEventListener("click", function () {
-      var text = textarea.value.trim();
-      if (!text) return;
+    const submitBtn = document.createElement('button')
+    submitBtn.className = 'comment-form-submit'
+    submitBtn.textContent = 'Reply'
+    submitBtn.addEventListener('click', function () {
+      const text = textarea.value.trim()
+      if (!text) {return}
       postComment(
         parentComment.file,
         parentComment.lineFrom,
         parentComment.lineTo,
         text,
         parentComment.id,
-        function () { form.remove(); }
-      );
-    });
+        function () {
+          form.remove()
+        },
+      )
+    })
 
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(submitBtn);
-    form.appendChild(textarea);
-    form.appendChild(btnRow);
+    btnRow.appendChild(cancelBtn)
+    btnRow.appendChild(submitBtn)
+    form.appendChild(textarea)
+    form.appendChild(btnRow)
 
-    parentCard.appendChild(form);
-    textarea.focus({ preventScroll: true });
+    parentCard.appendChild(form)
+    textarea.focus({ preventScroll: true })
   }
 
   function renderCommentGroup(group) {
-    var groupKey = group.file + ":" + group.lineFrom;
-    var startExpanded = !!expandedGroups[groupKey];
+    const groupKey = group.file + ':' + group.lineFrom
+    const startExpanded = !!expandedGroups[groupKey]
 
     // Separate root comments from replies
-    var roots = [];
-    var repliesByParent = {};
-    for (var i = 0; i < group.comments.length; i++) {
-      var c = group.comments[i];
+    const roots = []
+    const repliesByParent = {}
+    for (let i = 0; i < group.comments.length; i++) {
+      const c = group.comments[i]
       if (c.parentId) {
-        if (!repliesByParent[c.parentId]) repliesByParent[c.parentId] = [];
-        repliesByParent[c.parentId].push(c);
+        if (!repliesByParent[c.parentId]) {repliesByParent[c.parentId] = []}
+        repliesByParent[c.parentId].push(c)
       } else {
-        roots.push(c);
+        roots.push(c)
       }
     }
 
     // Determine if all root comments are resolved
-    var totalCount = group.comments.length;
-    var allResolved = roots.length > 0 && roots.every(function (r) { return r.resolved; });
+    const totalCount = group.comments.length
+    const allResolved =
+      roots.length > 0 &&
+      roots.every(function (r) {
+        return r.resolved
+      })
 
     // Render based on page type
     if (isDocumentsPage) {
       // Document page: find the block elements
-      var targetBlock = findBlockElement(group.file, group.lineTo);
-      if (!targetBlock) return;
+      const targetBlock = findBlockElement(group.file, group.lineTo)
+      if (!targetBlock) {return}
 
       // Find the lineFrom block to place the indicator
-      var indicatorBlock = findBlockElement(group.file, group.lineFrom);
-      if (!indicatorBlock) indicatorBlock = targetBlock;
+      let indicatorBlock = findBlockElement(group.file, group.lineFrom)
+      if (!indicatorBlock) {indicatorBlock = targetBlock}
 
       // Create the indicator dot on the lineFrom block's gutter
-      var gutter = indicatorBlock.querySelector(".doc-block-gutter");
+      const gutter = indicatorBlock.querySelector('.doc-block-gutter')
       if (gutter) {
-        var dot = document.createElement("span");
-        dot.className = "comment-indicator" + (allResolved ? " comment-indicator-resolved" : "");
-        dot.title = totalCount + " comment" + (totalCount === 1 ? "" : "s") + (allResolved ? " (resolved)" : "");
-        gutter.appendChild(dot);
+        const dot = document.createElement('span')
+        dot.className =
+          'comment-indicator' +
+          (allResolved ? ' comment-indicator-resolved' : '')
+        dot.title =
+          totalCount +
+          ' comment' +
+          (totalCount === 1 ? '' : 's') +
+          (allResolved ? ' (resolved)' : '')
+        gutter.appendChild(dot)
       }
 
       // Build the comment container — expanded if group is in expandedGroups, hidden otherwise
-      var commentContainer = document.createElement("div");
-      commentContainer.className = "doc-comment-container";
+      const commentContainer = document.createElement('div')
+      commentContainer.className = 'doc-comment-container'
       if (!startExpanded) {
-        commentContainer.style.display = "none";
+        commentContainer.style.display = 'none'
       }
 
-      for (var i = 0; i < roots.length; i++) {
-        var rootCard = buildCommentCard(roots[i], false);
+      for (let i = 0; i < roots.length; i++) {
+        const rootCard = buildCommentCard(roots[i], false)
 
         // Render replies for this root
-        var childReplies = repliesByParent[roots[i].id] || [];
+        const childReplies = repliesByParent[roots[i].id] || []
         if (childReplies.length > 0) {
-          var thread = document.createElement("div");
-          thread.className = "comment-thread";
-          for (var j = 0; j < childReplies.length; j++) {
-            thread.appendChild(buildCommentCard(childReplies[j], true));
+          const thread = document.createElement('div')
+          thread.className = 'comment-thread'
+          for (let j = 0; j < childReplies.length; j++) {
+            thread.appendChild(buildCommentCard(childReplies[j], true))
           }
-          rootCard.appendChild(thread);
+          rootCard.appendChild(thread)
         }
 
         // Append actions (Reply/Delete) after the thread
         if (rootCard._actions) {
-          rootCard.appendChild(rootCard._actions);
+          rootCard.appendChild(rootCard._actions)
         }
 
-        commentContainer.appendChild(rootCard);
+        commentContainer.appendChild(rootCard)
       }
 
       // Insert after the target block
-      targetBlock.parentNode.insertBefore(commentContainer, targetBlock.nextSibling);
+      targetBlock.parentNode.insertBefore(
+        commentContainer,
+        targetBlock.nextSibling,
+      )
 
       // Click the indicator to toggle comment visibility and highlight blocks
       if (gutter) {
-        var indicator = gutter.querySelector(".comment-indicator");
+        const indicator = gutter.querySelector('.comment-indicator')
         if (indicator) {
-          (function (container, gFile, gFrom, gTo) {
-            indicator.addEventListener("click", function (e) {
-              e.stopPropagation();
-              var visible = container.style.display !== "none";
+          ;(function (container, gFile, gFrom, gTo) {
+            indicator.addEventListener('click', function (e) {
+              e.stopPropagation()
+              const visible = container.style.display !== 'none'
               if (visible) {
-                container.style.display = "none";
+                container.style.display = 'none'
               } else {
-                container.style.display = "";
-                var pane = document.querySelector('.doc-tab-pane[data-doc-file="' + CSS.escape(gFile) + '"]');
+                container.style.display = ''
+                const pane = document.querySelector(
+                  '.doc-tab-pane[data-doc-file="' + CSS.escape(gFile) + '"]',
+                )
                 if (pane && window.walkthroughSelectRange) {
-                  window.walkthroughSelectRange(pane, gFrom, gTo);
+                  window.walkthroughSelectRange(pane, gFrom, gTo)
                 }
               }
-            });
-          })(commentContainer, group.file, group.lineFrom, group.lineTo);
+            })
+          })(commentContainer, group.file, group.lineFrom, group.lineTo)
         }
       }
     } else {
       // Code page: use table rows
-      var targetRow = findRowForLine(group.file, group.lineTo);
-      if (!targetRow) return;
+      const targetRow = findRowForLine(group.file, group.lineTo)
+      if (!targetRow) {return}
 
       // Find the lineFrom row to place the indicator
-      var indicatorRow = findRowForLine(group.file, group.lineFrom);
-      if (!indicatorRow) indicatorRow = targetRow;
+      let indicatorRow = findRowForLine(group.file, group.lineFrom)
+      if (!indicatorRow) {indicatorRow = targetRow}
 
       // Create the indicator dot on the lineFrom row (yellow = unresolved, green = all resolved)
-      var numCell = indicatorRow.querySelector(".line-num");
+      const numCell = indicatorRow.querySelector('.line-num')
       if (numCell) {
-        var dot = document.createElement("span");
-        dot.className = "comment-indicator" + (allResolved ? " comment-indicator-resolved" : "");
-        dot.title = totalCount + " comment" + (totalCount === 1 ? "" : "s") + (allResolved ? " (resolved)" : "");
-        numCell.insertBefore(dot, numCell.firstChild);
+        const dot = document.createElement('span')
+        dot.className =
+          'comment-indicator' +
+          (allResolved ? ' comment-indicator-resolved' : '')
+        dot.title =
+          totalCount +
+          ' comment' +
+          (totalCount === 1 ? '' : 's') +
+          (allResolved ? ' (resolved)' : '')
+        numCell.insertBefore(dot, numCell.firstChild)
       }
 
       // Build the comment row — expanded if group is in expandedGroups, hidden otherwise
-      var commentRow = document.createElement("tr");
-      commentRow.className = "comment-row";
+      const commentRow = document.createElement('tr')
+      commentRow.className = 'comment-row'
       if (!startExpanded) {
-        commentRow.style.display = "none";
+        commentRow.style.display = 'none'
       }
-      var commentCell = document.createElement("td");
-      commentCell.colSpan = 2;
-      commentCell.className = "comment-card-cell";
+      const commentCell = document.createElement('td')
+      commentCell.colSpan = 2
+      commentCell.className = 'comment-card-cell'
 
-      for (var i = 0; i < roots.length; i++) {
-        var rootCard = buildCommentCard(roots[i], false);
+      for (let i = 0; i < roots.length; i++) {
+        const rootCard = buildCommentCard(roots[i], false)
 
         // Render replies for this root
-        var childReplies = repliesByParent[roots[i].id] || [];
+        const childReplies = repliesByParent[roots[i].id] || []
         if (childReplies.length > 0) {
-          var thread = document.createElement("div");
-          thread.className = "comment-thread";
-          for (var j = 0; j < childReplies.length; j++) {
-            thread.appendChild(buildCommentCard(childReplies[j], true));
+          const thread = document.createElement('div')
+          thread.className = 'comment-thread'
+          for (let j = 0; j < childReplies.length; j++) {
+            thread.appendChild(buildCommentCard(childReplies[j], true))
           }
-          rootCard.appendChild(thread);
+          rootCard.appendChild(thread)
         }
 
         // Append actions (Reply/Delete) after the thread
         if (rootCard._actions) {
-          rootCard.appendChild(rootCard._actions);
+          rootCard.appendChild(rootCard._actions)
         }
 
-        commentCell.appendChild(rootCard);
+        commentCell.appendChild(rootCard)
       }
 
-      commentRow.appendChild(commentCell);
-      targetRow.parentNode.insertBefore(commentRow, targetRow.nextSibling);
+      commentRow.appendChild(commentCell)
+      targetRow.parentNode.insertBefore(commentRow, targetRow.nextSibling)
 
       // Click the indicator to toggle comment visibility and highlight lines
       if (numCell) {
-        var indicator = numCell.querySelector(".comment-indicator");
+        const indicator = numCell.querySelector('.comment-indicator')
         if (indicator) {
-          (function (row, gFile, gFrom, gTo) {
-            indicator.addEventListener("click", function (e) {
-              e.stopPropagation();
-              var visible = row.style.display !== "none";
+          ;(function (row, gFile, gFrom, gTo) {
+            indicator.addEventListener('click', function (e) {
+              e.stopPropagation()
+              const visible = row.style.display !== 'none'
               if (visible) {
-                row.style.display = "none";
+                row.style.display = 'none'
               } else {
-                row.style.display = "";
-                var table = numCell.closest(".code-table");
+                row.style.display = ''
+                const table = numCell.closest('.code-table')
                 if (table && window.walkthroughSelectRange) {
-                  window.walkthroughSelectRange(table, gFrom, gTo);
+                  window.walkthroughSelectRange(table, gFrom, gTo)
                 }
               }
-            });
-          })(commentRow, group.file, group.lineFrom, group.lineTo);
+            })
+          })(commentRow, group.file, group.lineFrom, group.lineTo)
         }
       }
     }
@@ -666,22 +751,31 @@
    */
   function formatTime(iso) {
     try {
-      var d = new Date(iso);
-      if (typeof Intl === "undefined" || typeof Intl.RelativeTimeFormat !== "function") {
-        return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const d = new Date(iso)
+      if (
+        typeof Intl === 'undefined' ||
+        typeof Intl.RelativeTimeFormat !== 'function'
+      ) {
+        return (
+          d.toLocaleDateString() +
+          ' ' +
+          d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        )
       }
-      var rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-      var diffSec = Math.round((d.getTime() - Date.now()) / 1000);
-      var abs = Math.abs(diffSec);
-      if (abs < 60) return rtf.format(diffSec, "second");
-      if (abs < 3600) return rtf.format(Math.round(diffSec / 60), "minute");
-      if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), "hour");
-      if (abs < 86400 * 7) return rtf.format(Math.round(diffSec / 86400), "day");
-      if (abs < 86400 * 30) return rtf.format(Math.round(diffSec / (86400 * 7)), "week");
-      if (abs < 86400 * 365) return rtf.format(Math.round(diffSec / (86400 * 30)), "month");
-      return rtf.format(Math.round(diffSec / (86400 * 365)), "year");
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+      const diffSec = Math.round((d.getTime() - Date.now()) / 1000)
+      const abs = Math.abs(diffSec)
+      if (abs < 60) {return rtf.format(diffSec, 'second')}
+      if (abs < 3600) {return rtf.format(Math.round(diffSec / 60), 'minute')}
+      if (abs < 86400) {return rtf.format(Math.round(diffSec / 3600), 'hour')}
+      if (abs < 86400 * 7) {return rtf.format(Math.round(diffSec / 86400), 'day')}
+      if (abs < 86400 * 30)
+        {return rtf.format(Math.round(diffSec / (86400 * 7)), 'week')}
+      if (abs < 86400 * 365)
+        {return rtf.format(Math.round(diffSec / (86400 * 30)), 'month')}
+      return rtf.format(Math.round(diffSec / (86400 * 365)), 'year')
     } catch (_) {
-      return iso;
+      return iso
     }
   }
 
@@ -690,14 +784,16 @@
    * timestamp in the title attribute (so hover surfaces the precise time).
    */
   function timeElement(iso) {
-    var el = document.createElement("time");
-    el.setAttribute("datetime", iso);
+    const el = document.createElement('time')
+    el.setAttribute('datetime', iso)
     try {
-      var d = new Date(iso);
-      el.setAttribute("title", d.toLocaleString());
-    } catch (_) { /* leave title unset */ }
-    el.textContent = formatTime(iso);
-    return el;
+      const d = new Date(iso)
+      el.setAttribute('title', d.toLocaleString())
+    } catch (_) {
+      /* leave title unset */
+    }
+    el.textContent = formatTime(iso)
+    return el
   }
 
   /* ------------------------------------------------------------------ */
@@ -705,144 +801,155 @@
   /* ------------------------------------------------------------------ */
 
   function createAddButton() {
-    var btn = document.createElement("button");
-    btn.className = "comment-add-btn";
-    btn.textContent = "+ Comment";
-    btn.style.display = "none";
-    document.body.appendChild(btn);
-    return btn;
+    const btn = document.createElement('button')
+    btn.className = 'comment-add-btn'
+    btn.textContent = '+ Comment'
+    btn.style.display = 'none'
+    document.body.appendChild(btn)
+    return btn
   }
 
   function positionAddButton(sel) {
-    if (!addBtn) addBtn = createAddButton();
+    if (!addBtn) {addBtn = createAddButton()}
 
     // Position near the last selected row in the code column
-    var selectedElements = isDocumentsPage
-      ? document.querySelectorAll(".doc-block.block-selected")
-      : document.querySelectorAll(".code-table tr.selected");
+    const selectedElements = isDocumentsPage
+      ? document.querySelectorAll('.doc-block.block-selected')
+      : document.querySelectorAll('.code-table tr.selected')
     if (selectedElements.length === 0) {
-      addBtn.style.display = "none";
-      return;
+      addBtn.style.display = 'none'
+      return
     }
 
-    var lastEl = selectedElements[selectedElements.length - 1];
-    var rect = lastEl.getBoundingClientRect();
-    var btnLeft = Math.min(rect.right - 100, window.innerWidth - 120);
-    addBtn.style.display = "block";
-    addBtn.style.position = "fixed";
-    addBtn.style.top = (rect.bottom + 4) + "px";
-    addBtn.style.left = btnLeft + "px";
-    addBtn.style.zIndex = "100";
+    const lastEl = selectedElements[selectedElements.length - 1]
+    const rect = lastEl.getBoundingClientRect()
+    const btnLeft = Math.min(rect.right - 100, window.innerWidth - 120)
+    addBtn.style.display = 'block'
+    addBtn.style.position = 'fixed'
+    addBtn.style.top = rect.bottom + 4 + 'px'
+    addBtn.style.left = btnLeft + 'px'
+    addBtn.style.zIndex = '100'
   }
 
   function hideAddButton() {
-    if (addBtn) addBtn.style.display = "none";
+    if (addBtn) {addBtn.style.display = 'none'}
   }
 
   function findLastSelectedElement() {
-    var selector = isDocumentsPage ? ".doc-block.block-selected" : ".code-table tr.selected";
-    var selected = document.querySelectorAll(selector);
-    return selected.length > 0 ? selected[selected.length - 1] : null;
+    const selector = isDocumentsPage
+      ? '.doc-block.block-selected'
+      : '.code-table tr.selected'
+    const selected = document.querySelectorAll(selector)
+    return selected.length > 0 ? selected[selected.length - 1] : null
   }
 
   function showCommentForm(sel) {
     // Prompt for author name before showing the form
-    var author = ensureAuthor();
-    if (!author) return;
+    const author = ensureAuthor()
+    if (!author) {return}
 
-    hideAddButton();
+    hideAddButton()
 
     // Remove existing form
-    var existingForm = document.querySelector(".comment-form-row, .doc-comment-form");
-    if (existingForm) existingForm.remove();
+    const existingForm = document.querySelector(
+      '.comment-form-row, .doc-comment-form',
+    )
+    if (existingForm) {existingForm.remove()}
 
-    var lastEl = findLastSelectedElement();
-    if (!lastEl) return;
+    const lastEl = findLastSelectedElement()
+    if (!lastEl) {return}
 
-    var container = document.createElement("div");
-    container.className = "comment-form-container";
+    const container = document.createElement('div')
+    container.className = 'comment-form-container'
 
     // Build label based on page type (block IDs use "B" prefix on documents page)
-    var prefix = isDocumentsPage ? "B" : "L";
-    var range = sel.from === sel.to
-      ? prefix + sel.from
-      : prefix + sel.from + "-" + prefix + sel.to;
-    var label = document.createElement("div");
-    label.className = "comment-form-label";
-    label.textContent = "Comment on " + sel.file + " " + range;
+    const prefix = isDocumentsPage ? 'B' : 'L'
+    const range =
+      sel.from === sel.to
+        ? prefix + sel.from
+        : prefix + sel.from + '-' + prefix + sel.to
+    const label = document.createElement('div')
+    label.className = 'comment-form-label'
+    label.textContent = 'Comment on ' + sel.file + ' ' + range
 
-    var textarea = document.createElement("textarea");
-    textarea.className = "comment-form-textarea";
-    textarea.placeholder = "Write a comment...";
-    textarea.rows = 3;
+    const textarea = document.createElement('textarea')
+    textarea.className = 'comment-form-textarea'
+    textarea.placeholder = 'Write a comment...'
+    textarea.rows = 3
 
-    var btnRow = document.createElement("div");
-    btnRow.className = "comment-form-actions";
+    const btnRow = document.createElement('div')
+    btnRow.className = 'comment-form-actions'
 
-    var cancelBtn = document.createElement("button");
-    cancelBtn.className = "comment-form-cancel";
-    cancelBtn.textContent = "Cancel";
-    cancelBtn.addEventListener("click", function () {
+    const cancelBtn = document.createElement('button')
+    cancelBtn.className = 'comment-form-cancel'
+    cancelBtn.textContent = 'Cancel'
+    cancelBtn.addEventListener('click', function () {
       if (isDocumentsPage) {
-        var formEl = document.querySelector(".doc-comment-form");
-        if (formEl) formEl.remove();
+        const formEl = document.querySelector('.doc-comment-form')
+        if (formEl) {formEl.remove()}
       } else {
-        var formRow = document.querySelector(".comment-form-row");
-        if (formRow) formRow.remove();
+        const formRow = document.querySelector('.comment-form-row')
+        if (formRow) {formRow.remove()}
       }
-    });
+    })
 
-    var submitBtn = document.createElement("button");
-    submitBtn.className = "comment-form-submit";
-    submitBtn.textContent = "Submit";
-    submitBtn.addEventListener("click", function () {
-      var text = textarea.value.trim();
-      if (!text) return;
+    const submitBtn = document.createElement('button')
+    submitBtn.className = 'comment-form-submit'
+    submitBtn.textContent = 'Submit'
+    submitBtn.addEventListener('click', function () {
+      const text = textarea.value.trim()
+      if (!text) {return}
       postComment(sel.file, sel.from, sel.to, text, null, function () {
         if (isDocumentsPage) {
-          var formEl = document.querySelector(".doc-comment-form");
-          if (formEl) formEl.remove();
+          const formEl = document.querySelector('.doc-comment-form')
+          if (formEl) {formEl.remove()}
         } else {
-          var formRow = document.querySelector(".comment-form-row");
-          if (formRow) formRow.remove();
+          const formRow = document.querySelector('.comment-form-row')
+          if (formRow) {formRow.remove()}
         }
-      });
-    });
+      })
+    })
 
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(submitBtn);
-    container.appendChild(label);
-    container.appendChild(textarea);
-    container.appendChild(btnRow);
+    btnRow.appendChild(cancelBtn)
+    btnRow.appendChild(submitBtn)
+    container.appendChild(label)
+    container.appendChild(textarea)
+    container.appendChild(btnRow)
 
     if (isDocumentsPage) {
       // On documents page: insert form as a div after the last selected block
-      var formDiv = document.createElement("div");
-      formDiv.className = "doc-comment-form";
-      formDiv.appendChild(container);
-      lastEl.parentNode.insertBefore(formDiv, lastEl.nextSibling);
+      const formDiv = document.createElement('div')
+      formDiv.className = 'doc-comment-form'
+      formDiv.appendChild(container)
+      lastEl.parentNode.insertBefore(formDiv, lastEl.nextSibling)
     } else {
       // On code pages: insert form as a table row
-      var formRow = document.createElement("tr");
-      formRow.className = "comment-form-row";
-      var formCell = document.createElement("td");
-      formCell.colSpan = 2;
-      formCell.className = "comment-form-cell";
-      formCell.appendChild(container);
-      formRow.appendChild(formCell);
-      lastEl.parentNode.insertBefore(formRow, lastEl.nextSibling);
+      const formRow = document.createElement('tr')
+      formRow.className = 'comment-form-row'
+      const formCell = document.createElement('td')
+      formCell.colSpan = 2
+      formCell.className = 'comment-form-cell'
+      formCell.appendChild(container)
+      formRow.appendChild(formCell)
+      lastEl.parentNode.insertBefore(formRow, lastEl.nextSibling)
     }
 
-    textarea.focus({ preventScroll: true });
+    textarea.focus({ preventScroll: true })
 
     // Scroll the first selected element to the top, accounting for the sticky header
-    var firstSelectedSelector = isDocumentsPage ? ".doc-block.block-selected" : ".code-table tr.selected";
-    var firstSelected = document.querySelector(firstSelectedSelector);
+    const firstSelectedSelector = isDocumentsPage
+      ? '.doc-block.block-selected'
+      : '.code-table tr.selected'
+    const firstSelected = document.querySelector(firstSelectedSelector)
     if (firstSelected) {
-      var topbar = document.querySelector(".topbar");
-      var headerHeight = topbar ? topbar.getBoundingClientRect().height : 0;
-      var targetY = firstSelected.getBoundingClientRect().top + window.scrollY - headerHeight - 8;
-      window.scrollTo({ top: targetY });
+      const topbar = document.querySelector('.topbar')
+      const headerHeight = topbar ? topbar.getBoundingClientRect().height : 0
+      const targetY =
+        firstSelected.getBoundingClientRect().top +
+        window.scrollY -
+        headerHeight -
+        8
+      window.scrollTo({ top: targetY })
     }
   }
 
@@ -850,44 +957,48 @@
   /*  Event Listeners                                                    */
   /* ------------------------------------------------------------------ */
 
-  document.addEventListener("walkthroughselectionchange", function () {
-    var sel = window.walkthroughSelection;
+  document.addEventListener('walkthroughselectionchange', function () {
+    const sel = window.walkthroughSelection
     if (sel) {
-      positionAddButton(sel);
+      positionAddButton(sel)
     } else {
-      hideAddButton();
+      hideAddButton()
     }
-  });
+  })
 
   // Add button click handler (delegated since button is created lazily)
-  document.addEventListener("click", function (e) {
-    if (e.target.classList && e.target.classList.contains("comment-add-btn")) {
-      var sel = window.walkthroughSelection;
+  document.addEventListener('click', function (e) {
+    if (e.target.classList && e.target.classList.contains('comment-add-btn')) {
+      const sel = window.walkthroughSelection
       if (sel) {
-        showCommentForm(sel);
+        showCommentForm(sel)
       }
     }
-  });
+  })
 
   // Hide the add-comment button on scroll
-  window.addEventListener("scroll", function () {
-    hideAddButton();
-  }, { passive: true });
+  window.addEventListener(
+    'scroll',
+    function () {
+      hideAddButton()
+    },
+    { passive: true },
+  )
 
   // Re-render comments when tabs change on documents page
-  document.addEventListener("doctabchange", function () {
-    renderAllComments();
-  });
+  document.addEventListener('doctabchange', function () {
+    renderAllComments()
+  })
 
   function init() {
-    renderDemoBanner();
-    renderAuthUi();
-    fetchComments();
+    renderDemoBanner()
+    renderAuthUi()
+    fetchComments()
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init)
   } else {
-    init();
+    init()
   }
-})();
+})()

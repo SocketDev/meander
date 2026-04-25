@@ -738,7 +738,7 @@ function renderPartNav(
     .map(part => {
       const cls = part.id === activePartId ? 'active' : ''
       const shortTitle = firstSignificantWord(part.title)
-      const full = `Part ${part.id}: ${part.title}`
+      const full = part.title
       return `<a class="${cls}" href="${partUrl(slug, part, basePath)}" title="${escapeHtml(full)}">${escapeHtml(shortTitle)}</a>`
     })
     .join('\n')
@@ -892,7 +892,7 @@ ${sectionRows}
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Walkthrough Part ${part.id}: ${escapeHtml(part.title)}</title>
+  <title>${escapeHtml(part.title)}</title>
   ${HLJS_PRELOAD_HINTS}
   ${headExtra}
   ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
@@ -900,7 +900,7 @@ ${sectionRows}
 </head>
 <body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'${commentBackendAttr}>
   <header class="topbar">
-    <h1>Part ${part.id}: ${escapeHtml(part.title)}</h1>
+    <h1>${escapeHtml(part.title)}</h1>
     <p>${escapeHtml(part.objective)}</p>
     <div class="part-nav">
       ${renderPartNav(slug, parts, part.id, hasDocuments, basePath)}
@@ -955,7 +955,7 @@ function renderIndexHtml(
         : ''
       return `<a class="mdr-toc-card" href="${partUrl(slug, part, basePath)}">
           <span class="mdr-toc-card-header">
-            <span class="mdr-toc-card-num">Part ${part.id}</span>
+            <span class="mdr-toc-card-num">Marker ${part.id}</span>
             ${badge}
           </span>
           <span class="mdr-toc-card-title">${escapeHtml(part.title)}</span>
@@ -1005,7 +1005,7 @@ function renderIndexHtml(
   <main class="mdr-index">
     ${heroHtml}
     <section class="mdr-toc">
-      <h2>Parts</h2>
+      <h2>Markers</h2>
       <div class="mdr-toc-grid">
         ${partCards}
         ${docsCard}
@@ -1453,7 +1453,7 @@ function renderFooter(
   if (footer === false) {
     return ''
   }
-  const defaultText = 'Built with meander'
+  const defaultText = 'Go wander with meander'
   const defaultHref = 'https://github.com/divmain/meander'
   const cfg = typeof footer === 'object' ? footer : {}
   const text = cfg.text ?? defaultText
@@ -1509,28 +1509,65 @@ function normalizeDocs(
  * "Anatomy, of a PURL" still lands on "Anatomy".
  */
 function firstSignificantWord(title: string): string {
+  /* Articles, conjunctions, short prepositions, and verb-particle
+   * tails (`Setting *Up*`, `Rolling *Out*`) never carry the
+   * title's meaning — always skip. */
   const stop = new Set([
+    '&',
     'a',
     'an',
-    'the',
     'and',
-    'or',
-    'of',
+    'down',
     'for',
-    'to',
     'in',
+    'of',
     'on',
+    'or',
+    'out',
+    'over',
+    'the',
+    'through',
+    'to',
+    'up',
     'with',
-    '&',
   ])
+  /* Gerund-style openers ("Getting Started", "Introducing X",
+   * "Setting Up Y") read as connective tissue, not the topic.
+   * When one of these leads AND a meaningful word follows, the
+   * follower is the better label. When the gerund stands alone
+   * ("Getting") it's all we've got, so we keep it. */
+  const weakLead = new Set([
+    'becoming',
+    'building',
+    'creating',
+    'designing',
+    'exploring',
+    'getting',
+    'introducing',
+    'making',
+    'setting',
+    'starting',
+    'understanding',
+    'using',
+    'working',
+  ])
+  const cleanWord = (w: string) => w.replace(/[,:;.!?]+$/, '')
   const words = title.split(/\s+/)
+  const significant: string[] = []
   for (const w of words) {
-    const cleaned = w.replace(/[,:;.!?]+$/, '')
+    const cleaned = cleanWord(w)
     if (cleaned && !stop.has(cleaned.toLowerCase())) {
-      return cleaned
+      significant.push(cleaned)
     }
   }
-  return words[0] ?? title
+  if (significant.length === 0) {
+    return words[0] ?? title
+  }
+  const first = significant[0]!
+  if (weakLead.has(first.toLowerCase()) && significant.length > 1) {
+    return significant[1]!
+  }
+  return first
 }
 
 /**
@@ -1987,10 +2024,20 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * toggles the read-only banner + composer disable in the
    * client. Both appear on part pages, documents pages, AND the
    * index so the banner shows up everywhere the reader lands. */
+  /* Map of part-id → title, surfaced to client-side modules
+   * (unresolved-comments group headers, etc.) so they can render
+   * the title alongside the number without an extra fetch. Keyed
+   * by id (not array index) so out-of-order or sparsely-numbered
+   * parts still resolve. */
+  const partTitlesById = JSON.stringify(
+    Object.fromEntries(parts.map(p => [String(p.id), p.title])),
+  )
   const bodyAttrs =
     (resolved.comments.backend
       ? ` data-comment-backend="${escapeHtml(resolved.comments.backend.replace(/\/+$/, ''))}"`
-      : '') + (resolved.demoMode ? ' data-demo-mode="true"' : '')
+      : '') +
+    (resolved.demoMode ? ' data-demo-mode="true"' : '') +
+    ` data-part-titles='${escapeHtml(partTitlesById)}'`
   const commentBackendAttr = bodyAttrs
 
   /* Post-render pipeline. Order matters:
@@ -2217,7 +2264,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     }
     const partLines = parts.map(part => {
       const url = abs(partUrl(slug, part, basePath))
-      return `- [Part ${part.id}: ${part.title}](${url}): ${part.objective}`
+      return `- [Marker ${part.id}: ${part.title}](${url}): ${part.objective}`
     })
     const docLines = documents.map(d => {
       /* Prefer the clean /slug/docs/<filename> URL when the

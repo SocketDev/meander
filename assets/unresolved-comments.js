@@ -1,33 +1,60 @@
-(function () {
-  "use strict";
+;(function () {
+  'use strict'
 
-  var slug = document.body.getAttribute("data-slug");
-  if (!slug) return;
+  const slug = document.body.getAttribute('data-slug')
+  if (!slug) {return}
 
-  var apiBase = "/" + slug + "/api/comments/unresolved";
-  var dropdown = null;
-  var unresolvedCount = 0;
+  const ns = window[Symbol.for('meander:pages')]
+  const apiBase = '/' + slug + '/api/comments/unresolved'
+  let dropdown = null
+  let unresolvedCount = 0
+
+  /* Resolve a part id to its human title via the body's
+   * data-part-titles map (emitted by generate.mts). Falls back
+   * to "Marker N" when the title is missing — the bare number
+   * is meaningless context-free, so the prefix is required.
+   * "Documents" is part 0 by convention. */
+  const partTitlesById = (function () {
+    try {
+      const raw = document.body.getAttribute('data-part-titles')
+      if (!raw) {
+        return {}
+      }
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (_) {
+      return {}
+    }
+  })()
+  function partLabel(partId) {
+    if (partId === 0) {return 'Documents'}
+    const title = partTitlesById[String(partId)]
+    return title || 'Marker ' + partId
+  }
 
   /* ------------------------------------------------------------------ */
   /*  SVG Icon                                                           */
   /* ------------------------------------------------------------------ */
 
   function createIcon() {
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "18");
-    svg.setAttribute("height", "18");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "2");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('width', '18')
+    svg.setAttribute('height', '18')
+    svg.setAttribute('fill', 'none')
+    svg.setAttribute('stroke', 'currentColor')
+    svg.setAttribute('stroke-width', '2')
+    svg.setAttribute('stroke-linecap', 'round')
+    svg.setAttribute('stroke-linejoin', 'round')
 
-    var path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path1.setAttribute("d", "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z");
-    svg.appendChild(path1);
+    const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path1.setAttribute(
+      'd',
+      'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+    )
+    svg.appendChild(path1)
 
-    return svg;
+    return svg
   }
 
   /* ------------------------------------------------------------------ */
@@ -35,35 +62,35 @@
   /* ------------------------------------------------------------------ */
 
   function createButton() {
-    var btn = document.createElement("button");
-    btn.className = "unresolved-btn";
-    btn.title = "View unresolved comments";
-    btn.setAttribute("aria-label", "View unresolved comments");
+    const btn = document.createElement('button')
+    btn.className = 'unresolved-btn'
+    btn.title = 'View unresolved comments'
+    btn.setAttribute('aria-label', 'View unresolved comments')
 
-    btn.appendChild(createIcon());
+    btn.appendChild(createIcon())
 
-    var badge = document.createElement("span");
-    badge.className = "unresolved-badge";
-    badge.style.display = "none";
-    btn.appendChild(badge);
+    const badge = document.createElement('span')
+    badge.className = 'unresolved-badge'
+    badge.style.display = 'none'
+    btn.appendChild(badge)
 
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      toggleDropdown();
-    });
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation()
+      toggleDropdown()
+    })
 
-    return btn;
+    return btn
   }
 
   function updateBadge(count) {
-    unresolvedCount = count;
-    var badge = document.querySelector(".unresolved-badge");
-    if (!badge) return;
+    unresolvedCount = count
+    const badge = document.querySelector('.unresolved-badge')
+    if (!badge) {return}
     if (count > 0) {
-      badge.textContent = count;
-      badge.style.display = "inline-flex";
+      badge.textContent = count
+      badge.style.display = 'inline-flex'
     } else {
-      badge.style.display = "none";
+      badge.style.display = 'none'
     }
   }
 
@@ -72,87 +99,97 @@
   /* ------------------------------------------------------------------ */
 
   function createDropdown() {
-    var el = document.createElement("div");
-    el.className = "unresolved-dropdown";
-    el.style.display = "none";
+    const el = document.createElement('div')
+    el.className = 'unresolved-dropdown'
+    el.style.display = 'none'
 
-    var header = document.createElement("div");
-    header.className = "unresolved-dropdown-header";
-    header.textContent = "Unresolved Comments";
-    el.appendChild(header);
+    const header = document.createElement('div')
+    header.className = 'unresolved-dropdown-header'
+    header.textContent = 'Unresolved Comments'
+    el.appendChild(header)
 
-    var list = document.createElement("div");
-    list.className = "unresolved-list";
-    el.appendChild(list);
+    const list = document.createElement('div')
+    list.className = 'unresolved-list'
+    el.appendChild(list)
 
-    var empty = document.createElement("div");
-    empty.className = "unresolved-empty";
-    empty.textContent = "No unresolved comments";
-    empty.style.display = "none";
-    el.appendChild(empty);
+    const empty = document.createElement('div')
+    empty.className = 'unresolved-empty'
+    empty.textContent = 'No unresolved comments'
+    empty.style.display = 'none'
+    el.appendChild(empty)
 
-    document.body.appendChild(el);
-    return el;
+    document.body.appendChild(el)
+    return el
   }
 
   function positionDropdown() {
-    if (!dropdown) return;
-    var btn = document.querySelector(".unresolved-btn");
-    if (!btn) return;
-    var rect = btn.getBoundingClientRect();
-    dropdown.style.position = "fixed";
-    dropdown.style.top = (rect.bottom + 8) + "px";
-    dropdown.style.right = (window.innerWidth - rect.right) + "px";
+    if (!dropdown) {return}
+    const btn = document.querySelector('.unresolved-btn')
+    if (!btn) {return}
+    const rect = btn.getBoundingClientRect()
+    dropdown.style.position = 'fixed'
+    dropdown.style.top = rect.bottom + 8 + 'px'
+    dropdown.style.right = window.innerWidth - rect.right + 'px'
   }
 
   function toggleDropdown() {
     if (!dropdown) {
-      dropdown = createDropdown();
+      dropdown = createDropdown()
     }
 
-    var visible = dropdown.style.display !== "none";
+    const visible = dropdown.style.display !== 'none'
     if (visible) {
-      dropdown.style.display = "none";
-      return;
+      dropdown.style.display = 'none'
+      return
     }
 
-    positionDropdown();
-    dropdown.style.display = "block";
-    fetchAndRenderComments();
+    if (ns && ns.popovers) {ns.popovers.openExclusive(closeDropdown)}
+    positionDropdown()
+    dropdown.style.display = 'block'
+    fetchAndRenderComments()
   }
 
   function closeDropdown() {
     if (dropdown) {
-      dropdown.style.display = "none";
+      dropdown.style.display = 'none'
     }
   }
+  if (ns && ns.popovers) {ns.popovers.register(closeDropdown)}
 
   /* ------------------------------------------------------------------ */
   /*  API                                                                */
   /* ------------------------------------------------------------------ */
 
   function fetchAndRenderComments() {
-    var list = dropdown.querySelector(".unresolved-list");
-    var empty = dropdown.querySelector(".unresolved-empty");
+    const list = dropdown.querySelector('.unresolved-list')
+    const empty = dropdown.querySelector('.unresolved-empty')
     list.innerHTML =
       '<div class="unresolved-skeleton" aria-hidden="true">' +
       '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
       '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
       '<div class="unresolved-skel-row"><div class="unresolved-skel-line skel-1"></div><div class="unresolved-skel-line skel-2"></div></div>' +
       '</div>' +
-      '<span class="visually-hidden" role="status">Loading unresolved comments…</span>';
-    empty.style.display = "none";
+      '<span class="visually-hidden" role="status">Loading unresolved comments…</span>'
+    empty.style.display = 'none'
 
-    fetch(apiBase, { signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined })
-      .then(function (r) { return r.json(); })
+    fetch(apiBase, {
+      signal:
+        typeof AbortSignal !== 'undefined' &&
+        typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(10000)
+          : undefined,
+    })
+      .then(function (r) {
+        return r.json()
+      })
       .then(function (comments) {
-        updateBadge(comments.length);
-        renderComments(comments);
+        updateBadge(comments.length)
+        renderComments(comments)
       })
       .catch(function (err) {
-        console.error("Failed to fetch unresolved comments:", err);
-        list.innerHTML = '<div class="unresolved-error">Failed to load</div>';
-      });
+        console.error('Failed to fetch unresolved comments:', err)
+        list.innerHTML = '<div class="unresolved-error">Failed to load</div>'
+      })
   }
 
   /* ------------------------------------------------------------------ */
@@ -160,108 +197,124 @@
   /* ------------------------------------------------------------------ */
 
   function renderComments(comments) {
-    var list = dropdown.querySelector(".unresolved-list");
-    var empty = dropdown.querySelector(".unresolved-empty");
-    list.innerHTML = "";
+    const list = dropdown.querySelector('.unresolved-list')
+    const empty = dropdown.querySelector('.unresolved-empty')
+    list.innerHTML = ''
 
     if (comments.length === 0) {
-      empty.style.display = "block";
-      return;
+      empty.style.display = 'block'
+      return
     }
 
-    var grouped = {};
-    for (var i = 0; i < comments.length; i++) {
-      var c = comments[i];
-      var key = c.part === 0 ? "Documents" : "Part " + c.part;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(c);
+    const grouped = {}
+    for (let i = 0; i < comments.length; i++) {
+      const c = comments[i]
+      const key = partLabel(c.part)
+      if (!grouped[key]) {grouped[key] = []}
+      grouped[key].push(c)
     }
 
-    var parts = Object.keys(grouped);
-    for (var p = 0; p < parts.length; p++) {
-      var partLabel = parts[p];
-      var partComments = grouped[partLabel];
+    const groupKeys = Object.keys(grouped)
+    for (let p = 0; p < groupKeys.length; p++) {
+      const groupKey = groupKeys[p]
+      const partComments = grouped[groupKey]
 
-      var groupHeader = document.createElement("div");
-      groupHeader.className = "unresolved-group-header";
-      groupHeader.textContent = partLabel + " (" + partComments.length + ")";
-      list.appendChild(groupHeader);
+      const groupHeader = document.createElement('div')
+      groupHeader.className = 'unresolved-group-header'
+      groupHeader.textContent = groupKey + ' (' + partComments.length + ')'
+      list.appendChild(groupHeader)
 
-      for (var j = 0; j < partComments.length; j++) {
-        var comment = partComments[j];
-        var item = createCommentItem(comment);
-        list.appendChild(item);
+      for (let j = 0; j < partComments.length; j++) {
+        const comment = partComments[j]
+        const item = createCommentItem(comment)
+        list.appendChild(item)
       }
     }
   }
 
   function createCommentItem(comment) {
-    var item = document.createElement("a");
-    item.className = "unresolved-item";
-    var range;
+    const item = document.createElement('a')
+    item.className = 'unresolved-item'
+    let range
     if (comment.part === 0) {
-      range = comment.lineFrom === comment.lineTo
-        ? "B" + comment.lineFrom
-        : "B" + comment.lineFrom + "-B" + comment.lineTo;
-      item.href = "/" + slug + "/documents#" + encodeURIComponent(comment.file) + ":" + range;
+      range =
+        comment.lineFrom === comment.lineTo
+          ? 'B' + comment.lineFrom
+          : 'B' + comment.lineFrom + '-B' + comment.lineTo
+      item.href =
+        '/' +
+        slug +
+        '/documents#' +
+        encodeURIComponent(comment.file) +
+        ':' +
+        range
     } else {
-      range = comment.lineFrom === comment.lineTo
-        ? "L" + comment.lineFrom
-        : "L" + comment.lineFrom + "-L" + comment.lineTo;
-      item.href = "/" + slug + "/part/" + comment.part + "#" + encodeURIComponent(comment.file) + ":" + range;
+      range =
+        comment.lineFrom === comment.lineTo
+          ? 'L' + comment.lineFrom
+          : 'L' + comment.lineFrom + '-L' + comment.lineTo
+      item.href =
+        '/' +
+        slug +
+        '/part/' +
+        comment.part +
+        '#' +
+        encodeURIComponent(comment.file) +
+        ':' +
+        range
     }
 
-    var fileLine = document.createElement("div");
-    fileLine.className = "unresolved-item-file";
-    fileLine.textContent = comment.file + " " + range;
+    const fileLine = document.createElement('div')
+    fileLine.className = 'unresolved-item-file'
+    fileLine.textContent = comment.file + ' ' + range
 
-    var author = document.createElement("span");
-    author.className = "unresolved-item-author";
-    author.textContent = comment.author;
+    const author = document.createElement('span')
+    author.className = 'unresolved-item-author'
+    author.textContent = comment.author
 
-    var preview = document.createElement("div");
-    preview.className = "unresolved-item-preview";
-    preview.textContent = truncate(comment.body, 80);
+    const preview = document.createElement('div')
+    preview.className = 'unresolved-item-preview'
+    preview.textContent = truncate(comment.body, 80)
 
-    var meta = document.createElement("div");
-    meta.className = "unresolved-item-meta";
-    meta.appendChild(author);
-    meta.appendChild(document.createTextNode(" \u00b7 "));
-    meta.appendChild(document.createTextNode(formatTime(comment.createdAt)));
+    const meta = document.createElement('div')
+    meta.className = 'unresolved-item-meta'
+    meta.appendChild(author)
+    meta.appendChild(document.createTextNode(' \u00b7 '))
+    meta.appendChild(document.createTextNode(formatTime(comment.createdAt)))
 
-    item.appendChild(fileLine);
-    item.appendChild(preview);
-    item.appendChild(meta);
+    item.appendChild(fileLine)
+    item.appendChild(preview)
+    item.appendChild(meta)
 
-    item.addEventListener("click", function (e) {
-      e.preventDefault();
-      window.location.href = item.href;
-    });
+    item.addEventListener('click', function (e) {
+      e.preventDefault()
+      window.location.href = item.href
+    })
 
-    return item;
+    return item
   }
 
   function truncate(str, max) {
-    if (str.length <= max) return str;
-    return str.substring(0, max - 3) + "...";
+    if (str.length <= max) {return str}
+    return str.substring(0, max - 3) + '...'
   }
 
   function formatTime(iso) {
     try {
-      var d = new Date(iso);
-      var now = new Date();
-      var diffMs = now - d;
-      var diffMins = Math.floor(diffMs / 60000);
-      var diffHours = Math.floor(diffMs / 3600000);
-      var diffDays = Math.floor(diffMs / 86400000);
+      const d = new Date(iso)
+      const now = new Date()
+      const diffMs = now - d
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffHours = Math.floor(diffMs / 3600000)
+      const diffDays = Math.floor(diffMs / 86400000)
 
-      if (diffMins < 1) return "just now";
-      if (diffMins < 60) return diffMins + "m ago";
-      if (diffHours < 24) return diffHours + "h ago";
-      if (diffDays < 7) return diffDays + "d ago";
-      return d.toLocaleDateString();
+      if (diffMins < 1) {return 'just now'}
+      if (diffMins < 60) {return diffMins + 'm ago'}
+      if (diffHours < 24) {return diffHours + 'h ago'}
+      if (diffDays < 7) {return diffDays + 'd ago'}
+      return d.toLocaleDateString()
     } catch (_) {
-      return iso;
+      return iso
     }
   }
 
@@ -270,52 +323,66 @@
   /* ------------------------------------------------------------------ */
 
   function init() {
-    var topbar = document.querySelector(".topbar");
-    if (!topbar) return;
+    const topbar = document.querySelector('.topbar')
+    if (!topbar) {return}
 
-    var actions = topbar.querySelector(".topbar-actions");
+    let actions = topbar.querySelector('.topbar-actions')
     if (!actions) {
-      actions = document.createElement("div");
-      actions.className = "topbar-actions";
-      topbar.appendChild(actions);
+      actions = document.createElement('div')
+      actions.className = 'topbar-actions'
+      topbar.appendChild(actions)
     }
 
-    var btn = createButton();
-    actions.appendChild(btn);
+    const btn = createButton()
+    actions.appendChild(btn)
 
     // Load unresolved comments count
-    loadUnresolved();
+    loadUnresolved()
 
     // Hide dropdown when clicking outside
-    document.addEventListener("click", function (e) {
-      if (!dropdown) return;
-      var btn = document.querySelector(".unresolved-btn");
-      var isClickInside = dropdown.contains(e.target) || btn.contains(e.target);
+    document.addEventListener('click', function (e) {
+      if (!dropdown) {return}
+      const btn = document.querySelector('.unresolved-btn')
+      const isClickInside = dropdown.contains(e.target) || btn.contains(e.target)
       if (!isClickInside) {
-        closeDropdown();
+        closeDropdown()
       }
-    });
+    })
 
     // Reposition dropdown on resize
-    window.addEventListener("resize", function () {
-      if (dropdown && dropdown.style.display !== "none") {
-        positionDropdown();
-      }
-    }, { passive: true });
+    window.addEventListener(
+      'resize',
+      function () {
+        if (dropdown && dropdown.style.display !== 'none') {
+          positionDropdown()
+        }
+      },
+      { passive: true },
+    )
   }
 
   function loadUnresolved() {
-    fetch(apiBase, { signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined })
-      .then(function (r) { return r.json(); })
-      .then(function (comments) {
-        updateBadge(comments.length);
+    fetch(apiBase, {
+      signal:
+        typeof AbortSignal !== 'undefined' &&
+        typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(10000)
+          : undefined,
+    })
+      .then(function (r) {
+        return r.json()
       })
-      .catch(function () { /* silently fail */ });
+      .then(function (comments) {
+        updateBadge(comments.length)
+      })
+      .catch(function () {
+        /* silently fail */
+      })
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init)
   } else {
-    init();
+    init()
   }
-})();
+})()

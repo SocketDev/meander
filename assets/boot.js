@@ -8,9 +8,9 @@
  *   - ns.storageGet(key)        guarded localStorage read
  *   - ns.storageSet(key, value) guarded write (null ⇒ remove)
  *   - ns.onReady(fn)            run after DOMContentLoaded */
-"use strict";
-(() => {
-  const ns = (window[Symbol.for("meander:pages")] ??= {});
+'use strict'
+;(() => {
+  const ns = (window[Symbol.for('meander:pages')] ??= {})
 
   /* Desktop + iOS Safari emit "…Safari/…" in their UA string
    * without any Chromium-family marker. Flagging them via
@@ -18,52 +18,86 @@
    * known Safari quirks — e.g. content-visibility: auto still
    * has :target + find-in-page glitches in Safari 18+. No-op
    * on every other browser. */
-  const ua = navigator.userAgent;
+  const ua = navigator.userAgent
   if (
-    ua.includes("Safari/") &&
-    !ua.includes("Chrome/") &&
-    !ua.includes("Chromium/") &&
-    !ua.includes("Edg/")
+    ua.includes('Safari/') &&
+    !ua.includes('Chrome/') &&
+    !ua.includes('Chromium/') &&
+    !ua.includes('Edg/')
   ) {
-    document.documentElement.setAttribute("data-ua", "safari");
+    document.documentElement.setAttribute('data-ua', 'safari')
   }
 
-  ns.storageGet = (key) => {
+  ns.storageGet = key => {
     try {
-      return localStorage.getItem(key);
+      return localStorage.getItem(key)
     } catch {
-      return null;
+      return null
     }
-  };
+  }
 
   ns.storageSet = (key, value) => {
     try {
       if (value === null) {
-        localStorage.removeItem(key);
+        localStorage.removeItem(key)
       } else {
-        localStorage.setItem(key, value);
+        localStorage.setItem(key, value)
       }
     } catch {
       /* private mode / quota / disabled — ignore */
     }
-  };
+  }
 
   const safe = (tag, fn) => {
     try {
-      fn();
+      fn()
     } catch (e) {
-      console.error(`[meander:pages] ${tag}:`, e);
+      console.error(`[meander:pages] ${tag}:`, e)
     }
-  };
+  }
 
-  ns.onReady = (fn) => {
-    const run = () => safe("onReady", fn);
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", run, { once: true });
+  ns.onReady = fn => {
+    const run = () => safe('onReady', fn)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run, { once: true })
     } else {
-      run();
+      run()
     }
-  };
+  }
+
+  /* Popover registry — keeps the topbar's various menus mutually
+   * exclusive. Each module registers a closer on install; before
+   * opening its own popover it calls openExclusive(self) which
+   * fires every other registered closer. Errors in one closer
+   * don't prevent the others from running.
+   *
+   *   const closer = () => closeMenu();
+   *   ns.popovers.register(closer);
+   *   ...
+   *   btn.addEventListener("click", () => {
+   *     ns.popovers.openExclusive(closer);
+   *     openMenu();
+   *   });
+   */
+  const closers = new Set()
+  ns.popovers = {
+    register(close) {
+      closers.add(close)
+      return () => closers.delete(close)
+    },
+    openExclusive(self) {
+      for (const close of closers) {
+        if (close !== self) {
+          safe('popovers.close', close)
+        }
+      }
+    },
+    closeAll() {
+      for (const close of closers) {
+        safe('popovers.close', close)
+      }
+    },
+  }
 
   /* Run `fn` once hljs has tokenized the first `.line-code code`
    * block. hljs splits text nodes when it runs, so any module
@@ -72,32 +106,32 @@
    * + once-guard so a slow CDN can't stall work, and the observer
    * + timeout can't both fire. Resolves immediately if there are
    * no code blocks or hljs already ran. */
-  ns.onHljsReady = (fn) => {
+  ns.onHljsReady = fn => {
     ns.onReady(() => {
-      const codes = document.querySelectorAll(".line-code code");
-      let fired = false;
+      const codes = document.querySelectorAll('.line-code code')
+      let fired = false
       const once = () => {
         if (fired) {
-          return;
+          return
         }
-        fired = true;
-        safe("onHljsReady", fn);
-      };
-      if (codes.length === 0 || codes[0].classList.contains("hljs")) {
-        once();
-        return;
+        fired = true
+        safe('onHljsReady', fn)
+      }
+      if (codes.length === 0 || codes[0].classList.contains('hljs')) {
+        once()
+        return
       }
       const obs = new MutationObserver(() => {
-        if (codes[0].classList.contains("hljs")) {
-          obs.disconnect();
-          once();
+        if (codes[0].classList.contains('hljs')) {
+          obs.disconnect()
+          once()
         }
-      });
-      obs.observe(codes[0], { attributes: true, attributeFilter: ["class"] });
+      })
+      obs.observe(codes[0], { attributes: true, attributeFilter: ['class'] })
       setTimeout(() => {
-        obs.disconnect();
-        once();
-      }, 1500);
-    });
-  };
-})();
+        obs.disconnect()
+        once()
+      }, 1500)
+    })
+  }
+})()
