@@ -285,6 +285,20 @@ a:hover {
   column-gap: 12px;
   row-gap: 0;
   align-items: start;
+  /* Paint the entire right column as one continuous dark band so
+   * stacked code sections sit inside ONE dark region instead of
+   * each carrying its own panel. No per-section gaps, no
+   * stairstep when the column reflows on splitter drag. The
+   * gradient stops at --col-split (left edge of code column)
+   * with a 12px transparent gutter for the column-gap. */
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--col-split, 50) * 1%),
+    transparent calc(var(--col-split, 50) * 1% + 12px),
+    var(--code-bg) calc(var(--col-split, 50) * 1% + 12px),
+    var(--code-bg) 100%
+  );
 }
 
 .files-stack {
@@ -356,6 +370,10 @@ a:hover {
 
 .file-grid pre {
   height: 100%;
+  /* Don't let <pre>'s default --code-bg leak past the section
+   * bounds during column reflow — let .code-section own the
+   * painted area instead. */
+  background: transparent;
 }
 
 .left-pane,
@@ -389,12 +407,6 @@ a:hover {
   border-collapse: collapse;
   width: 100%;
   border-spacing: 0;
-  /* Paint the whole table area in --code-bg so wrapped lines and
-   * non-cell gaps inherit the panel's dark fill. Without this,
-   * wrapped continuation rows leave ghost gaps where the rounded
-   * corner clip bites into the table, producing a stairstep on
-   * the left edge. */
-  background: var(--code-bg);
 }
 
 .code-table tr {
@@ -511,6 +523,18 @@ a:hover {
 .pair-grid .annotation-card,
 .pair-grid .code-section {
   margin-bottom: 0;
+}
+
+/* Pair-grid layout — the .pair-grid background gradient already
+ * paints the dark code area as one continuous band. The
+ * individual code-section boxes inside become invisible
+ * containers; they shouldn't paint their own bg, border, or
+ * radius (which would create visible boundaries between
+ * sections inside the otherwise-uniform dark column). */
+.pair-grid .code-section {
+  border-radius: 0;
+  border: 0;
+  background: transparent;
 }
 
 .code-section {
