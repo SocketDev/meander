@@ -47,6 +47,7 @@
     var btn = document.createElement("button");
     btn.className = "export-btn";
     btn.title = "Export comments";
+    btn.setAttribute("aria-label", "Export comments");
     btn.appendChild(createIcon());
 
     btn.addEventListener("click", function (e) {

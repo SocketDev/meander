@@ -38,6 +38,7 @@
     var btn = document.createElement("button");
     btn.className = "unresolved-btn";
     btn.title = "View unresolved comments";
+    btn.setAttribute("aria-label", "View unresolved comments");
 
     btn.appendChild(createIcon());
 
@@ -136,7 +137,7 @@
     list.innerHTML = '<div class="unresolved-loading">Loading...</div>';
     empty.style.display = "none";
 
-    fetch(apiBase)
+    fetch(apiBase, { signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined })
       .then(function (r) { return r.json(); })
       .then(function (comments) {
         updateBadge(comments.length);
@@ -298,7 +299,7 @@
   }
 
   function loadUnresolved() {
-    fetch(apiBase)
+    fetch(apiBase, { signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined })
       .then(function (r) { return r.json(); })
       .then(function (comments) {
         updateBadge(comments.length);

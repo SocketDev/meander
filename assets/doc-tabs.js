@@ -100,7 +100,8 @@
     var topbar = document.querySelector(".topbar");
     var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
     var y = el.getBoundingClientRect().top + window.scrollY - offset;
-    window.scrollTo({ top: y, behavior: "smooth" });
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
   }
 
   function scrollToTarget(anchor) {

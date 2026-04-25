@@ -160,7 +160,8 @@
 
     // Scroll the first selected row into view
     if (currentSelection.length > 0) {
-      currentSelection[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      currentSelection[0].scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
     }
   }
 

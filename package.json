@@ -4,6 +4,22 @@
   "description": "Walkthrough generator — annotated code walkthroughs with comments, hosted on Val Town",
   "license": "MIT",
   "author": "Dale Bustad <github@dale.link>",
+  "homepage": "https://github.com/divmain/meander#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/divmain/meander.git"
+  },
+  "bugs": {
+    "url": "https://github.com/divmain/meander/issues"
+  },
+  "keywords": [
+    "walkthrough",
+    "documentation",
+    "static-site-generator",
+    "code-tour",
+    "comments",
+    "val-town"
+  ],
   "type": "module",
   "packageManager": "pnpm@11.0.0-rc.5",
   "engines": {

@@ -3,6 +3,54 @@ import { parseArgs } from 'node:util'
 const command = process.argv[2]
 const commandArgs = process.argv.slice(3)
 
+const HELP_TEXT = `meander — walkthrough generator with comments
+
+Commands:
+  meander generate <meander.config.json>   Generate walkthrough HTML
+  meander serve <meander.config.json>      Generate + start local preview
+  meander publish <meander.config.json>    Publish HTML to Val Town blob storage
+  meander deploy-val [val-name]            Deploy or update the Val Town val
+  meander db key <verb> [val-name]         Manage the comment-store wrapping key
+                                           (init / rotate / restore / audit / retire)
+  meander blob key <verb> [val-name]       Manage the walkthrough-blob wrapping key
+                                           (init / rotate / restore / show)
+  meander doctor                           Report system + peer-dep status
+
+Flags (publish, deploy-val):
+  --token-env <NAME>    Env var to read for the bearer token (default:
+                        $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
+  --graceful            Missing token / creds → warn + exit 0 instead of
+                        throwing. For CI jobs that shouldn't fail when the
+                        secret isn't provisioned (fork PRs, demo setups).
+
+Flags (deploy-val only):
+  --out-dir <name>             Blob-key prefix the val reads from. Must match
+                               what 'meander publish' uploads to. Default: pages.
+  --allowed-domains <csv>      Comma-separated email-domain allowlist the val
+                               accepts for writes. Empty (default) means writes
+                               are refused — the safe starting posture.
+  --demo-mode                  Deploy the val in demo mode: comment UI renders
+                               a banner and writes return 403.
+
+Flags (db key, blob key):
+  --threshold <N>              Shamir threshold (init/rotate/restore). Default: 2.
+  --shares <N>                 Shamir total share count (init/rotate). Default: 3.
+  --share-file <path>          Read a share from a file (repeatable, rotate/restore).
+                               Otherwise prompts interactively.
+  --generation <N>             Generation to operate on (db key retire only).
+
+Environment variables:
+  VALTOWN_TOKEN              Val Town API bearer token (default env name).
+                             See docs/deploying.md for scopes.
+  MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
+                             token from. Set to e.g. "MY_VT_TOKEN" if your
+                             GitHub secret has a different name.
+  MEANDER_BLOB_KEY           Hex-encoded 32-byte wrapping key for envelope
+                             blob encryption. Required by publish only when
+                             encryptBlobs: true in meander.config.json.
+                             Generate with \`meander blob key init\`. See
+                             docs/encryption.md for the envelope scheme.`
+
 /**
  * The Val Town flags shared by `publish` + `deploy-val`:
  *   --token-env <NAME>  env var meander reads for the Val Town bearer token
@@ -247,6 +295,10 @@ async function dispatchBlob(args: readonly string[]): Promise<void> {
 }
 
 async function main() {
+  if (command === '--help' || command === '-h' || command === 'help') {
+    process.stdout.write(HELP_TEXT + '\n')
+    return
+  }
   switch (command) {
     case 'generate': {
       const { values, positionals } = parseArgs({
@@ -365,53 +417,7 @@ async function main() {
       break
     }
     default: {
-      console.error(`meander — walkthrough generator with comments
-
-Commands:
-  meander generate <meander.config.json>   Generate walkthrough HTML
-  meander serve <meander.config.json>      Generate + start local preview
-  meander publish <meander.config.json>    Publish HTML to Val Town blob storage
-  meander deploy-val [val-name]            Deploy or update the Val Town val
-  meander db key <verb> [val-name]         Manage the comment-store wrapping key
-                                           (init / rotate / restore / audit / retire)
-  meander blob key <verb> [val-name]       Manage the walkthrough-blob wrapping key
-                                           (init / rotate / restore / show)
-  meander doctor                           Report system + peer-dep status
-
-Flags (publish, deploy-val):
-  --token-env <NAME>    Env var to read for the bearer token (default:
-                        $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
-  --graceful            Missing token / creds → warn + exit 0 instead of
-                        throwing. For CI jobs that shouldn't fail when the
-                        secret isn't provisioned (fork PRs, demo setups).
-
-Flags (deploy-val only):
-  --out-dir <name>             Blob-key prefix the val reads from. Must match
-                               what 'meander publish' uploads to. Default: pages.
-  --allowed-domains <csv>      Comma-separated email-domain allowlist the val
-                               accepts for writes. Empty (default) means writes
-                               are refused — the safe starting posture.
-  --demo-mode                  Deploy the val in demo mode: comment UI renders
-                               a banner and writes return 403.
-
-Flags (db key, blob key):
-  --threshold <N>              Shamir threshold (init/rotate/restore). Default: 2.
-  --shares <N>                 Shamir total share count (init/rotate). Default: 3.
-  --share-file <path>          Read a share from a file (repeatable, rotate/restore).
-                               Otherwise prompts interactively.
-  --generation <N>             Generation to operate on (db key retire only).
-
-Environment variables:
-  VALTOWN_TOKEN              Val Town API bearer token (default env name).
-                             See docs/deploying.md for scopes.
-  MEANDER_VALTOWN_TOKEN_ENV  Override the env-var name meander reads the
-                             token from. Set to e.g. "MY_VT_TOKEN" if your
-                             GitHub secret has a different name.
-  MEANDER_BLOB_KEY           Hex-encoded 32-byte wrapping key for envelope
-                             blob encryption. Required by publish only when
-                             encryptBlobs: true in meander.config.json.
-                             Generate with \`meander blob key init\`. See
-                             docs/encryption.md for the envelope scheme.`)
+      console.error(HELP_TEXT)
       if (command) {
         console.error(`\nUnknown command: ${command}`)
       }

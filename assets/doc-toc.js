@@ -56,6 +56,7 @@
     var button = document.createElement("button");
     button.className = "doc-toc-btn";
     button.title = "Table of Contents";
+    button.setAttribute("aria-label", "Table of Contents");
     button.appendChild(createIcon());
     button.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -146,7 +147,8 @@
             var topbar = document.querySelector(".topbar");
             var offset = topbar ? topbar.getBoundingClientRect().height + 16 : 16;
             var y = target.getBoundingClientRect().top + window.scrollY - offset;
-            window.scrollTo({ top: y, behavior: "smooth" });
+            var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
           }
           closeTocDropdown();
         });

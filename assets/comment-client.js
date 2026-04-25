@@ -34,6 +34,25 @@
    * visually dim the composer rather than hiding it. */
   var demoMode = document.body.getAttribute("data-demo-mode") === "true";
 
+  var FETCH_TIMEOUT_MS = 10000;
+
+  /**
+   * Build an AbortSignal that fires after FETCH_TIMEOUT_MS, optionally
+   * composed with a caller-supplied signal via AbortSignal.any() (ES2024).
+   * Falls back to the timeout-only signal in older runtimes.
+   */
+  function requestSignal(userSignal) {
+    if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
+      return undefined;
+    }
+    var timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+    if (!userSignal) return timeoutSignal;
+    if (typeof AbortSignal.any === "function") {
+      return AbortSignal.any([timeoutSignal, userSignal]);
+    }
+    return timeoutSignal;
+  }
+
   function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
   function getEmail() { return localStorage.getItem(EMAIL_KEY) || ""; }
   function setSession(token, email) {
@@ -62,6 +81,8 @@
     var token = getToken();
     if (token) { headers["Authorization"] = "Bearer " + token; }
     init.headers = headers;
+    var signal = requestSignal(init.signal);
+    if (signal) { init.signal = signal; }
     return fetch(url, init).then(function (r) {
       if (r.status === 401 && token) {
         clearSession();
@@ -74,7 +95,8 @@
     return fetch(authBase + "/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email })
+      body: JSON.stringify({ email: email }),
+      signal: requestSignal()
     }).then(function (r) {
       return r.json().then(function (data) {
         if (!r.ok) { throw new Error(data.error || "request failed"); }
@@ -87,7 +109,8 @@
     return fetch(authBase + "/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, code: code })
+      body: JSON.stringify({ email: email, code: code }),
+      signal: requestSignal()
     }).then(function (r) {
       return r.json().then(function (data) {
         if (!r.ok) { throw new Error(data.error || "verify failed"); }
@@ -362,7 +385,11 @@
       ? prefix + comment.lineFrom
       : prefix + comment.lineFrom + "-" + prefix + comment.lineTo;
     var resolvedLabel = isResolved ? " (resolved)" : "";
-    meta.textContent = comment.author + (isReply ? "" : " on " + range) + " \u00b7 " + formatTime(comment.createdAt) + resolvedLabel;
+    meta.appendChild(document.createTextNode(comment.author + (isReply ? "" : " on " + range) + " \u00b7 "));
+    meta.appendChild(timeElement(comment.createdAt));
+    if (resolvedLabel) {
+      meta.appendChild(document.createTextNode(resolvedLabel));
+    }
 
     var body = document.createElement("div");
     body.className = "comment-body";
@@ -632,13 +659,45 @@
     }
   }
 
+  /**
+   * Returns "3 hours ago" / "yesterday" / "last week" via
+   * Intl.RelativeTimeFormat (numeric: 'auto'). Falls back to absolute
+   * date+time on runtimes without RelativeTimeFormat.
+   */
   function formatTime(iso) {
     try {
       var d = new Date(iso);
-      return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      if (typeof Intl === "undefined" || typeof Intl.RelativeTimeFormat !== "function") {
+        return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+      var rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+      var diffSec = Math.round((d.getTime() - Date.now()) / 1000);
+      var abs = Math.abs(diffSec);
+      if (abs < 60) return rtf.format(diffSec, "second");
+      if (abs < 3600) return rtf.format(Math.round(diffSec / 60), "minute");
+      if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), "hour");
+      if (abs < 86400 * 7) return rtf.format(Math.round(diffSec / 86400), "day");
+      if (abs < 86400 * 30) return rtf.format(Math.round(diffSec / (86400 * 7)), "week");
+      if (abs < 86400 * 365) return rtf.format(Math.round(diffSec / (86400 * 30)), "month");
+      return rtf.format(Math.round(diffSec / (86400 * 365)), "year");
     } catch (_) {
       return iso;
     }
+  }
+
+  /**
+   * Build a semantic <time datetime="..."> element with the absolute
+   * timestamp in the title attribute (so hover surfaces the precise time).
+   */
+  function timeElement(iso) {
+    var el = document.createElement("time");
+    el.setAttribute("datetime", iso);
+    try {
+      var d = new Date(iso);
+      el.setAttribute("title", d.toLocaleString());
+    } catch (_) { /* leave title unset */ }
+    el.textContent = formatTime(iso);
+    return el;
   }
 
   /* ------------------------------------------------------------------ */
