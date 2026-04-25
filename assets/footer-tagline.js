@@ -1,8 +1,15 @@
-/* Footer tagline rotator — picks a random entry from the
- * .mdr-footer-tagline element's data-taglines JSON array on
- * every page load and swaps the link's text content. The
- * server-rendered text (data-taglines[0]) acts as the no-JS
- * fallback; this script just adds variety. */
+/* Footer tagline rotator — picks a random prefix on every page
+ * load and updates the .mdr-footer-tagline span. The brand word
+ * "meander" lives in a sibling <a> element and is never touched.
+ *
+ * Two attribute shapes supported for backward-compat:
+ *   - data-tagline-prefixes: array of prefixes, "<prefix> meander"
+ *     is reconstructed visually via the sibling link
+ *   - data-taglines: array of full strings (legacy fallback when
+ *     the consumer's pool doesn't end "...with meander") — in
+ *     that case the whole element is the link and we swap its
+ *     entire text content
+ */
 ;(function () {
   'use strict'
 
@@ -12,11 +19,13 @@
   }
 
   ns.onReady(() => {
-    const link = document.querySelector('.mdr-footer-tagline')
-    if (!link) {
+    const el = document.querySelector('.mdr-footer-tagline')
+    if (!el) {
       return
     }
-    const raw = link.getAttribute('data-taglines')
+    const prefixesRaw = el.getAttribute('data-tagline-prefixes')
+    const taglinesRaw = el.getAttribute('data-taglines')
+    const raw = prefixesRaw || taglinesRaw
     if (!raw) {
       return
     }
@@ -30,8 +39,8 @@
       return
     }
     const pick = pool[Math.floor(Math.random() * pool.length)]
-    if (typeof pick === 'string' && pick.length > 0 && pick !== link.textContent) {
-      link.textContent = pick
+    if (typeof pick === 'string' && pick.length > 0 && pick !== el.textContent) {
+      el.textContent = pick
     }
   })
 })()

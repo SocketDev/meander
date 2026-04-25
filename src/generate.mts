@@ -1669,6 +1669,19 @@ const DEFAULT_TAGLINES: readonly string[] = [
   'Savor the moment with meander',
 ]
 
+/* Strip the trailing " meander" so the rotator can render the
+ * prefix as plain text and the brand word as the actual link.
+ * Taglines that don't end with " meander" round-trip unchanged
+ * (consumer override) and the rotator falls back to wrapping
+ * the whole string. */
+function splitTagline(tagline: string): { prefix: string; isStandard: boolean } {
+  const m = /^(.*?)\s*meander\s*$/i.exec(tagline)
+  if (m && m[1]) {
+    return { prefix: m[1].trim(), isStandard: true }
+  }
+  return { prefix: tagline, isStandard: false }
+}
+
 function renderFooter(
   footer:
     | boolean
@@ -1687,15 +1700,35 @@ function renderFooter(
    *   3. (default)      — DEFAULT_TAGLINES, JS rotates per load
    */
   if (cfg.text) {
+    /* Custom text: render as a single linked phrase. Consumer
+     * picks the entire copy; we don't tease apart "meander". */
     return `<footer class="mdr-footer">
     <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.text)}</a>
   </footer>`
   }
-  const pool = cfg.taglines && cfg.taglines.length > 0 ? cfg.taglines : DEFAULT_TAGLINES
-  const fallback = pool[0]!
-  const taglineData = JSON.stringify(pool)
-  return `<footer class="mdr-footer">
+  const pool =
+    cfg.taglines && cfg.taglines.length > 0 ? cfg.taglines : DEFAULT_TAGLINES
+  /* Encode the pool as prefixes only when every tagline matches
+   * the standard "<prefix> meander" shape. The link is always
+   * the literal word "meander"; the prefix is plain text and
+   * the rotator only swaps the prefix span. If a consumer's
+   * pool breaks the convention, fall back to the legacy
+   * whole-string-as-link behavior. */
+  const split = pool.map(splitTagline)
+  const allStandard = split.every(s => s.isStandard)
+  if (!allStandard) {
+    const fallback = pool[0]!
+    const taglineData = JSON.stringify(pool)
+    return `<footer class="mdr-footer">
     <a class="mdr-footer-tagline" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-taglines='${escapeHtml(taglineData)}'>${escapeHtml(fallback)}</a>
+  </footer>`
+  }
+  const prefixes = split.map(s => s.prefix)
+  const fallbackPrefix = prefixes[0]!
+  const prefixData = JSON.stringify(prefixes)
+  return `<footer class="mdr-footer">
+    <span class="mdr-footer-tagline" data-tagline-prefixes='${escapeHtml(prefixData)}'>${escapeHtml(fallbackPrefix)}</span>
+    <a class="mdr-footer-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">meander</a>
   </footer>`
 }
 

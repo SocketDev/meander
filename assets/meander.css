@@ -2768,6 +2768,13 @@ pre.mdr-repo-tree code {
   text-decoration-color: var(--accent);
 }
 
+/* Tagline split — prefix span is plain text, the brand word
+ * sits in the sibling <a>. The space between them comes from
+ * the HTML whitespace between </span> and <a>. */
+.mdr-footer-tagline {
+  color: var(--muted);
+}
+
 /* ── Neo-Kijū — bolt strike + spark sequence ─────────────────── */
 
 /* Bolt strike — when neo-kiju is picked, the lightning bolt
