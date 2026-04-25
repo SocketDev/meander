@@ -61,13 +61,33 @@ Comments live in a Val Town SQLite database. Each row carries:
 
 - `id`, `slug`, `part`, `file`, `line_from`, `line_to`, `parent_id`,
   `resolved`, `created_at` — plaintext, for indexing + filtering.
-- `body`, `author` — encrypted with AES-256-GCM (see
-  [encryption.md](./encryption.md) for key derivation + binary
-  format).
+- `body`, `author` — encrypted with AES-256-GCM under a per-row
+  data key.
+- `dek_wrapped`, `key_generation` — the per-row data key, wrapped
+  under `MEANDER_DB_KEY_<key_generation>`. See
+  [encryption.md](./encryption.md) for the envelope scheme + the
+  rotation lifecycle.
 
 Magic codes live in a separate `magic_codes` table with `email`
 primary key. Stores a salted SHA-256 hash of the code, not the
 code itself — leaking this table doesn't leak any user's code.
+
+## Admin endpoints
+
+The val exposes a small `/admin/*` surface used by the
+`meander db key` ceremonies. All admin routes require
+`Authorization: Bearer <MEANDER_ADMIN_TOKEN>`. The admin token
+is minted by `deploy-val` and read back by the ceremonies via
+the operator's Val Town API token.
+
+| Method | Path               | Purpose                                                                 |
+| ------ | ------------------ | ----------------------------------------------------------------------- |
+| `GET`  | `/admin/key-audit` | Per-generation row counts + the current pointer.                         |
+| `POST` | `/admin/rewrap`    | Re-wrap rows from one generation to another. Body: `{ fromGeneration, toGeneration, batchSize? }`. Idempotent + cursor-driven. |
+
+Comment ciphertext is never decrypted on these routes — only
+each row's small wrapped DEK moves. See
+[operating.md](./operating.md) for the rotation runbook.
 
 ## Demo mode
 

@@ -183,7 +183,7 @@ meander deploy-val                     # first-time val setup
 meander publish meander.config.json    # upload encrypted HTML
 ```
 
-See [docs/publishing.md](docs/publishing.md) for the full setup
+See [docs/deploying.md](docs/deploying.md) for the full setup
 (env vars, CI integration, graceful skip for fork PRs).
 
 ## Examples
@@ -198,12 +198,14 @@ See [docs/publishing.md](docs/publishing.md) for the full setup
 
 - [Features + configuration](docs/features.md) — every opt-in and
   opt-out knob, with examples.
-- [Publishing](docs/publishing.md) — Val Town setup, token scopes,
-  CI integration.
+- [Deploying](docs/deploying.md) — Val Town setup, token scopes,
+  first-time deploy, CI integration.
 - [Comment API](docs/comment-api.md) — the REST endpoints the
   browser client hits.
-- [Encryption at rest](docs/encryption.md) — what's encrypted,
-  key derivation, binary format.
+- [Encryption](docs/encryption.md) — envelope scheme, threat
+  model, Shamir custody, recovery scenarios.
+- [Operating](docs/operating.md) — day-2 ops runbook: rotation,
+  restoration drills, custodian responsibilities.
 - [Contributing](docs/contributing.md) — working on meander
   itself: tests, CI, style, architecture tour.
 
