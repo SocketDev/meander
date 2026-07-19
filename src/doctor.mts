@@ -87,7 +87,7 @@ function getMeanderVersion(): string {
       }
       /* Only trust the result when the name matches — a parent
        * package.json in a monorepo checkout would still parse. */
-      if (meta.name === '@divmain/meander' && meta.version) {
+      if (meta.name === '@socketsecurity/meander' && meta.version) {
         return meta.version
       }
     } catch {

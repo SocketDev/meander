@@ -1,7 +1,7 @@
 name: 📘 Demo site (GH Pages)
 
 # Builds the fixture walkthrough and deploys it to
-# https://divmain.github.io/meander/ as a live demo.
+# https://socketdev.github.io/meander/ as a live demo.
 #
 # Consumers can copy this workflow into their own repo — replace
 # --base-path with your repo name, point at your own

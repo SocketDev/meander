@@ -33,7 +33,7 @@ docs site build, a CI artifact upload, etc.).
 
 ```typescript
 // scripts/build-walkthrough.mts
-import { generate } from '@divmain/meander'
+import { generate } from '@socketsecurity/meander'
 
 await generate('./meander.config.json', {
   basePath: '/meander',  // matches your hosting prefix
@@ -90,7 +90,7 @@ jobs:
       - run: pnpm install
       - run: |
           node --input-type=module -e "
-            import { generate } from '@divmain/meander'
+            import { generate } from '@socketsecurity/meander'
             await generate('./meander.config.json', { basePath: '/your-repo' })
           "
           # GH Pages skips files starting with _ without a .nojekyll marker.

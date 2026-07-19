@@ -1691,7 +1691,7 @@ function renderFooter(
   if (footer === false) {
     return ''
   }
-  const defaultHref = 'https://github.com/divmain/meander'
+  const defaultHref = 'https://github.com/SocketDev/meander'
   const cfg = typeof footer === 'object' ? footer : {}
   const href = cfg.href ?? defaultHref
   /* Three modes:

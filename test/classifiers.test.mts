@@ -64,7 +64,7 @@ describe('isScopedPackage', () => {
   it('accepts @scope/name form', () => {
     expect(isScopedPackage('@babel/core')).toBe(true)
     expect(isScopedPackage('@sindresorhus/is')).toBe(true)
-    expect(isScopedPackage('@divmain/meander')).toBe(true)
+    expect(isScopedPackage('@socketsecurity/meander')).toBe(true)
   })
 
   it('rejects unscoped packages', () => {

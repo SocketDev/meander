@@ -5,7 +5,7 @@
  * Two outputs:
  *   dist/cli.mjs      single-file bundle, consumer-install entry.
  *   dist/*.d.mts      type declarations for programmatic consumers
- *                     (`import { generate } from '@divmain/meander'`).
+ *                     (`import { generate } from '@socketsecurity/meander'`).
  *
  * Types come from `tsc --emitDeclarationOnly`; the bundle itself
  * is pure JS + uses esbuild's much faster transform pipeline.

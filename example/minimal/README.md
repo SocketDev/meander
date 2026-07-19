@@ -8,7 +8,7 @@ two annotations.
 From this directory:
 
 ```bash
-pnpm install -g @divmain/meander
+pnpm install -g @socketsecurity/meander
 meander generate meander.config.json
 meander serve meander.config.json
 ```

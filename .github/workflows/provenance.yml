@@ -1,13 +1,13 @@
 name: 📦 Publish to npm
 
-# Publishes @divmain/meander to npm with Sigstore-backed
+# Publishes @socketsecurity/meander to npm with Sigstore-backed
 # provenance. Manual trigger only — we don't auto-publish on
 # every tag because that's an over-powerful default for a
 # public package.
 #
 # One-time setup:
 #   1. In npm's UI, enable Trusted Publishing for
-#      @divmain/meander, pointing at this repo + this workflow
+#      @socketsecurity/meander, pointing at this repo + this workflow
 #      name. npm will trust short-lived OIDC tokens from this
 #      workflow; no NPM_TOKEN secret needed.
 #   2. (Alternative if trusted publishing is off) mint an npm

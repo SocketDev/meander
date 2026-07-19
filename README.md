@@ -12,8 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="https://socket.dev/npm/package/@divmain/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@divmain/meander"></a>
-  <a href="https://github.com/divmain/meander/actions/workflows/ci.yml"><img alt="CI - @divmain/meander" src="https://github.com/divmain/meander/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://socket.dev/npm/package/@socketsecurity/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@socketsecurity/meander"></a>
+  <a href="https://github.com/SocketDev/meander/actions/workflows/ci.yml"><img alt="CI - @socketsecurity/meander" src="https://github.com/SocketDev/meander/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Coverage" src="https://img.shields.io/badge/coverage-99%25-brightgreen">
 </p>
 
@@ -53,13 +53,13 @@ list and configuration knobs.
 ## Install
 
 ```bash
-pnpm install -g @divmain/meander
+pnpm install -g @socketsecurity/meander
 ```
 
 Or run without installing:
 
 ```bash
-npx @divmain/meander generate meander.config.json
+npx @socketsecurity/meander generate meander.config.json
 ```
 
 **Requirements**: Node >= 20.

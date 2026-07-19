@@ -42,5 +42,6 @@ Thumbs.db
 
 # Dev-generated preview output from `pnpm dev` / `meander serve`
 # against the local fixture. Always regenerated from the source.
+/pages/
 /test/fixtures/*/pages/
 /test/fixtures/*/walkthrough/

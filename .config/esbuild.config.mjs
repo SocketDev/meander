@@ -2,7 +2,7 @@
  * @fileoverview esbuild build config for meander.
  *
  * Produces a single-file `dist/cli.mjs` so consumers who install
- * `@divmain/meander` get a self-contained CLI — no transitive
+ * `@socketsecurity/meander` get a self-contained CLI — no transitive
  * node_modules scan required at runtime.
  *
  * Externals:

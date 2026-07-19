@@ -67,7 +67,7 @@ there.
   + full test suite with coverage.
 - `.github/workflows/pages.yml` — builds the fixture under
   `--base-path=/meander` and deploys it to
-  `https://divmain.github.io/meander/` as a live demo.
+  `https://socketdev.github.io/meander/` as a live demo.
 
 Keep every action ref pinned to a full commit SHA, not a tag,
 per the fleet security policy.
