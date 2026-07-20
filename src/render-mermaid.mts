@@ -2,19 +2,20 @@
  * Build-time Mermaid → SVG renderer.
  *
  * Why build-time, not client-side:
- *   - Zero client JS. Pages ship finished SVG; no mermaid bundle,
- *     no render flash, no layout shift.
- *   - Keeps CSP tight; no extra script-src entry.
- *   - SVGO pass shrinks each diagram ~30%.
+ *
+ * - Zero client JS. Pages ship finished SVG; no mermaid bundle, no render flash,
+ *   no layout shift.
+ * - Keeps CSP tight; no extra script-src entry.
+ * - SVGO pass shrinks each diagram ~30%.
  *
  * How it works:
- *   1. Spin up one shared puppeteer browser per build.
- *   2. Hash source + theme + mermaid version. Cache hit → return
- *      SVG from disk.
- *   3. Otherwise render into a DOM-attached container (the
- *      mermaid-isomorphic pattern — getBBox() on a detached
- *      node returns zero or stale metrics) and grab the SVG.
- *   4. Pipe through SVGO. Write to cache + return.
+ *
+ * 1. Spin up one shared puppeteer browser per build.
+ * 2. Hash source + theme + mermaid version. Cache hit → return SVG from disk.
+ * 3. Otherwise render into a DOM-attached container (the mermaid-isomorphic
+ *    pattern — getBBox() on a detached node returns zero or stale metrics) and
+ *    grab the SVG.
+ * 4. Pipe through SVGO. Write to cache + return.
  *
  * Puppeteer + mermaid + svgo are optional peer deps so the
  * dependency footprint is only paid by consumers who use them.
@@ -22,9 +23,14 @@
  * markdown processing falls back to leaving ```mermaid blocks
  * as inert <pre><code> — consumers see the raw source.
  */
-import { hash as cryptoHash } from 'node:crypto'
+import crypto from 'node:crypto'
 import { existsSync, promises as fs } from 'node:fs'
 import path from 'node:path'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import type * as puppeteer from 'puppeteer'
+import type * as svgo from 'svgo'
+
+const logger = getDefaultLogger()
 
 export type MermaidTheme = 'default' | 'dark' | 'neutral' | 'forest'
 
@@ -94,7 +100,7 @@ export async function createMermaidRenderer(
   const mermaidVersion = existsSync(mermaidPkgPath)
     ? ((
         JSON.parse(await fs.readFile(mermaidPkgPath, 'utf8')) as {
-          version?: string
+          version?: string | undefined
         }
       ).version ?? '0')
     : '0'
@@ -102,17 +108,17 @@ export async function createMermaidRenderer(
   /* Dynamic imports so consumers without mermaid/puppeteer/svgo
    * don't fail to load meander itself — only fail when they
    * actually try to render a diagram. */
-  let puppeteerMod: { launch: typeof import('puppeteer').launch }
+  let puppeteerMod: { launch: typeof puppeteer.launch }
   try {
     puppeteerMod = (await import('puppeteer')) as unknown as {
-      launch: typeof import('puppeteer').launch
+      launch: typeof puppeteer.launch
     }
   } catch {
     throw new Error(
       'puppeteer not installed. Install with: pnpm add -D puppeteer',
     )
   }
-  let svgoMod: typeof import('svgo')
+  let svgoMod: typeof svgo
   try {
     svgoMod = await import('svgo')
   } catch {
@@ -123,8 +129,8 @@ export async function createMermaidRenderer(
 
   /* Lazy-launch — pay the Chromium boot cost (~1-2s) only when
    * there's a cache miss. Unchanged diagrams are pure disk reads. */
-  let browser: import('puppeteer').Browser | null = null
-  const ensureBrowser = async (): Promise<import('puppeteer').Browser> => {
+  let browser: puppeteer.Browser | undefined = undefined
+  const ensureBrowser = async (): Promise<puppeteer.Browser> => {
     if (!browser) {
       browser = await puppeteerMod.launch({
         headless: true,
@@ -138,7 +144,7 @@ export async function createMermaidRenderer(
     source: string,
     theme: MermaidTheme,
   ): Promise<string> => {
-    const key = cryptoHash(
+    const key = crypto.hash(
       'sha256',
       `${mermaidVersion}\n${theme}\n${source}`,
       'hex',
@@ -246,11 +252,26 @@ export async function createMermaidRenderer(
   const close = async (): Promise<void> => {
     if (browser) {
       await browser.close()
-      browser = null
+      browser = undefined
     }
   }
 
   return { render, close }
+}
+
+/**
+ * Replace the placeholder tokens left by `preRenderMermaidBlocks`
+ * with their rendered SVGs. Run after marked.parse().
+ */
+export function inlineMermaidSvgs(
+  html: string,
+  svgByToken: Map<string, string>,
+): string {
+  let out = html
+  for (const [token, svg] of svgByToken) {
+    out = out.replace(token, svg)
+  }
+  return out
 }
 
 /**
@@ -302,7 +323,7 @@ export async function preRenderMermaidBlocks(
   for (const [i, result] of results.entries()) {
     if (result.status === 'rejected') {
       const token = tokens[i]?.token ?? '?'
-      console.error(
+      logger.fail(
         `[mermaid] ${token} render failed:`,
         result.reason instanceof Error ? result.reason.message : result.reason,
       )
@@ -313,19 +334,4 @@ export async function preRenderMermaidBlocks(
     out = out.replace(match, `<div class="mdr-mermaid">${token}</div>`)
   }
   return { markdown: out, svgByToken }
-}
-
-/**
- * Replace the placeholder tokens left by `preRenderMermaidBlocks`
- * with their rendered SVGs. Run after marked.parse().
- */
-export function inlineMermaidSvgs(
-  html: string,
-  svgByToken: Map<string, string>,
-): string {
-  let out = html
-  for (const [token, svg] of svgByToken) {
-    out = out.replace(token, svg)
-  }
-  return out
 }

@@ -1,4 +1,6 @@
-/** @fileoverview Unit tests for applyBasePathToHtml. */
+/**
+ * @file Unit tests for applyBasePathToHtml.
+ */
 
 import { describe, expect, it } from 'vitest'
 

@@ -1,8 +1,7 @@
 /**
- * @fileoverview Tests for src/blob-key.mts ceremony commands.
- *
- * Same shape as test/db-key.test.mts — fakes from
- * test/utils/fake-deps.mts drive the ceremony functions end-to-end.
+ * @file Tests for src/blob-key.mts ceremony commands.
+ *   Same shape as test/db-key.test.mts — fakes from
+ *   test/utils/fake-deps.mts drive the ceremony functions end-to-end.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -75,7 +74,9 @@ describe('blobKeyRotate', () => {
     /* Output prompts the operator to re-publish — without that
      * step the val's blobs become unreadable. */
     expect(deps.io.text()).toContain('meander publish')
-    expect(deps.io.text()).toContain('every existing encrypted blob is unreadable')
+    expect(deps.io.text()).toContain(
+      'every existing encrypted blob is unreadable',
+    )
   })
 
   it('refuses when MEANDER_BLOB_KEY is not set', async () => {
@@ -139,9 +140,9 @@ describe('blobKeyRestore', () => {
         .slice(0, 2)
         .map(encodeShare),
     })
-    await expect(
-      blobKeyRestore({ threshold: 2 }, deps),
-    ).rejects.toThrow(/already set to a different value/)
+    await expect(blobKeyRestore({ threshold: 2 }, deps)).rejects.toThrow(
+      /already set to a different value/,
+    )
   })
 })
 

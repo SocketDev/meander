@@ -7,11 +7,11 @@ isolated by `slug`.
 
 ## Auth endpoints
 
-| Method   | Path                       | What it does                                        |
-| -------- | -------------------------- | --------------------------------------------------- |
-| `POST`   | `/api/auth/request`        | Email a 6-digit magic code.                         |
-| `POST`   | `/api/auth/verify`         | Verify the code; returns a session JWT.             |
-| `GET`    | `/api/auth/me`             | Echo the authenticated email + demo-mode flag.      |
+| Method | Path                | What it does                                   |
+| ------ | ------------------- | ---------------------------------------------- |
+| `POST` | `/api/auth/request` | Email a 6-digit magic code.                    |
+| `POST` | `/api/auth/verify`  | Verify the code; returns a session JWT.        |
+| `GET`  | `/api/auth/me`      | Echo the authenticated email + demo-mode flag. |
 
 ### Magic-code flow
 
@@ -38,14 +38,14 @@ Rejection reasons the client can surface:
 
 ## Comment endpoints
 
-| Method   | Path                                | What it does                                      |
-| -------- | ----------------------------------- | ------------------------------------------------- |
-| `GET`    | `/:slug/api/comments?part=N`        | Fetch all comments for part `N` of `:slug`.       |
-| `POST`   | `/:slug/api/comments`               | Create a new comment or a reply. **Auth required.** |
-| `PATCH`  | `/:slug/api/comments/:id`           | Mark `:id` resolved / unresolved. **Auth required.** |
-| `DELETE` | `/:slug/api/comments/:id`           | Delete comment `:id`. **Auth required.**          |
-| `GET`    | `/:slug/api/comments/unresolved`    | List every open (unresolved) root comment.        |
-| `GET`    | `/:slug/api/comments/export`        | Download all comments for `:slug` as JSON.        |
+| Method   | Path                             | What it does                                         |
+| -------- | -------------------------------- | ---------------------------------------------------- |
+| `GET`    | `/:slug/api/comments?part=N`     | Fetch all comments for part `N` of `:slug`.          |
+| `POST`   | `/:slug/api/comments`            | Create a new comment or a reply. **Auth required.**  |
+| `PATCH`  | `/:slug/api/comments/:id`        | Mark `:id` resolved / unresolved. **Auth required.** |
+| `DELETE` | `/:slug/api/comments/:id`        | Delete comment `:id`. **Auth required.**             |
+| `GET`    | `/:slug/api/comments/unresolved` | List every open (unresolved) root comment.           |
+| `GET`    | `/:slug/api/comments/export`     | Download all comments for `:slug` as JSON.           |
 
 Auth-required routes check for `Authorization: Bearer <jwt>`.
 No header → `401`. Bad / expired token → `401`. Domain not on
@@ -80,9 +80,9 @@ The val exposes a small `/admin/*` surface used by the
 is minted by `deploy-val` and read back by the ceremonies via
 the operator's Val Town API token.
 
-| Method | Path               | Purpose                                                                 |
-| ------ | ------------------ | ----------------------------------------------------------------------- |
-| `GET`  | `/admin/key-audit` | Per-generation row counts + the current pointer.                         |
+| Method | Path               | Purpose                                                                                                                        |
+| ------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`  | `/admin/key-audit` | Per-generation row counts + the current pointer.                                                                               |
 | `POST` | `/admin/rewrap`    | Re-wrap rows from one generation to another. Body: `{ fromGeneration, toGeneration, batchSize? }`. Idempotent + cursor-driven. |
 
 Comment ciphertext is never decrypted on these routes — only

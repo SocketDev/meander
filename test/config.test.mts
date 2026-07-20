@@ -1,10 +1,12 @@
-/** @fileoverview Tests for MeanderConfigSchema + resolveOptOuts + loadMeanderConfig. */
+/**
+ * @file Tests for MeanderConfigSchema + resolveOptOuts + loadMeanderConfig.
+ */
 
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { MeanderConfig } from '../src/config.mts'

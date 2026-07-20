@@ -1,10 +1,9 @@
 /**
- * @fileoverview Readline-path coverage for createIoChannel.
- *
- * Lives in its own file because vi.mock('node:readline/promises')
- * has to be hoisted to module scope; doing it inline in
- * ceremony-deps.test.mts would mock readline for tests that need
- * the real one. Separating gives each side a clean mock state.
+ * @file Readline-path coverage for createIoChannel.
+ *   Lives in its own file because vi.mock('node:readline/promises')
+ *   has to be hoisted to module scope; doing it inline in
+ *   ceremony-deps.test.mts would mock readline for tests that need
+ *   the real one. Separating gives each side a clean mock state.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * smuggle leftover state into the next one. */
 const answers: string[] = []
 
-vi.mock('node:readline/promises', () => ({
+vi.mock(import('node:readline/promises'), () => ({
   createInterface: () => ({
     question: async () => answers.shift() ?? '',
     close: () => {},

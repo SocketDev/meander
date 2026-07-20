@@ -11,16 +11,125 @@
  * visible at the call site.
  */
 
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
 import ValTown from '@valtown/sdk'
 
 export const API_BASE = 'https://api.val.town'
 
+/**
+ * Delete an env var on the val. Used by `db key retire` to remove
+ * an old generation that no row references anymore. Returns true
+ * if the key existed and was removed, false if it wasn't there to
+ * begin with — both outcomes are success from the caller's view.
+ */
+export async function deleteEnvVar(
+  token: string,
+  valId: string,
+  key: string,
+): Promise<boolean> {
+  const res = await httpRequest(
+    `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+  if (res.status === 404) {
+    return false
+  }
+  if (!res.ok) {
+    throw new Error(
+      `deleteEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
+    )
+  }
+  return true
+}
+
+/**
+ * Generate a URL-safe random secret of `bytes` bytes' entropy,
+ * base64url-encoded. Used for tokens (admin token, JWT secret)
+ * and any other random non-key secrets the val needs.
+ */
+export function generateSecret(bytes = 32): string {
+  /* Lazy node:crypto import keeps this module pure for code paths
+   * that only do val-API calls — useful when the same module is
+   * pulled in by both Node + tests. */
+  const buf = new Uint8Array(bytes)
+  crypto.getRandomValues(buf)
+  let s = ''
+  for (let i = 0; i < buf.length; i++) {
+    s += String.fromCharCode(buf[i]!)
+  }
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Read an env var on the val. Returns undefined if the key isn't
+ * set — Val Town's API responds 404 in that case.
+ */
+export async function getEnvVar(
+  token: string,
+  valId: string,
+  key: string,
+): Promise<string | undefined> {
+  const res = await httpRequest(
+    `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (res.status === 404) {
+    return undefined
+  }
+  if (!res.ok) {
+    throw new Error(
+      `getEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
+    )
+  }
+  const body = (await res.json()) as { value?: string | undefined }
+  return typeof body.value === 'string' ? body.value : undefined
+}
+
+/**
+ * List the names of every env var on the val. Used by ceremony
+ * commands to find existing MEANDER_DB_KEY_<n> generations
+ * without needing to probe each one. Names only — values are
+ * fetched separately when needed, so an audit doesn't have to
+ * stream the wrapping keys themselves.
+ */
+export async function listEnvVarNames(
+  token: string,
+  valId: string,
+): Promise<string[]> {
+  const res = await httpRequest(
+    `${API_BASE}/v2/vals/${valId}/environment_variables`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (!res.ok) {
+    throw new Error(`listEnvVarNames failed: ${res.status} ${await res.text()}`)
+  }
+  const body = (await res.json()) as {
+    data?: Array<{ key?: string | undefined }> | undefined
+  }
+  const out: string[] = []
+  for (const entry of body.data ?? []) {
+    if (typeof entry.key === 'string') {
+      out.push(entry.key)
+    }
+  }
+  return out
+}
+
 export type ValHandle = {
-  /** Val Town's internal ID for the val. */
+  /**
+   * Val Town's internal ID for the val.
+   */
   id: string
-  /** The val's username (resolved from /me/profile). */
+  /**
+   * The val's username (resolved from /me/profile).
+   */
   username: string
-  /** The val's HTTPS URL — `https://<username>-<valname>.web.val.run`. */
+  /**
+   * The val's HTTPS URL — `https://<username>-<valname>.web.val.run`.
+   */
   url: string
 }
 
@@ -52,31 +161,6 @@ export async function resolveVal(
 }
 
 /**
- * Read an env var on the val. Returns undefined if the key isn't
- * set — Val Town's API responds 404 in that case.
- */
-export async function getEnvVar(
-  token: string,
-  valId: string,
-  key: string,
-): Promise<string | undefined> {
-  const res = await fetch(
-    `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  )
-  if (res.status === 404) {
-    return undefined
-  }
-  if (!res.ok) {
-    throw new Error(
-      `getEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
-    )
-  }
-  const body = (await res.json()) as { value?: string }
-  return typeof body.value === 'string' ? body.value : undefined
-}
-
-/**
  * Set an env var on the val. PUT first (succeeds if it already
  * exists); fall back to POST (creates a new key). Idempotent
  * either way.
@@ -87,7 +171,7 @@ export async function setEnvVar(
   key: string,
   value: string,
 ): Promise<void> {
-  const updateRes = await fetch(
+  const updateRes = await httpRequest(
     `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
     {
       method: 'PUT',
@@ -101,7 +185,7 @@ export async function setEnvVar(
   if (updateRes.ok) {
     return
   }
-  const createRes = await fetch(
+  const createRes = await httpRequest(
     `${API_BASE}/v2/vals/${valId}/environment_variables`,
     {
       method: 'POST',
@@ -117,79 +201,4 @@ export async function setEnvVar(
       `setEnvVar(${key}) failed: ${createRes.status} ${await createRes.text()}`,
     )
   }
-}
-
-/**
- * Delete an env var on the val. Used by `db key retire` to remove
- * an old generation that no row references anymore. Returns true
- * if the key existed and was removed, false if it wasn't there to
- * begin with — both outcomes are success from the caller's view.
- */
-export async function deleteEnvVar(
-  token: string,
-  valId: string,
-  key: string,
-): Promise<boolean> {
-  const res = await fetch(
-    `${API_BASE}/v2/vals/${valId}/environment_variables/${key}`,
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
-  if (res.status === 404) {
-    return false
-  }
-  if (!res.ok) {
-    throw new Error(
-      `deleteEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
-    )
-  }
-  return true
-}
-
-/**
- * List the names of every env var on the val. Used by ceremony
- * commands to find existing MEANDER_DB_KEY_<n> generations
- * without needing to probe each one. Names only — values are
- * fetched separately when needed, so an audit doesn't have to
- * stream the wrapping keys themselves.
- */
-export async function listEnvVarNames(
-  token: string,
-  valId: string,
-): Promise<string[]> {
-  const res = await fetch(
-    `${API_BASE}/v2/vals/${valId}/environment_variables`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  )
-  if (!res.ok) {
-    throw new Error(`listEnvVarNames failed: ${res.status} ${await res.text()}`)
-  }
-  const body = (await res.json()) as { data?: Array<{ key?: string }> }
-  const out: string[] = []
-  for (const entry of body.data ?? []) {
-    if (typeof entry.key === 'string') {
-      out.push(entry.key)
-    }
-  }
-  return out
-}
-
-/**
- * Generate a URL-safe random secret of `bytes` bytes' entropy,
- * base64url-encoded. Used for tokens (admin token, JWT secret)
- * and any other random non-key secrets the val needs.
- */
-export function generateSecret(bytes = 32): string {
-  /* Lazy node:crypto import keeps this module pure for code paths
-   * that only do val-API calls — useful when the same module is
-   * pulled in by both Node + tests. */
-  const buf = new Uint8Array(bytes)
-  crypto.getRandomValues(buf)
-  let s = ''
-  for (let i = 0; i < buf.length; i++) {
-    s += String.fromCharCode(buf[i]!)
-  }
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }

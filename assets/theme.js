@@ -85,7 +85,7 @@
     return t === 'dark' || t === 'light' || t === 'neo-kiju' ? t : 'system'
   }
   const persistTheme = theme =>
-    storageSet(THEME_KEY, theme === 'system' ? null : theme)
+    storageSet(THEME_KEY, theme === 'system' ? undefined : theme)
   const systemPrefersDark = () =>
     window.matchMedia &&
     window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -194,7 +194,7 @@
     /* Standard menu-button keyboard bindings (ArrowUp/Down, Home,
      * End, Esc, Tab) via the boot.js helper. Replaces the local
      * Escape-only handler above. */
-    if (ns.popovers && ns.popovers.bindKeyboard) {
+    if (ns.popovers?.bindKeyboard) {
       ns.popovers.bindKeyboard({
         trigger: btn,
         panel: menu,

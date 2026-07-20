@@ -1,9 +1,11 @@
-/** @fileoverview Unit tests for envelope encryption: body encrypt/decrypt
- * with a per-row data key, plus wrapKey/unwrapKey for the data key under
- * a database wrapping key. */
+/**
+ * @file Unit tests for envelope encryption: body encrypt/decrypt
+ *   with a per-row data key, plus wrapKey/unwrapKey for the data key under
+ *   a database wrapping key.
+ */
 
 import { describe, expect, it } from 'vitest'
-import { randomBytes } from 'node:crypto'
+import crypto from 'node:crypto'
 
 import {
   decrypt,
@@ -68,7 +70,7 @@ describe('encrypt / decrypt round-trip', () => {
   })
 
   it('rejects keys of wrong length', () => {
-    const wrongKey = randomBytes(16)
+    const wrongKey = crypto.randomBytes(16)
     expect(() => encrypt('hi', wrongKey)).toThrow(/32 bytes/)
     expect(() => decrypt('AAAA', wrongKey)).toThrow(/32 bytes/)
   })
@@ -225,10 +227,8 @@ describe('unwrapKey rejects malformed input', () => {
 
   it('throws on wrapping-key wrong length', () => {
     const dataKey = randomDataKey()
-    const shortKey = randomBytes(16)
+    const shortKey = crypto.randomBytes(16)
     expect(() => wrapKey(dataKey, shortKey)).toThrow(/32 bytes/)
-    expect(() =>
-      unwrapKey('AAAA', shortKey),
-    ).toThrow(/32 bytes/)
+    expect(() => unwrapKey('AAAA', shortKey)).toThrow(/32 bytes/)
   })
 })

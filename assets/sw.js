@@ -37,7 +37,7 @@ self.addEventListener('install', event => {
       /* Individual `add` with catch so a missing asset doesn't
        * abort the whole install. Atomic `addAll` would roll back
        * the entire cache on a single 404. */
-      Promise.all(PRECACHE.map(url => cache.add(url).catch(() => null))),
+      Promise.all(PRECACHE.map(url => cache.add(url).catch(() => undefined))),
     ),
   )
   /* Activate immediately so the new worker starts serving without
@@ -94,8 +94,31 @@ self.addEventListener('fetch', event => {
   event.respondWith(cacheFirst(request))
 })
 
-async function networkFirst(request) {
+export async function cacheFirst(request) {
+  const cache = await caches.open(CACHE_NAME)
+  const cached = await cache.match(request)
+  // oxlint-disable-next-line socket/no-fetch-prefer-http-request -- browser service worker: fetch is the SW runtime API; @socketsecurity/lib http-request is Node-only.
+  const networkFetch = fetch(request)
+    .then(response => {
+      /* Only cache 2xx — don't poison the cache with 500s / 404s
+       * from a transient backend glitch. Fire-and-forget `put`
+       * with a catch so quota errors don't surface. */
+      if (response.ok) {
+        cache.put(request, response.clone()).catch(() => {})
+      }
+      return response
+    })
+    .catch(() => undefined)
+  if (cached) {
+    return cached
+  }
+  const fresh = await networkFetch
+  return fresh ?? Response.error()
+}
+
+export async function networkFirst(request) {
   try {
+    // oxlint-disable-next-line socket/no-fetch-prefer-http-request -- browser service worker: fetch is the SW runtime API; @socketsecurity/lib http-request is Node-only.
     const response = await fetch(request)
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME)
@@ -110,25 +133,4 @@ async function networkFirst(request) {
     }
     throw new Error('offline and no cached copy')
   }
-}
-
-async function cacheFirst(request) {
-  const cache = await caches.open(CACHE_NAME)
-  const cached = await cache.match(request)
-  const networkFetch = fetch(request)
-    .then(response => {
-      /* Only cache 2xx — don't poison the cache with 500s / 404s
-       * from a transient backend glitch. Fire-and-forget `put`
-       * with a catch so quota errors don't surface. */
-      if (response.ok) {
-        cache.put(request, response.clone()).catch(() => {})
-      }
-      return response
-    })
-    .catch(() => null)
-  if (cached) {
-    return cached
-  }
-  const fresh = await networkFetch
-  return fresh ?? Response.error()
 }

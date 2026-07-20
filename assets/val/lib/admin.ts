@@ -9,12 +9,12 @@
  * from Deno.env + the val-town imports.
  *
  * Endpoints:
- *   GET  /admin/key-audit    Per-generation row counts + the
- *                            current pointer.
- *   POST /admin/rewrap       Re-wrap rows from one generation to
- *                            another. Body: { fromGeneration,
- *                            toGeneration, batchSize? }. Idempotent
- *                            + cursor-driven.
+ * GET  /admin/key-audit    Per-generation row counts + the
+ * current pointer.
+ * POST /admin/rewrap       Re-wrap rows from one generation to
+ * another. Body: { fromGeneration,
+ * toGeneration, batchSize? }. Idempotent
+ * \+ cursor-driven.
  *
  * Both endpoints require `Authorization: Bearer <admin token>`.
  * The token is constant-time-compared so timing won't leak its
@@ -26,17 +26,42 @@ import type { Context } from 'npm:hono@4'
 
 import { importKey, unwrapKey, wrapKey } from './crypto.ts'
 
-/** SQLite client surface the handlers depend on (a slice of
- *  `https://esm.town/v/std/sqlite/main.ts`). Tests pass a stub. */
+export function adminAuth(
+  c: Context,
+  adminToken: string,
+): Response | undefined {
+  if (!adminToken) {
+    return c.json(
+      { error: 'admin disabled — MEANDER_ADMIN_TOKEN not set on val' },
+      503,
+    )
+  }
+  const auth = c.req.header('authorization') || ''
+  const m = auth.match(/^Bearer\s+(.+)$/i)
+  if (!m) {
+    return c.json({ error: 'admin auth required' }, 401)
+  }
+  if (!constantTimeEqual(m[1]!, adminToken)) {
+    return c.json({ error: 'admin auth failed' }, 401)
+  }
+  return undefined
+}
+
+/**
+ * SQLite client surface the handlers depend on (a slice of
+ * `https://esm.town/v/std/sqlite/main.ts`). Tests pass a stub.
+ */
 export type SqliteClient = {
   execute: (
-    arg: string | { sql: string; args?: Record<string, unknown> },
+    arg: string | { sql: string; args?: Record<string, unknown> | undefined },
   ) => Promise<{ rows: readonly unknown[] }>
 }
 
-/** Wrapping-key context — same shape as ./keys.ts's
- *  `WrappingKeyContext`, restated here so tests don't need to
- *  build a full Deno-env-backed context to exercise the routes. */
+/**
+ * Wrapping-key context — same shape as ./keys.ts's
+ * `WrappingKeyContext`, restated here so tests don't need to
+ * build a full Deno-env-backed context to exercise the routes.
+ */
 export type AdminKeyContext = {
   currentGeneration: number
   getKey: (generation: number) => Promise<CryptoKey>
@@ -46,14 +71,20 @@ export type AdminKeyContext = {
 export type AdminDeps = {
   sqlite: SqliteClient
   ensureDb: () => Promise<void>
-  /** May be undefined when the val booted without a configured
-   *  wrapping key — admin routes surface a 500 in that case. */
+  /**
+   * May be undefined when the val booted without a configured
+   * wrapping key — admin routes surface a 500 in that case.
+   */
   keyContext: AdminKeyContext | undefined
-  /** Reason the keyContext is missing. Surfaced verbatim in the
-   *  error body to help operators debug. */
+  /**
+   * Reason the keyContext is missing. Surfaced verbatim in the
+   * error body to help operators debug.
+   */
   keyContextError: string | undefined
-  /** Admin bearer token. Empty string disables admin routes
-   *  (the val returns 503). */
+  /**
+   * Admin bearer token. Empty string disables admin routes
+   * (the val returns 503).
+   */
   adminToken: string
 }
 
@@ -73,25 +104,7 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-function adminAuth(c: Context, adminToken: string): Response | undefined {
-  if (!adminToken) {
-    return c.json(
-      { error: 'admin disabled — MEANDER_ADMIN_TOKEN not set on val' },
-      503,
-    )
-  }
-  const auth = c.req.header('authorization') || ''
-  const m = auth.match(/^Bearer\s+(.+)$/i)
-  if (!m) {
-    return c.json({ error: 'admin auth required' }, 401)
-  }
-  if (!constantTimeEqual(m[1]!, adminToken)) {
-    return c.json({ error: 'admin auth failed' }, 401)
-  }
-  return undefined
-}
-
-function noKeyContextResponse(c: Context, deps: AdminDeps): Response {
+export function noKeyContextResponse(c: Context, deps: AdminDeps): Response {
   const reason =
     deps.keyContextError ??
     'server missing MEANDER_DB_KEY_<n> + MEANDER_DB_KEY_CURRENT — run `meander db key init`'

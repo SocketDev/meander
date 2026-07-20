@@ -5,11 +5,9 @@ import ValTown from '@valtown/sdk'
 
 import { generateSecret, getEnvVar, setEnvVar } from './valtown-env.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
-function getValSourcePath(): string {
-  const thisFile = fileURLToPath(import.meta.url)
-  return path.join(path.dirname(thisFile), '..', 'assets', 'val', 'index.ts')
-}
+const logger = getDefaultLogger()
 
 /**
  * Bundle the val's `index.ts` + its `lib/*.ts` helpers into a
@@ -20,7 +18,7 @@ function getValSourcePath(): string {
  * External: `npm:*`, `https://esm.town/*` — Deno resolves those
  * at runtime.
  */
-async function bundleValSource(entryPath: string): Promise<string> {
+export async function bundleValSource(entryPath: string): Promise<string> {
   const esbuild = await import('esbuild')
   const result = await esbuild.build({
     entryPoints: [entryPath],
@@ -39,22 +37,32 @@ async function bundleValSource(entryPath: string): Promise<string> {
 }
 
 export type DeployValOptions = {
-  /** Override the env var read for the bearer token. Default:
-   *  MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN. */
+  /**
+   * Override the env var read for the bearer token. Default:
+   * MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN.
+   */
   tokenEnv?: string | undefined
-  /** When true, missing token / auth creds log a warning and
-   *  return 0 instead of throwing. Used by CI workflows where
-   *  the comment-backend deploy is opt-in (e.g. public fork PRs
-   *  that never get the secret). */
+  /**
+   * When true, missing token / auth creds log a warning and
+   * return 0 instead of throwing. Used by CI workflows where
+   * the comment-backend deploy is opt-in (e.g. public fork PRs
+   * that never get the secret).
+   */
   graceful?: boolean | undefined
-  /** Blob-key prefix the val should read from. Matches whatever
-   *  `meander publish` uploads to. Default: "pages". */
+  /**
+   * Blob-key prefix the val should read from. Matches whatever
+   * `meander publish` uploads to. Default: "pages".
+   */
   outDir?: string | undefined
-  /** Comma-separated email-domain allowlist written to the val's
-   *  env. Default: empty (val refuses writes until configured). */
+  /**
+   * Comma-separated email-domain allowlist written to the val's
+   * env. Default: empty (val refuses writes until configured).
+   */
   allowedEmailDomains?: string | undefined
-  /** When true, the val returns 403 on writes + the comment UI
-   *  shows a "demo" banner. Default: false. */
+  /**
+   * When true, the val returns 403 on writes + the comment UI
+   * shows a "demo" banner. Default: false.
+   */
   demoMode?: boolean | undefined
 }
 
@@ -74,7 +82,7 @@ export async function deployVal(
   if (!token) {
     const msg = missingTokenMessage(envName)
     if (graceful) {
-      console.log(`[deploy-val] skipped — ${msg}`)
+      logger.log(`[deploy-val] skipped — ${msg}`)
       return
     }
     throw new Error(msg)
@@ -85,8 +93,8 @@ export async function deployVal(
 
   const profile = await client.me.profile.retrieve()
   const username = profile.username ?? ''
-  console.log(`Logged in as: ${username}`)
-  console.log(`Looking for existing val "${valName}"...`)
+  logger.log(`Logged in as: ${username}`)
+  logger.log(`Looking for existing val "${valName}"...`)
 
   let valId: string | undefined
   try {
@@ -97,33 +105,33 @@ export async function deployVal(
   }
 
   if (valId) {
-    console.log(`Found existing val: ${valId}`)
+    logger.log(`Found existing val: ${valId}`)
   } else {
-    console.log(`Creating new val "${valName}"...`)
+    logger.log(`Creating new val "${valName}"...`)
     const created = await client.vals.create({
       name: valName,
       privacy: 'unlisted',
       description: 'Walkthrough viewer with comments',
     })
     valId = created.id
-    console.log(`Created val: ${valId}`)
+    logger.log(`Created val: ${valId}`)
   }
 
-  console.log('Updating val source code...')
+  logger.log('Updating val source code…')
   try {
     await client.vals.files.update(valId, {
       path: 'index.ts',
       content: valSource,
       type: 'http',
     })
-    console.log('Updated index.ts')
+    logger.log('Updated index.ts')
   } catch {
     await client.vals.files.create(valId, {
       path: 'index.ts',
       content: valSource,
       type: 'http',
     })
-    console.log('Created index.ts')
+    logger.log('Created index.ts')
   }
 
   /* Env var list. MEANDER_JWT_SECRET + MEANDER_ADMIN_TOKEN are
@@ -133,7 +141,11 @@ export async function deployVal(
    * the `meander db key` and `meander blob key` ceremonies, which
    * control share distribution and the generation pointer.
    * deploy-val only handles the val's non-key configuration. */
-  const envVars: Array<{ key: string; value: string; preserveIfSet?: true }> = [
+  const envVars: Array<{
+    key: string
+    value: string
+    preserveIfSet?: true | undefined
+  }> = [
     { key: 'MEANDER_OUT_DIR', value: outDir },
     { key: 'MEANDER_ALLOWED_EMAIL_DOMAINS', value: allowedEmailDomains },
     { key: 'MEANDER_DEMO_MODE', value: demoMode ? 'true' : 'false' },
@@ -149,27 +161,34 @@ export async function deployVal(
     },
   ]
 
-  console.log('Setting environment variables...')
+  logger.log('Setting environment variables…')
   for (const { key, value, preserveIfSet } of envVars) {
     if (preserveIfSet) {
       const existing = await getEnvVar(token, valId, key)
       if (existing) {
-        console.log(`  Preserved ${key} (already set)`)
+        logger.log(`  Preserved ${key} (already set)`)
         continue
       }
     }
     await setEnvVar(token, valId, key, value)
-    console.log(`  Set ${key}`)
+    logger.log(`  Set ${key}`)
   }
 
   const val = await client.vals.retrieve(valId)
-  console.log(`\nDone! Val URL: ${val.links.html}`)
+  logger.log('')
+  logger.log(`Done! Val URL: ${val.links.html}`)
   if (!allowedEmailDomains) {
-    console.log(
-      '\nNote: MEANDER_ALLOWED_EMAIL_DOMAINS is empty — writes will be refused.',
+    logger.log('')
+    logger.log(
+      'Note: MEANDER_ALLOWED_EMAIL_DOMAINS is empty — writes will be refused.',
     )
-    console.log(
+    logger.log(
       '      Set it via --allowed-domains=gmail.com,example.com or the val settings.',
     )
   }
+}
+
+export function getValSourcePath(): string {
+  const thisFile = fileURLToPath(import.meta.url)
+  return path.join(path.dirname(thisFile), '..', 'assets', 'val', 'index.ts')
 }

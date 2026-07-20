@@ -6,13 +6,6 @@
 
 import { b64urlEncode } from './jwt.ts'
 
-export function parseAllowedDomains(raw: string | undefined): string[] {
-  return (raw || '')
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(Boolean)
-}
-
 export function emailDomainAllowed(
   email: string,
   allowed: readonly string[],
@@ -26,16 +19,6 @@ export function emailDomainAllowed(
 }
 
 /**
- * Random 6-digit numeric code, zero-padded. Uses
- * crypto.getRandomValues for unpredictability.
- */
-export function sixDigitCode(): string {
-  const buf = new Uint32Array(1)
-  crypto.getRandomValues(buf)
-  return (buf[0]! % 1_000_000).toString().padStart(6, '0')
-}
-
-/**
  * Hash a magic code with the email as a salt. Stored server-side
  * in the `magic_codes` table; the raw code never lands on disk.
  */
@@ -43,4 +26,21 @@ export async function hashCode(code: string, email: string): Promise<string> {
   const bytes = new TextEncoder().encode(`${email}:${code}`)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return b64urlEncode(new Uint8Array(digest))
+}
+
+export function parseAllowedDomains(raw: string | undefined): string[] {
+  return (raw || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+/**
+ * Random 6-digit numeric code, zero-padded. Uses
+ * crypto.getRandomValues for unpredictability.
+ */
+export function sixDigitCode(): string {
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return (buf[0]! % 1_000_000).toString().padStart(6, '0')
 }

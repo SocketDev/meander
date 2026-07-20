@@ -1,3 +1,6 @@
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+const logger = getDefaultLogger()
+
 /* Inline-code tokenizer registry.
  *
  * Consumers can register custom classifier + tokenizer pairs
@@ -27,7 +30,6 @@
  * .doc-content that isn't already inside a <pre>. Block code
  * (fenced code) is left alone — hljs already highlights those
  * at the block level. */
-'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
   if (!ns) {
@@ -62,7 +64,7 @@
       } catch (e) {
         /* A single bad tokenizer shouldn't kill the page —
          * log and move on to the next candidate. */
-        console.error(`[meander:inline-tokenizers] ${entry.name}:`, e)
+        logger.fail(`[meander:inline-tokenizers] ${entry.name}:`, e)
       }
     }
     /* Fallback: hljs TypeScript. Gated on hljs being present

@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup and install
-        uses: ./.github/actions/setup-and-install
+        uses: ./.github/actions/fleet/setup-and-install
 
       # Generate the fixture into its own dir so the emit output
       # is what we upload. --base-path=/meander matches the GH

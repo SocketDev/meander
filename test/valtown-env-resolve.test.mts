@@ -1,10 +1,9 @@
 /**
- * @fileoverview Tests for resolveVal in src/valtown-env.mts.
- *
- * resolveVal goes through the @valtown/sdk client (not raw fetch),
- * so its tests need the SDK mocked. Separated into its own file
- * so the vi.mock() doesn't bleed into the fetch-based tests in
- * test/valtown-env.test.mts.
+ * @file Tests for resolveVal in src/valtown-env.mts.
+ *   resolveVal goes through the @valtown/sdk client (not raw fetch),
+ *   so its tests need the SDK mocked. Separated into its own file
+ *   so the vi.mock() doesn't bleed into the fetch-based tests in
+ *   test/valtown-env.test.mts.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -12,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest'
 const profileMock = vi.fn()
 const aliasMock = vi.fn()
 
-vi.mock('@valtown/sdk', () => {
+vi.mock(import('@valtown/sdk'), () => {
   /* The real export is a class — `new ValTown({...})` in production.
    * Provide a stub class whose instances expose the same shape. */
   class FakeValTown {

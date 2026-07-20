@@ -1,3 +1,8 @@
+/* max-file-lines: browser-client — single cohesive IIFE-scoped browser client; a bundler-free split would break the shared closure state and script load order. */
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
+const logger = getDefaultLogger()
+
 ;(function () {
   'use strict'
 
@@ -5,7 +10,9 @@
   const partId = parseInt(document.body.getAttribute('data-part'), 10)
   const pageType = document.body.getAttribute('data-page-type')
   const isDocumentsPage = pageType === 'documents'
-  if (!slug || isNaN(partId)) {return}
+  if (!slug || isNaN(partId)) {
+    return
+  }
 
   /* When meander emits data-comment-backend on <body>, the HTML
    * is hosted off-origin (GH Pages, Cloudflare Pages, etc.) and
@@ -19,7 +26,7 @@
     ? backendBase + '/' + slug + '/api/comments'
     : '/' + slug + '/api/comments'
   let comments = []
-  let addBtn = null
+  let addBtn = undefined
   const expandedGroups = {} // group keys that should render expanded
 
   /* ------------------------------------------------------------------ */
@@ -36,7 +43,7 @@
    * visually dim the composer rather than hiding it. */
   const demoMode = document.body.getAttribute('data-demo-mode') === 'true'
 
-  const FETCH_TIMEOUT_MS = 10000
+  const FETCH_TIMEOUT_MS = 10_000
 
   /**
    * Build an AbortSignal that fires after FETCH_TIMEOUT_MS, optionally
@@ -51,7 +58,9 @@
       return undefined
     }
     const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    if (!userSignal) {return timeoutSignal}
+    if (!userSignal) {
+      return timeoutSignal
+    }
     if (typeof AbortSignal.any === 'function') {
       return AbortSignal.any([timeoutSignal, userSignal])
     }
@@ -74,16 +83,16 @@
   }
 
   /**
-   * fetch wrapper that attaches Authorization when a token is
+   * Fetch wrapper that attaches Authorization when a token is
    * stored and auto-clears the session on 401 (expired / rotated).
    */
-  function authFetch(url, init) {
-    init = init || {}
+  function authFetch(url, reqInit) {
+    reqInit = reqInit || {}
     const headers = {}
-    if (init.headers) {
-      for (const k in init.headers) {
-        if (Object.prototype.hasOwnProperty.call(init.headers, k)) {
-          headers[k] = init.headers[k]
+    if (reqInit.headers) {
+      for (const k in reqInit.headers) {
+        if (Object.prototype.hasOwnProperty.call(reqInit.headers, k)) {
+          headers[k] = reqInit.headers[k]
         }
       }
     }
@@ -91,12 +100,12 @@
     if (token) {
       headers['Authorization'] = 'Bearer ' + token
     }
-    init.headers = headers
-    const signal = requestSignal(init.signal)
+    reqInit.headers = headers
+    const signal = requestSignal(reqInit.signal)
     if (signal) {
-      init.signal = signal
+      reqInit.signal = signal
     }
-    return fetch(url, init).then(function (r) {
+    return httpRequest(url, reqInit).then(function (r) {
       if (r.status === 401 && token) {
         clearSession()
       }
@@ -105,7 +114,7 @@
   }
 
   function requestMagicCode(email) {
-    return fetch(authBase + '/request', {
+    return httpRequest(authBase + '/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email }),
@@ -121,7 +130,7 @@
   }
 
   function verifyMagicCode(email, code) {
-    return fetch(authBase + '/verify', {
+    return httpRequest(authBase + '/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, code: code }),
@@ -138,19 +147,27 @@
 
   function signIn(callback) {
     let email = prompt('Email address to sign in with:')
-    if (!email || !email.trim()) {return}
+    if (!email || !email.trim()) {
+      return
+    }
     email = email.trim()
     requestMagicCode(email)
       .then(function () {
-        const code = prompt('Check your email for a 6-digit code. Enter it here:')
-        if (!code || !code.trim()) {return}
+        const code = prompt(
+          'Check your email for a 6-digit code. Enter it here:',
+        )
+        if (!code || !code.trim()) {
+          return
+        }
         return verifyMagicCode(email, code.trim()).then(function (data) {
           setSession(data.token, data.email)
-          if (callback) {callback()}
+          if (callback) {
+            callback()
+          }
         })
       })
       .catch(function (err) {
-        alert('Sign-in failed: ' + (err && err.message ? err.message : err))
+        alert('Sign-in failed: ' + (err?.message ? err.message : err))
       })
   }
 
@@ -193,7 +210,9 @@
         lineTo: lineTo,
         body: body,
       }
-      if (parentId) {payload.parentId = parentId}
+      if (parentId) {
+        payload.parentId = parentId
+      }
       authFetch(apiBase, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,10 +230,12 @@
           comments.push(comment)
           expandedGroups[comment.file + ':' + comment.lineFrom] = true
           renderAllComments()
-          if (callback) {callback()}
+          if (callback) {
+            callback()
+          }
         })
         .catch(function (err) {
-          alert('Failed to post: ' + (err && err.message ? err.message : err))
+          alert('Failed to post: ' + (err?.message ? err.message : err))
         })
     })
   }
@@ -232,7 +253,7 @@
           renderAllComments()
         })
         .catch(function (err) {
-          console.error('Failed to delete comment:', err)
+          logger.fail('Failed to delete comment:', err)
         })
     })
   }
@@ -259,7 +280,7 @@
           renderAllComments()
         })
         .catch(function (err) {
-          console.error('Failed to toggle resolved:', err)
+          logger.fail('Failed to toggle resolved:', err)
         })
     })
   }
@@ -274,9 +295,13 @@
    * from "+ Comment" / Reply / Resolve actions instead. */
   function renderAuthUi() {
     const existing = document.querySelector('.mdr-auth')
-    if (existing) {existing.parentNode.removeChild(existing)}
+    if (existing) {
+      existing.parentNode.removeChild(existing)
+    }
     const email = getEmail()
-    if (!email) {return}
+    if (!email) {
+      return
+    }
     const el = document.createElement('div')
     el.className = 'mdr-auth'
     const span = document.createElement('span')
@@ -300,14 +325,14 @@
     }
   }
 
-  function signInFlow(after) {
-    signIn(after)
-  }
-
   function renderDemoBanner() {
-    if (!demoMode) {return}
+    if (!demoMode) {
+      return
+    }
     const key = 'meander:demo-banner-dismissed-v1'
-    if (localStorage.getItem(key) === 'true') {return}
+    if (localStorage.getItem(key) === 'true') {
+      return
+    }
     const el = document.createElement('div')
     el.className = 'mdr-demo-banner'
     const msg = document.createElement('span')
@@ -331,9 +356,11 @@
   /* ------------------------------------------------------------------ */
 
   function getActiveDocFile() {
-    if (!isDocumentsPage) {return null}
+    if (!isDocumentsPage) {
+      return undefined
+    }
     const activePane = document.querySelector('.doc-tab-pane.active')
-    return activePane ? activePane.getAttribute('data-doc-file') : null
+    return activePane ? activePane.getAttribute('data-doc-file') : undefined
   }
 
   function renderAllComments() {
@@ -364,7 +391,9 @@
     const parentGroupKey = {}
     for (let j = 0; j < commentsToRender.length; j++) {
       const c = commentsToRender[j]
-      if (c.parentId) {continue} // handle replies in second pass
+      if (c.parentId) {
+        continue
+      } // handle replies in second pass
       const key = c.file + ':' + c.lineFrom
       if (!groups[key]) {
         groups[key] = {
@@ -375,14 +404,18 @@
         }
       }
       // Expand the group's lineTo to cover the widest range
-      if (c.lineTo > groups[key].lineTo) {groups[key].lineTo = c.lineTo}
+      if (c.lineTo > groups[key].lineTo) {
+        groups[key].lineTo = c.lineTo
+      }
       groups[key].comments.push(c)
       parentGroupKey[c.id] = key
     }
     // Second pass: attach replies to their parent's group
     for (let j = 0; j < commentsToRender.length; j++) {
       const c = commentsToRender[j]
-      if (!c.parentId) {continue}
+      if (!c.parentId) {
+        continue
+      }
       const gKey = parentGroupKey[c.parentId]
       if (gKey && groups[gKey]) {
         groups[gKey].comments.push(c)
@@ -408,14 +441,16 @@
         }
       }
     }
-    return null
+    return undefined
   }
 
   function findBlockElement(file, blockId) {
     const pane = document.querySelector(
       '.doc-tab-pane[data-doc-file="' + CSS.escape(file) + '"]',
     )
-    if (!pane) {return null}
+    if (!pane) {
+      return undefined
+    }
     return pane.querySelector('.doc-block[data-block-id="' + blockId + '"]')
   }
 
@@ -458,7 +493,10 @@
       resolveBtn.type = 'button'
       resolveBtn.className = 'comment-resolve-btn'
       resolveBtn.textContent = comment.resolved ? 'Unresolve' : 'Resolve'
-      resolveBtn.setAttribute('aria-pressed', comment.resolved ? 'true' : 'false')
+      resolveBtn.setAttribute(
+        'aria-pressed',
+        comment.resolved ? 'true' : 'false',
+      )
       ;(function (cid, currentlyResolved) {
         resolveBtn.addEventListener('click', function () {
           toggleResolved(cid, !currentlyResolved)
@@ -510,14 +548,16 @@
     }
 
     const author = ensureAuthor()
-    if (!author) {return}
+    if (!author) {
+      return
+    }
 
     const form = document.createElement('div')
     form.className = 'comment-reply-form'
 
     const textarea = document.createElement('textarea')
     textarea.className = 'comment-form-textarea'
-    textarea.placeholder = 'Write a reply...'
+    textarea.placeholder = 'Write a reply…'
     textarea.rows = 2
 
     const btnRow = document.createElement('div')
@@ -537,7 +577,9 @@
     submitBtn.textContent = 'Reply'
     submitBtn.addEventListener('click', function () {
       const text = textarea.value.trim()
-      if (!text) {return}
+      if (!text) {
+        return
+      }
       postComment(
         parentComment.file,
         parentComment.lineFrom,
@@ -569,7 +611,9 @@
     for (let i = 0; i < group.comments.length; i++) {
       const c = group.comments[i]
       if (c.parentId) {
-        if (!repliesByParent[c.parentId]) {repliesByParent[c.parentId] = []}
+        if (!repliesByParent[c.parentId]) {
+          repliesByParent[c.parentId] = []
+        }
         repliesByParent[c.parentId].push(c)
       } else {
         roots.push(c)
@@ -588,11 +632,15 @@
     if (isDocumentsPage) {
       // Document page: find the block elements
       const targetBlock = findBlockElement(group.file, group.lineTo)
-      if (!targetBlock) {return}
+      if (!targetBlock) {
+        return
+      }
 
       // Find the lineFrom block to place the indicator
       let indicatorBlock = findBlockElement(group.file, group.lineFrom)
-      if (!indicatorBlock) {indicatorBlock = targetBlock}
+      if (!indicatorBlock) {
+        indicatorBlock = targetBlock
+      }
 
       // Create the indicator dot on the lineFrom block's gutter
       const gutter = indicatorBlock.querySelector('.doc-block-gutter')
@@ -681,7 +729,7 @@
               toggle()
             })
             indicator.addEventListener('keydown', function (e) {
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault()
                 e.stopPropagation()
                 toggle()
@@ -693,11 +741,15 @@
     } else {
       // Code page: use table rows
       const targetRow = findRowForLine(group.file, group.lineTo)
-      if (!targetRow) {return}
+      if (!targetRow) {
+        return
+      }
 
       // Find the lineFrom row to place the indicator
       let indicatorRow = findRowForLine(group.file, group.lineFrom)
-      if (!indicatorRow) {indicatorRow = targetRow}
+      if (!indicatorRow) {
+        indicatorRow = targetRow
+      }
 
       // Create the indicator dot on the lineFrom row (yellow = unresolved, green = all resolved)
       const numCell = indicatorRow.querySelector('.line-num')
@@ -758,7 +810,7 @@
       if (numCell) {
         const indicator = numCell.querySelector('.comment-indicator')
         if (indicator) {
-          ;(function (row, gFile, gFrom, gTo) {
+          ;(function (row, _gFile, gFrom, gTo) {
             const toggle = function () {
               const visible = row.style.display !== 'none'
               if (visible) {
@@ -778,7 +830,7 @@
               toggle()
             })
             indicator.addEventListener('keydown', function (e) {
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault()
                 e.stopPropagation()
                 toggle()
@@ -811,15 +863,25 @@
       const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
       const diffSec = Math.round((d.getTime() - Date.now()) / 1000)
       const abs = Math.abs(diffSec)
-      if (abs < 60) {return rtf.format(diffSec, 'second')}
-      if (abs < 3600) {return rtf.format(Math.round(diffSec / 60), 'minute')}
-      if (abs < 86400) {return rtf.format(Math.round(diffSec / 3600), 'hour')}
-      if (abs < 86400 * 7) {return rtf.format(Math.round(diffSec / 86400), 'day')}
-      if (abs < 86400 * 30)
-        {return rtf.format(Math.round(diffSec / (86400 * 7)), 'week')}
-      if (abs < 86400 * 365)
-        {return rtf.format(Math.round(diffSec / (86400 * 30)), 'month')}
-      return rtf.format(Math.round(diffSec / (86400 * 365)), 'year')
+      if (abs < 60) {
+        return rtf.format(diffSec, 'second')
+      }
+      if (abs < 3600) {
+        return rtf.format(Math.round(diffSec / 60), 'minute')
+      }
+      if (abs < 86_400) {
+        return rtf.format(Math.round(diffSec / 3600), 'hour')
+      }
+      if (abs < 86_400 * 7) {
+        return rtf.format(Math.round(diffSec / 86_400), 'day')
+      }
+      if (abs < 86_400 * 30) {
+        return rtf.format(Math.round(diffSec / (86_400 * 7)), 'week')
+      }
+      if (abs < 86_400 * 365) {
+        return rtf.format(Math.round(diffSec / (86_400 * 30)), 'month')
+      }
+      return rtf.format(Math.round(diffSec / (86_400 * 365)), 'year')
     } catch (_) {
       return iso
     }
@@ -857,8 +919,10 @@
     return btn
   }
 
-  function positionAddButton(sel) {
-    if (!addBtn) {addBtn = createAddButton()}
+  function positionAddButton(_sel) {
+    if (!addBtn) {
+      addBtn = createAddButton()
+    }
 
     // Position near the last selected row in the code column
     const selectedElements = isDocumentsPage
@@ -880,7 +944,9 @@
   }
 
   function hideAddButton() {
-    if (addBtn) {addBtn.style.display = 'none'}
+    if (addBtn) {
+      addBtn.style.display = 'none'
+    }
   }
 
   function findLastSelectedElement() {
@@ -888,13 +954,15 @@
       ? '.doc-block.block-selected'
       : '.code-table tr.selected'
     const selected = document.querySelectorAll(selector)
-    return selected.length > 0 ? selected[selected.length - 1] : null
+    return selected.length > 0 ? selected[selected.length - 1] : undefined
   }
 
   function showCommentForm(sel) {
     // Prompt for author name before showing the form
     const author = ensureAuthor()
-    if (!author) {return}
+    if (!author) {
+      return
+    }
 
     hideAddButton()
 
@@ -902,10 +970,14 @@
     const existingForm = document.querySelector(
       '.comment-form-row, .doc-comment-form',
     )
-    if (existingForm) {existingForm.remove()}
+    if (existingForm) {
+      existingForm.remove()
+    }
 
     const lastEl = findLastSelectedElement()
-    if (!lastEl) {return}
+    if (!lastEl) {
+      return
+    }
 
     const container = document.createElement('div')
     container.className = 'comment-form-container'
@@ -922,7 +994,7 @@
 
     const textarea = document.createElement('textarea')
     textarea.className = 'comment-form-textarea'
-    textarea.placeholder = 'Write a comment...'
+    textarea.placeholder = 'Write a comment…'
     textarea.rows = 3
 
     const btnRow = document.createElement('div')
@@ -935,10 +1007,14 @@
     cancelBtn.addEventListener('click', function () {
       if (isDocumentsPage) {
         const formEl = document.querySelector('.doc-comment-form')
-        if (formEl) {formEl.remove()}
+        if (formEl) {
+          formEl.remove()
+        }
       } else {
         const formRow = document.querySelector('.comment-form-row')
-        if (formRow) {formRow.remove()}
+        if (formRow) {
+          formRow.remove()
+        }
       }
     })
 
@@ -948,14 +1024,20 @@
     submitBtn.textContent = 'Submit'
     submitBtn.addEventListener('click', function () {
       const text = textarea.value.trim()
-      if (!text) {return}
-      postComment(sel.file, sel.from, sel.to, text, null, function () {
+      if (!text) {
+        return
+      }
+      postComment(sel.file, sel.from, sel.to, text, undefined, function () {
         if (isDocumentsPage) {
           const formEl = document.querySelector('.doc-comment-form')
-          if (formEl) {formEl.remove()}
+          if (formEl) {
+            formEl.remove()
+          }
         } else {
           const formRow = document.querySelector('.comment-form-row')
-          if (formRow) {formRow.remove()}
+          if (formRow) {
+            formRow.remove()
+          }
         }
       })
     })
@@ -1018,7 +1100,7 @@
 
   // Add button click handler (delegated since button is created lazily)
   document.addEventListener('click', function (e) {
-    if (e.target.classList && e.target.classList.contains('comment-add-btn')) {
+    if (e.target.classList?.contains('comment-add-btn')) {
       const sel = window.walkthroughSelection
       if (sel) {
         showCommentForm(sel)

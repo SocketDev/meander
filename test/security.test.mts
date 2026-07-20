@@ -1,10 +1,13 @@
-/** @fileoverview Tests for security.mts — SRI computation + injection, CSP meta. */
+/**
+ * @file Tests for security.mts — SRI computation + injection, CSP meta.
+ */
 
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
+import nock from 'nock'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
@@ -36,72 +39,71 @@ describe('computeIntegrity', () => {
 
 describe('sriForUrl cache', () => {
   let tmpDir: string
-  let capturedUrl: string | null = null
-  const originalFetch = globalThis.fetch
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-sri-'))
-    capturedUrl = null
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      capturedUrl = typeof input === 'string' ? input : String(input)
-      const bytes = new TextEncoder().encode('cdn payload')
-      return {
-        ok: true,
-        status: 200,
-        arrayBuffer: async () => bytes.buffer,
-      } as unknown as Response
-    }) as typeof globalThis.fetch
+    /* @socketsecurity/lib 6.x drives httpRequest through Node's
+     * http/https modules, so we intercept with nock (a globalThis.fetch
+     * stub would never be reached). */
+    nock.disableNetConnect()
   })
 
   afterEach(async () => {
-    globalThis.fetch = originalFetch
+    nock.cleanAll()
+    nock.enableNetConnect()
     await safeDelete(tmpDir, { recursive: true, force: true })
   })
 
   it('fetches + returns sha512 on first call', async () => {
     const url = 'https://unpkg.com/foo@1/index.js'
+    const scope = nock('https://unpkg.com')
+      .get('/foo@1/index.js')
+      .reply(200, 'cdn payload')
     const h = await sriForUrl(url, { cacheDir: tmpDir })
     expect(h).toMatch(/^sha512-/)
-    expect(capturedUrl).toBe(url)
+    expect(scope.isDone()).toBe(true)
   })
 
   it('second call hits the cache (no fetch)', async () => {
     const url = 'https://unpkg.com/foo@1/index.js'
+    const fetched = nock('https://unpkg.com')
+      .get('/foo@1/index.js')
+      .reply(200, 'cdn payload')
     const first = await sriForUrl(url, { cacheDir: tmpDir })
-    capturedUrl = null
+    expect(fetched.isDone()).toBe(true)
+    /* A second interceptor that must NOT be consumed: a cache hit
+     * means no network, so this stays pending. */
+    const shouldNotFetch = nock('https://unpkg.com')
+      .get('/foo@1/index.js')
+      .reply(200, 'different payload')
     const second = await sriForUrl(url, { cacheDir: tmpDir })
     expect(second).toBe(first)
-    expect(capturedUrl).toBeNull()
+    expect(shouldNotFetch.isDone()).toBe(false)
   })
 
   it('omitting cacheDir fetches every time', async () => {
     const url = 'https://unpkg.com/foo@1/index.js'
+    const first = nock('https://unpkg.com')
+      .get('/foo@1/index.js')
+      .reply(200, 'cdn payload')
     await sriForUrl(url)
-    expect(capturedUrl).toBe(url)
-    capturedUrl = null
+    expect(first.isDone()).toBe(true)
+    const second = nock('https://unpkg.com')
+      .get('/foo@1/index.js')
+      .reply(200, 'cdn payload')
     await sriForUrl(url)
-    expect(capturedUrl).toBe(url)
+    expect(second.isDone()).toBe(true)
   })
 
   it('throws on non-ok response', async () => {
-    globalThis.fetch = (async () =>
-      ({
-        ok: false,
-        status: 404,
-        arrayBuffer: async () => new ArrayBuffer(0),
-      }) as unknown as Response) as typeof globalThis.fetch
+    nock('https://unpkg.com').get('/missing@1/boom.js').reply(404, '')
     await expect(
       sriForUrl('https://unpkg.com/missing@1/boom.js'),
     ).rejects.toThrow(/HTTP 404/)
   })
 
   it('throws on non-ok response even with cacheDir set', async () => {
-    globalThis.fetch = (async () =>
-      ({
-        ok: false,
-        status: 503,
-        arrayBuffer: async () => new ArrayBuffer(0),
-      }) as unknown as Response) as typeof globalThis.fetch
+    nock('https://unpkg.com').get('/down@1/index.js').reply(503, '')
     await expect(
       sriForUrl('https://unpkg.com/down@1/index.js', { cacheDir: tmpDir }),
     ).rejects.toThrow(/HTTP 503/)
@@ -110,26 +112,22 @@ describe('sriForUrl cache', () => {
 
 describe('injectSriIntegrity', () => {
   let tmpDir: string
-  const originalFetch = globalThis.fetch
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-sri-inject-'))
-    globalThis.fetch = (async () => {
-      const bytes = new TextEncoder().encode('remote body')
-      return {
-        ok: true,
-        status: 200,
-        arrayBuffer: async () => bytes.buffer,
-      } as unknown as Response
-    }) as typeof globalThis.fetch
+    /* Block real network; remote-ref tests register their own nock
+     * interceptor. Local-file + skip cases make no request. */
+    nock.disableNetConnect()
   })
 
   afterEach(async () => {
-    globalThis.fetch = originalFetch
+    nock.cleanAll()
+    nock.enableNetConnect()
     await safeDelete(tmpDir, { recursive: true, force: true })
   })
 
   it('injects integrity on a remote <script src>', async () => {
+    nock('https://unpkg.com').get('/foo/index.js').reply(200, 'remote body')
     const html =
       '<html><head><script src="https://unpkg.com/foo/index.js"></script></head><body></body></html>'
     const out = await injectSriIntegrity(html)
@@ -324,7 +322,7 @@ describe('injectCspMeta', () => {
     const out = injectCspMeta(html)
     expect(out).toContain('<meta http-equiv="Content-Security-Policy"')
     /* No raw double quote inside the content= value — must be escaped. */
-    const metaMatch = out.match(/content="([^"]*)"/)
+    const metaMatch = out.match(/content="(?:[^"]*)"/)
     expect(metaMatch).not.toBeNull()
   })
 })

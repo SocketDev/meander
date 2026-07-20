@@ -1,21 +1,22 @@
 /**
- * @fileoverview Tests for src/ceremony-deps.mts.
- *
- * The ceremony test files exercise gatherShares + printShares
- * indirectly via dbKeyInit/Rotate/etc. This file covers the
- * surface those don't reach: the production factories
- * (createEnvClient / createAdminClient / createIoChannel),
- * the pure helpers (bytesToHex / hexToBytes /
- * validateShamirParams), and the standalone behavior of
- * gatherShares + printShares against the FakeIo channel.
+ * @file Tests for src/ceremony-deps.mts.
+ *   The ceremony test files exercise gatherShares + printShares
+ *   indirectly via dbKeyInit/Rotate/etc. This file covers the
+ *   surface those don't reach: the production factories
+ *   (createEnvClient / createAdminClient / createIoChannel),
+ *   the pure helpers (bytesToHex / hexToBytes /
+ *   validateShamirParams), and the standalone behavior of
+ *   gatherShares + printShares against the FakeIo channel.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import os from 'node:os'
 import path from 'node:path'
 
+import nock from 'nock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// oxlint-disable-next-line socket/no-src-import-in-test-expect -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
 import {
   bytesToHex,
   createAdminClient,
@@ -29,7 +30,15 @@ import {
 import { encodeShare, split } from '../src/shamir.mts'
 import { FakeIo } from './utils/fake-deps.mts'
 
+const VAL_API = 'https://api.val.town'
+
+beforeEach(() => {
+  nock.disableNetConnect()
+})
+
 afterEach(() => {
+  nock.cleanAll()
+  nock.enableNetConnect()
   vi.restoreAllMocks()
 })
 
@@ -122,9 +131,7 @@ describe('gatherShares', () => {
 
   it('propagates an exhausted IoChannel as a clear error', async () => {
     const io = new FakeIo([]) // no shares queued
-    await expect(gatherShares(io, 2)).rejects.toThrow(
-      /no more shares queued/,
-    )
+    await expect(gatherShares(io, 2)).rejects.toThrow(/no more shares queued/)
   })
 })
 
@@ -170,37 +177,27 @@ describe('printShares', () => {
 
 describe('createEnvClient', () => {
   it('binds token + valId into every method', async () => {
-    const seen: Array<{ url: string; auth: string | null; method: string }> = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      const headers = new Headers(init?.headers ?? {})
-      seen.push({
-        url: typeof input === 'string' ? input : input.toString(),
-        auth: headers.get('authorization'),
-        method: (init?.method ?? 'GET').toUpperCase(),
-      })
-      /* Return shapes the production callers expect. */
-      if (init?.method === 'DELETE') {
-        return new Response('', { status: 200 })
-      }
-      if (init?.method === 'PUT') {
-        return new Response('', { status: 200 })
-      }
-      return new Response(JSON.stringify({ data: [], value: 'v' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    })
+    /* Each interceptor pins the exact per-method URL under
+     * /v2/vals/val-id-42/... and requires `Bearer tok-xyz`; nock
+     * only matches when both hold, so scope.isDone() proves every
+     * call carried the bound token + valId. */
+    const envPath = '/v2/vals/val-id-42/environment_variables'
+    const scope = nock(VAL_API)
+      .matchHeader('authorization', 'Bearer tok-xyz')
+      .get(`${envPath}/FOO`)
+      .reply(200, { value: 'v' })
+      .put(`${envPath}/BAR`)
+      .reply(200, '')
+      .get(envPath)
+      .reply(200, { data: [] })
+      .delete(`${envPath}/OLD`)
+      .reply(200, '')
     const env = createEnvClient('tok-xyz', 'val-id-42')
     await env.getEnvVar('FOO')
     await env.setEnvVar('BAR', 'v')
     await env.listEnvVarNames()
     await env.deleteEnvVar('OLD')
-    /* Every call carries Bearer tok-xyz and references val-id-42. */
-    expect(seen).toHaveLength(4)
-    for (const s of seen) {
-      expect(s.auth).toBe('Bearer tok-xyz')
-      expect(s.url).toContain('/v2/vals/val-id-42/environment_variables')
-    }
+    expect(scope.isDone()).toBe(true)
   })
 })
 
@@ -210,53 +207,40 @@ describe('createEnvClient', () => {
 
 describe('createAdminClient', () => {
   it('keyAudit GETs /admin/key-audit with Bearer token', async () => {
-    const seen: Array<{ url: string; auth: string | null }> = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      const headers = new Headers(init?.headers ?? {})
-      seen.push({
-        url: typeof input === 'string' ? input : input.toString(),
-        auth: headers.get('authorization'),
+    /* The interceptor's path pins the URL and matchHeader pins the
+     * Bearer token — nock only replies when both match, so a green
+     * result + isDone() proves the request shape. */
+    const scope = nock('https://my-val.web.val.run')
+      .get('/admin/key-audit')
+      .matchHeader('authorization', 'Bearer admin-tok')
+      .reply(200, {
+        visibleGenerations: [1],
+        currentGeneration: 1,
+        rowCounts: { '1': 5 },
       })
-      return new Response(
-        JSON.stringify({
-          visibleGenerations: [1],
-          currentGeneration: 1,
-          rowCounts: { '1': 5 },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      )
-    })
-    const admin = createAdminClient(
-      'https://my-val.web.val.run',
-      'admin-tok',
-    )
+    const admin = createAdminClient('https://my-val.web.val.run', 'admin-tok')
     const result = await admin.keyAudit()
     expect(result.currentGeneration).toBe(1)
     expect(result.rowCounts).toEqual({ '1': 5 })
-    expect(seen[0]!.url).toBe('https://my-val.web.val.run/admin/key-audit')
-    expect(seen[0]!.auth).toBe('Bearer admin-tok')
+    expect(scope.isDone()).toBe(true)
   })
 
   it('keyAudit throws on non-OK status', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return new Response('boom', { status: 500 })
-    })
+    nock('https://x.web.val.run').get('/admin/key-audit').reply(500, 'boom')
     const admin = createAdminClient('https://x.web.val.run', 'admin-tok')
     await expect(admin.keyAudit()).rejects.toThrow(/audit failed.*500/)
   })
 
   it('rewrap POSTs JSON with the request body', async () => {
-    const seen: Array<{ method: string; body: string | undefined }> = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
-      seen.push({
-        method: (init?.method ?? 'GET').toUpperCase(),
-        body: typeof init?.body === 'string' ? init.body : undefined,
+    /* The body arg makes nock match only when the POST payload
+     * deep-equals it, so isDone() confirms method + body. */
+    const scope = nock('https://x.web.val.run')
+      .post('/admin/rewrap', {
+        fromGeneration: 1,
+        toGeneration: 2,
+        batchSize: 50,
       })
-      return new Response(
-        JSON.stringify({ rewrapped: 7, remaining: 3 }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      )
-    })
+      .reply(200, { rewrapped: 7, remaining: 3 })
     const admin = createAdminClient('https://x.web.val.run', 'admin-tok')
     const result = await admin.rewrap({
       fromGeneration: 1,
@@ -264,36 +248,26 @@ describe('createAdminClient', () => {
       batchSize: 50,
     })
     expect(result).toEqual({ rewrapped: 7, remaining: 3 })
-    expect(seen[0]!.method).toBe('POST')
-    expect(JSON.parse(seen[0]!.body!)).toEqual({
-      fromGeneration: 1,
-      toGeneration: 2,
-      batchSize: 50,
-    })
+    expect(scope.isDone()).toBe(true)
   })
 
   it('rewrap defaults batchSize to 100 when not provided', async () => {
-    let seenBody: string | undefined
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
-      seenBody = typeof init?.body === 'string' ? init.body : undefined
-      return new Response(JSON.stringify({ rewrapped: 0, remaining: 0 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
+    /* batchSize omitted by the caller must be sent as 100 — the
+     * body matcher fails (request unmatched) if it isn't. */
+    const scope = nock('https://x.web.val.run')
+      .post('/admin/rewrap', {
+        fromGeneration: 1,
+        toGeneration: 2,
+        batchSize: 100,
       })
-    })
+      .reply(200, { rewrapped: 0, remaining: 0 })
     const admin = createAdminClient('https://x.web.val.run', 'admin-tok')
     await admin.rewrap({ fromGeneration: 1, toGeneration: 2 })
-    expect(JSON.parse(seenBody!)).toEqual({
-      fromGeneration: 1,
-      toGeneration: 2,
-      batchSize: 100,
-    })
+    expect(scope.isDone()).toBe(true)
   })
 
   it('rewrap throws on non-OK status', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return new Response('nope', { status: 400 })
-    })
+    nock('https://x.web.val.run').post('/admin/rewrap').reply(400, 'nope')
     const admin = createAdminClient('https://x.web.val.run', 'admin-tok')
     await expect(
       admin.rewrap({ fromGeneration: 1, toGeneration: 2 }),
@@ -308,7 +282,7 @@ describe('createAdminClient', () => {
 describe('createIoChannel', () => {
   let tmp: string
   beforeEach(() => {
-    tmp = mkdtempSync(path.join(tmpdir(), 'meander-iochannel-'))
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'meander-iochannel-'))
   })
   afterEach(() => {
     rmSync(tmp, { recursive: true, force: true })

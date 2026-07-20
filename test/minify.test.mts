@@ -1,4 +1,6 @@
-/** @fileoverview Tests for minify.mts — inline-script minify, SVG shrink, asset minify. */
+/**
+ * @file Tests for minify.mts — inline-script minify, SVG shrink, asset minify.
+ */
 
 import { describe, expect, it } from 'vitest'
 

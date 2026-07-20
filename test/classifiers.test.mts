@@ -1,13 +1,15 @@
-/** @fileoverview Unit tests for inline-code classifiers. */
+/**
+ * @file Unit tests for inline-code classifiers.
+ */
 
 import { describe, expect, it } from 'vitest'
 
 import {
-  _PURL_RE,
   isEmail,
   isPurl,
   isScopedPackage,
   isUrl,
+  PURL_RE,
 } from '../src/classifiers.mts'
 
 describe('isEmail', () => {
@@ -106,8 +108,8 @@ describe('isPurl', () => {
     expect(isPurl('https://example.com')).toBe(false)
   })
 
-  it('_PURL_RE exposes capture groups for tokenizers', () => {
-    const m = 'pkg:npm/lodash@4.17.21?q=x#frag'.match(_PURL_RE)
+  it('PURL_RE exposes capture groups for tokenizers', () => {
+    const m = 'pkg:npm/lodash@4.17.21?q=x#frag'.match(PURL_RE)
     expect(m).not.toBeNull()
     expect(m![1]).toBe('pkg:')
     expect(m![2]).toBe('npm')

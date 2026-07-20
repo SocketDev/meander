@@ -12,101 +12,20 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
-type PeerStatus = {
-  name: string
-  required: string
-  resolved: string | null
-  description: string
-}
-
-/** Resolve a peer dep via `require.resolve` from the caller's
- *  cwd. Returns the resolved version or `null` if not found.
- *
- *  Two-step: first confirm the package is resolvable via its
- *  main entry (some packages — svgo, puppeteer — have strict
- *  `exports` maps that reject `./package.json`), then walk up
- *  from the main entry to find package.json on disk and read
- *  its version. */
-async function resolvePeer(name: string): Promise<string | null> {
-  try {
-    const { createRequire } = await import('node:module')
-    const req = createRequire(path.join(process.cwd(), 'package.json'))
-    let entryPath: string
-    try {
-      entryPath = req.resolve(name)
-    } catch {
-      return null
-    }
-    /* Walk up directories from the resolved entry until we hit
-     * a package.json whose `name` matches. Handles nested
-     * node_modules + workspace links without depending on the
-     * package's own `exports`. */
-    let dir = path.dirname(entryPath)
-    while (dir !== path.dirname(dir)) {
-      const candidate = path.join(dir, 'package.json')
-      if (existsSync(candidate)) {
-        try {
-          const meta = JSON.parse(readFileSync(candidate, 'utf-8')) as {
-            name?: string
-            version?: string
-          }
-          if (meta.name === name) {
-            return meta.version ?? 'unknown'
-          }
-        } catch {
-          /* malformed package.json — keep walking */
-        }
-      }
-      dir = path.dirname(dir)
-    }
-    return 'unknown'
-  } catch {
-    return null
-  }
-}
-
-/** Self-resolve meander's own version so the report shows
- *  which install this doctor is speaking for. Reads the
- *  bundled package.json one level above the compiled output
- *  (dist/doctor.js) or the source (src/doctor.mts). */
-function getMeanderVersion(): string {
-  const thisFile = fileURLToPath(import.meta.url)
-  const candidates = [
-    path.join(path.dirname(thisFile), '..', 'package.json'),
-    path.join(path.dirname(thisFile), '..', '..', 'package.json'),
-  ]
-  for (const c of candidates) {
-    if (!existsSync(c)) {
-      continue
-    }
-    try {
-      const meta = JSON.parse(readFileSync(c, 'utf-8')) as {
-        name?: string
-        version?: string
-      }
-      /* Only trust the result when the name matches — a parent
-       * package.json in a monorepo checkout would still parse. */
-      if (meta.name === '@socketsecurity/meander' && meta.version) {
-        return meta.version
-      }
-    } catch {
-      /* malformed JSON — try the next candidate */
-    }
-  }
-  return 'unknown'
-}
+const logger = getDefaultLogger()
 
 export async function doctor(): Promise<void> {
-  console.log('meander doctor')
-  console.log(`  platform: ${process.platform}-${process.arch}`)
-  console.log(`  node:     ${process.version}`)
-  console.log(`  meander:  ${getMeanderVersion()}`)
-  console.log(`  cwd:      ${process.cwd()}`)
-  console.log('')
-  console.log('Optional peer dependencies')
-  console.log('  (only needed when the feature they gate is enabled)')
-  console.log('')
+  logger.log('meander doctor')
+  logger.log(`  platform: ${process.platform}-${process.arch}`)
+  logger.log(`  node:     ${process.version}`)
+  logger.log(`  meander:  ${getMeanderVersion()}`)
+  logger.log(`  cwd:      ${process.cwd()}`)
+  logger.log('')
+  logger.log('Optional peer dependencies')
+  logger.log('  (only needed when the feature they gate is enabled)')
+  logger.log('')
 
   const peers: Array<Omit<PeerStatus, 'resolved'>> = [
     {
@@ -139,26 +58,120 @@ export async function doctor(): Promise<void> {
   )
 
   const nameWidth = Math.max(...results.map(r => r.name.length))
-  for (const r of results) {
-    const marker = r.resolved ? '✓' : '✗'
+  for (let i = 0, { length } = results; i < length; i += 1) {
+    const r = results[i]!
     const pad = r.name.padEnd(nameWidth)
     const version = r.resolved
       ? r.resolved
       : `not installed (need ${r.required})`
-    console.log(`  ${marker} ${pad}  ${version}`)
-    console.log(`    ${r.description}`)
+    const detail = `${pad}  ${version}`
+    if (r.resolved) {
+      logger.success(detail)
+    } else {
+      logger.fail(detail)
+    }
+    logger.log(`    ${r.description}`)
   }
 
   const missing = results.filter(r => !r.resolved)
-  console.log('')
+  logger.log('')
   if (missing.length === 0) {
-    console.log('All optional peers resolved.')
+    logger.log('All optional peers resolved.')
     return
   }
-  console.log(
+  logger.log(
     `${missing.length} optional peer(s) missing. Features requiring them ` +
       `silently no-op; install with:`,
   )
-  console.log('')
-  console.log(`  pnpm add -D ${missing.map(p => p.name).join(' ')}`)
+  logger.log('')
+  logger.log(`  pnpm add -D ${missing.map(p => p.name).join(' ')}`)
+}
+
+/**
+ * Self-resolve meander's own version so the report shows
+ * which install this doctor is speaking for. Reads the
+ * bundled package.json one level above the compiled output
+ * (dist/doctor.js) or the source (src/doctor.mts).
+ */
+export function getMeanderVersion(): string {
+  const thisFile = fileURLToPath(import.meta.url)
+  const candidates = [
+    path.join(path.dirname(thisFile), '..', 'package.json'),
+    path.join(path.dirname(thisFile), '..', '..', 'package.json'),
+  ]
+  for (let i = 0, { length } = candidates; i < length; i += 1) {
+    const c = candidates[i]!
+    if (!existsSync(c)) {
+      continue
+    }
+    try {
+      const meta = JSON.parse(readFileSync(c, 'utf-8')) as {
+        name?: string | undefined
+        version?: string | undefined
+      }
+      /* Only trust the result when the name matches — a parent
+       * package.json in a monorepo checkout would still parse. */
+      if (meta.name === '@socketsecurity/meander' && meta.version) {
+        return meta.version
+      }
+    } catch {
+      /* malformed JSON — try the next candidate */
+    }
+  }
+  return 'unknown'
+}
+
+export type PeerStatus = {
+  name: string
+  required: string
+  resolved: string | undefined
+  description: string
+}
+
+/**
+ * Resolve a peer dep via `require.resolve` from the caller's
+ * cwd. Returns the resolved version or `null` if not found.
+ *
+ * Two-step: first confirm the package is resolvable via its
+ * main entry (some packages — svgo, puppeteer — have strict
+ * `exports` maps that reject `./package.json`), then walk up
+ * from the main entry to find package.json on disk and read
+ * its version.
+ */
+export async function resolvePeer(name: string): Promise<string | undefined> {
+  try {
+    const { createRequire } = await import('node:module')
+    const req = createRequire(path.join(process.cwd(), 'package.json'))
+    let entryPath: string
+    try {
+      entryPath = req.resolve(name)
+    } catch {
+      return undefined
+    }
+    /* Walk up directories from the resolved entry until we hit
+     * a package.json whose `name` matches. Handles nested
+     * node_modules + workspace links without depending on the
+     * package's own `exports`. */
+    let dir = path.dirname(entryPath)
+    while (dir !== path.dirname(dir)) {
+      const candidate = path.join(dir, 'package.json')
+      if (existsSync(candidate)) {
+        try {
+          const meta = JSON.parse(readFileSync(candidate, 'utf-8')) as {
+            name?: string | undefined
+            version?: string | undefined
+          }
+          if (meta.name === name) {
+            return meta.version ?? 'unknown'
+          }
+        } catch {
+          /* malformed package.json — keep walking */
+        }
+      }
+      dir = path.dirname(dir)
+    }
+    return 'unknown'
+  } catch {
+    return undefined
+  }
 }

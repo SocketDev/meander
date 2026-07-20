@@ -26,8 +26,79 @@ import {
   getEnvVar as realGetEnvVar,
   listEnvVarNames as realListEnvVarNames,
   setEnvVar as realSetEnvVar,
-  type ValHandle,
 } from './valtown-env.mts'
+import type { ValHandle } from './valtown-env.mts'
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+
+const logger = getDefaultLogger()
+
+export function bytesToHex(bytes: Uint8Array | Buffer): string {
+  let s = ''
+  for (let i = 0; i < bytes.length; i++) {
+    s += bytes[i]!.toString(16).padStart(2, '0')
+  }
+  return s
+}
+
+/**
+ * Build the production AdminClient targeting the val. Uses the
+ * Val's own URL + a previously-fetched MEANDER_ADMIN_TOKEN to call
+ * /admin/* endpoints. Errors propagate as Error so the ceremony's
+ * top-level handler can format them.
+ */
+export function createAdminClient(
+  valUrl: string,
+  adminToken: string,
+): AdminClient {
+  return {
+    async keyAudit() {
+      const res = await httpRequest(`${valUrl}/admin/key-audit`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+      if (!res.ok) {
+        throw new Error(`audit failed: ${res.status} ${res.text()}`)
+      }
+      return res.json<KeyAuditResponse>()
+    },
+    async rewrap(req) {
+      const res = await httpRequest(`${valUrl}/admin/rewrap`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromGeneration: req.fromGeneration,
+          toGeneration: req.toGeneration,
+          batchSize: req.batchSize ?? 100,
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(`rewrap failed: ${res.status} ${res.text()}`)
+      }
+      return res.json<RewrapResponse>()
+    },
+  }
+}
+
+/**
+ * Bundle the full production CeremonyDeps. Convenience builder
+ * for `cli.mts`'s dispatch — keeps the call sites short.
+ */
+export function createDefaultDeps(
+  token: string,
+  val: ValHandle,
+  adminToken: string,
+  shareFiles: readonly string[] = [],
+): CeremonyDeps {
+  return {
+    env: createEnvClient(token, val.id),
+    admin: createAdminClient(val.url, adminToken),
+    io: createIoChannel(shareFiles),
+    randomWrappingKey: realRandomWrappingKey,
+  }
+}
 
 /**
  * Bound Val Town env-var client. Each method is the same as the
@@ -84,19 +155,29 @@ export type IoChannel = {
    * the next available share comes from `shareFiles`.
    */
   readShare: (prompt: string) => Promise<string>
-  /** Write a status line. Tests assert on the captured array. */
+  /**
+   * Write a status line. Tests assert on the captured array.
+   */
   printLine: (line: string) => void
 }
 
 export type CeremonyDeps = {
-  /** Bound env-var client targeting the val. */
+  /**
+   * Bound env-var client targeting the val.
+   */
   env: EnvClient
-  /** Bound admin-route client targeting the val. */
+  /**
+   * Bound admin-route client targeting the val.
+   */
   admin: AdminClient
-  /** Interactive + file-driven share entry, plus output sink. */
+  /**
+   * Interactive + file-driven share entry, plus output sink.
+   */
   io: IoChannel
-  /** Random 32-byte wrapping key. Tests substitute a deterministic
-   *  function for reproducible fixtures. */
+  /**
+   * Random 32-byte wrapping key. Tests substitute a deterministic
+   * function for reproducible fixtures.
+   */
   randomWrappingKey: () => Buffer
 }
 
@@ -104,54 +185,15 @@ export type CeremonyDeps = {
 /*  Production factories                                                */
 /* ------------------------------------------------------------------ */
 
-/** Build the production EnvClient bound to a token + val. */
+/**
+ * Build the production EnvClient bound to a token + val.
+ */
 export function createEnvClient(token: string, valId: string): EnvClient {
   return {
     getEnvVar: key => realGetEnvVar(token, valId, key),
     setEnvVar: (key, value) => realSetEnvVar(token, valId, key, value),
     deleteEnvVar: key => realDeleteEnvVar(token, valId, key),
     listEnvVarNames: () => realListEnvVarNames(token, valId),
-  }
-}
-
-/**
- * Build the production AdminClient targeting the val. Uses the
- * Val's own URL + a previously-fetched MEANDER_ADMIN_TOKEN to call
- * /admin/* endpoints. Errors propagate as Error so the ceremony's
- * top-level handler can format them.
- */
-export function createAdminClient(
-  valUrl: string,
-  adminToken: string,
-): AdminClient {
-  return {
-    async keyAudit() {
-      const res = await fetch(`${valUrl}/admin/key-audit`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      })
-      if (!res.ok) {
-        throw new Error(`audit failed: ${res.status} ${await res.text()}`)
-      }
-      return (await res.json()) as KeyAuditResponse
-    },
-    async rewrap(req) {
-      const res = await fetch(`${valUrl}/admin/rewrap`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fromGeneration: req.fromGeneration,
-          toGeneration: req.toGeneration,
-          batchSize: req.batchSize ?? 100,
-        }),
-      })
-      if (!res.ok) {
-        throw new Error(`rewrap failed: ${res.status} ${await res.text()}`)
-      }
-      return (await res.json()) as RewrapResponse
-    },
   }
 }
 
@@ -193,32 +235,10 @@ export function createIoChannel(shareFiles: readonly string[] = []): IoChannel {
       return answer
     },
     printLine(line: string) {
-      console.log(line)
+      logger.log(line)
     },
   }
 }
-
-/**
- * Bundle the full production CeremonyDeps. Convenience builder
- * for `cli.mts`'s dispatch — keeps the call sites short.
- */
-export function createDefaultDeps(
-  token: string,
-  val: ValHandle,
-  adminToken: string,
-  shareFiles: readonly string[] = [],
-): CeremonyDeps {
-  return {
-    env: createEnvClient(token, val.id),
-    admin: createAdminClient(val.url, adminToken),
-    io: createIoChannel(shareFiles),
-    randomWrappingKey: realRandomWrappingKey,
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Pure helpers (used by ceremonies, side-effect-free)                */
-/* ------------------------------------------------------------------ */
 
 /**
  * Pull `threshold` shares through the IoChannel and decode each
@@ -237,6 +257,17 @@ export async function gatherShares(
     shares.push(decodeShare(text))
   }
   return shares
+}
+
+export function hexToBytes(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error('expected 64 hex characters (32 bytes)')
+  }
+  const out = new Uint8Array(32)
+  for (let i = 0; i < 32; i++) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+  }
+  return out
 }
 
 /**
@@ -280,33 +311,6 @@ export function printShares(
   }
   io.printLine('═'.repeat(72))
 }
-
-/* ------------------------------------------------------------------ */
-/*  Hex coding (small enough to live here vs. a shared utility)        */
-/* ------------------------------------------------------------------ */
-
-export function bytesToHex(bytes: Uint8Array | Buffer): string {
-  let s = ''
-  for (let i = 0; i < bytes.length; i++) {
-    s += bytes[i]!.toString(16).padStart(2, '0')
-  }
-  return s
-}
-
-export function hexToBytes(hex: string): Uint8Array {
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error('expected 64 hex characters (32 bytes)')
-  }
-  const out = new Uint8Array(32)
-  for (let i = 0; i < 32; i++) {
-    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  }
-  return out
-}
-
-/* ------------------------------------------------------------------ */
-/*  Param validation                                                    */
-/* ------------------------------------------------------------------ */
 
 export function validateShamirParams(threshold: number, shares: number): void {
   if (!Number.isInteger(threshold) || threshold < 2) {

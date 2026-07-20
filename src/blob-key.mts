@@ -2,25 +2,26 @@
  * `meander blob key` — walkthrough-blob wrapping-key ceremony.
  *
  * Subcommands:
- *   init     Generate the wrapping key, Shamir-split it, plant
- *            MEANDER_BLOB_KEY on the val, and print shares for
- *            distribution. Refuses if a key already exists.
- *   rotate   Generate a new key, plant it on the val, print
- *            new shares. Operator runs `meander publish` after
- *            rotation to re-encrypt every blob under the new
- *            key — blobs are regenerable from source, so there's
- *            no rewrap dance.
- *   restore  Reassemble the key from shares + plant it on the
- *            val. Used after accidental env-var loss.
- *   show     Print the current MEANDER_BLOB_KEY's hex form.
- *            Used to seed the operator's local env so
- *            `meander publish` can encrypt blobs.
+ * init     Generate the wrapping key, Shamir-split it, plant
+ * MEANDER_BLOB_KEY on the val, and print shares for
+ * distribution. Refuses if a key already exists.
+ * rotate   Generate a new key, plant it on the val, print
+ * new shares. Operator runs `meander publish` after
+ * rotation to re-encrypt every blob under the new
+ * key — blobs are regenerable from source, so there's
+ * no rewrap dance.
+ * restore  Reassemble the key from shares + plant it on the
+ * val. Used after accidental env-var loss.
+ * show     Print the current MEANDER_BLOB_KEY's hex form.
+ * Used to seed the operator's local env so
+ * `meander publish` can encrypt blobs.
  *
  * Asymmetric to `db key` because blob storage is regenerable:
- *   - No generation pointer, no per-blob generation tag.
- *   - No /admin/rewrap endpoint — old blobs become un-decryptable
- *     after rotation, but `meander publish` rebuilds them.
- *   - The operator holds a copy locally (publish needs it).
+ *
+ * - No generation pointer, no per-blob generation tag.
+ * - No /admin/rewrap endpoint — old blobs become un-decryptable after rotation,
+ *   but `meander publish` rebuilds them.
+ * - The operator holds a copy locally (publish needs it).
  */
 
 import { combine, split } from './shamir.mts'
@@ -29,8 +30,8 @@ import {
   gatherShares,
   printShares,
   validateShamirParams,
-  type CeremonyDeps,
 } from './ceremony-deps.mts'
+import type { CeremonyDeps } from './ceremony-deps.mts'
 
 const BLOB_KEY = 'MEANDER_BLOB_KEY'
 
@@ -47,8 +48,9 @@ export async function blobKeyInit(
   options: BlobKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const threshold = options.threshold ?? 2
-  const sharesCount = options.shares ?? 3
+  const opts = { __proto__: null, ...options } as typeof options
+  const threshold = opts.threshold ?? 2
+  const sharesCount = opts.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const existing = await deps.env.getEnvVar(BLOB_KEY)
@@ -80,16 +82,49 @@ export async function blobKeyInit(
   deps.io.printLine(`  export ${BLOB_KEY}=${hex}`)
 }
 
-/* ------------------------------------------------------------------ */
-/*  rotate                                                              */
-/* ------------------------------------------------------------------ */
+export async function blobKeyRestore(
+  options: BlobKeyOptions,
+  deps: CeremonyDeps,
+): Promise<void> {
+  const opts = { __proto__: null, ...options } as typeof options
+  const threshold = opts.threshold ?? 2
+  validateShamirParams(threshold, threshold)
+
+  const existing = await deps.env.getEnvVar(BLOB_KEY)
+  deps.io.printLine(`Restoring ${BLOB_KEY} from ${threshold} shares…`)
+  const shares = await gatherShares(deps.io, threshold)
+  const recovered = combine(shares)
+  const hex = bytesToHex(recovered)
+
+  if (existing === hex) {
+    deps.io.printLine(
+      `  Shares match existing ${BLOB_KEY} — nothing to restore`,
+    )
+    return
+  }
+  if (existing) {
+    throw new Error(
+      `${BLOB_KEY} is already set to a different value. Use \`meander blob key rotate\` to replace it.`,
+    )
+  }
+
+  await deps.env.setEnvVar(BLOB_KEY, hex)
+  deps.io.printLine(`  Set ${BLOB_KEY}`)
+  deps.io.printLine('')
+  deps.io.printLine(
+    'Local env: set the same key in your shell so `meander publish` works:',
+  )
+  deps.io.printLine('')
+  deps.io.printLine(`  export ${BLOB_KEY}=${hex}`)
+}
 
 export async function blobKeyRotate(
   options: BlobKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const threshold = options.threshold ?? 2
-  const sharesCount = options.shares ?? 3
+  const opts = { __proto__: null, ...options } as typeof options
+  const threshold = opts.threshold ?? 2
+  const sharesCount = opts.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const existing = await deps.env.getEnvVar(BLOB_KEY)
@@ -134,49 +169,6 @@ export async function blobKeyRotate(
     `(the val's MEANDER_BLOB_KEY no longer matches the wrapped DEKs in storage).`,
   )
 }
-
-/* ------------------------------------------------------------------ */
-/*  restore                                                             */
-/* ------------------------------------------------------------------ */
-
-export async function blobKeyRestore(
-  options: BlobKeyOptions,
-  deps: CeremonyDeps,
-): Promise<void> {
-  const threshold = options.threshold ?? 2
-  validateShamirParams(threshold, threshold)
-
-  const existing = await deps.env.getEnvVar(BLOB_KEY)
-  deps.io.printLine(`Restoring ${BLOB_KEY} from ${threshold} shares...`)
-  const shares = await gatherShares(deps.io, threshold)
-  const recovered = combine(shares)
-  const hex = bytesToHex(recovered)
-
-  if (existing === hex) {
-    deps.io.printLine(
-      `  Shares match existing ${BLOB_KEY} — nothing to restore`,
-    )
-    return
-  }
-  if (existing) {
-    throw new Error(
-      `${BLOB_KEY} is already set to a different value. Use \`meander blob key rotate\` to replace it.`,
-    )
-  }
-
-  await deps.env.setEnvVar(BLOB_KEY, hex)
-  deps.io.printLine(`  Set ${BLOB_KEY}`)
-  deps.io.printLine('')
-  deps.io.printLine(
-    'Local env: set the same key in your shell so `meander publish` works:',
-  )
-  deps.io.printLine('')
-  deps.io.printLine(`  export ${BLOB_KEY}=${hex}`)
-}
-
-/* ------------------------------------------------------------------ */
-/*  show                                                                */
-/* ------------------------------------------------------------------ */
 
 /**
  * Print the val's current MEANDER_BLOB_KEY in hex. Lets the

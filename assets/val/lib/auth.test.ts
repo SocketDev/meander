@@ -1,5 +1,5 @@
 /**
- * @fileoverview Tests for assets/val/lib/auth.ts.
+ * @file Tests for assets/val/lib/auth.ts.
  */
 
 import { strict as assert } from 'node:assert'

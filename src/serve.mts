@@ -8,84 +8,44 @@
  * rewrites path requests to match the URL shape the deployed
  * val uses:
  *
- *   /                        → <outDir>/index.html
- *   /:slug                   → <outDir>/index.html
- *   /:slug/part/:n           → <outDir>/part-:n.html
- *   /:slug/documents         → <outDir>/documents.html
- *   /:slug/<asset>           → <outDir>/<asset>
- *   /<asset>                 → <outDir>/<asset>
+ * /                        → <outDir>/index.html
+ * /:slug                   → <outDir>/index.html
+ * /:slug/part/:n           → <outDir>/part-:n.html
+ * /:slug/documents         → <outDir>/documents.html
+ * /:slug/<asset>           → <outDir>/<asset>
+ * /<asset>                 → <outDir>/<asset>
  *
  * No auth, no SSL, single-process. Ctrl+C to stop.
  */
-import { readFileSync, existsSync, promises as fs } from 'node:fs'
+import { existsSync, promises as fs, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import type { Server } from 'node:http'
 import path from 'node:path'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
-type ServeOptions = {
+const logger = getDefaultLogger()
+
+export type ServeOptions = {
   port?: number | undefined
   basePath?: string | undefined
 }
 
 const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
+  '.html': 'text/html; charset=utf-8',
   '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
-  '.txt': 'text/plain; charset=utf-8',
-  '.md': 'text/markdown; charset=utf-8',
-}
-
-/**
- * Translate a URL path to a file relative to the walkthrough
- * output dir. Mirrors the deployed val's routing rules so the
- * local preview matches what ships.
- */
-export function routeToFile(
-  slug: string,
-  urlPath: string,
-  partIds: ReadonlySet<number>,
-  hasDocuments: boolean,
-): string | undefined {
-  if (urlPath === '' || urlPath === '/') {
-    return 'index.html'
-  }
-  // Strip leading slash for downstream processing
-  const clean = urlPath.replace(/^\/+/, '').replace(/\/+$/, '')
-  // Slug-prefixed root
-  if (clean === slug) {
-    return 'index.html'
-  }
-  // /:slug/part/:n
-  const partMatch = clean.match(
-    new RegExp(`^${escapeRegex(slug)}/part/(\\d+)$`),
-  )
-  if (partMatch) {
-    const n = Number(partMatch[1])
-    if (partIds.has(n)) {
-      return `part-${n}.html`
-    }
-    return undefined
-  }
-  // /:slug/documents
-  if (hasDocuments && clean === `${slug}/documents`) {
-    return 'documents.html'
-  }
-  // Strip slug prefix from asset-shaped requests so /<slug>/file.css
-  // and /file.css both resolve to the same file on disk.
-  const slugPrefix = `${slug}/`
-  const asset = clean.startsWith(slugPrefix)
-    ? clean.slice(slugPrefix.length)
-    : clean
-  return asset
 }
 
 export function escapeRegex(s: string): string {
@@ -133,8 +93,52 @@ export async function readWalkthroughMeta(outDir: string): Promise<{
   }
 }
 
+/**
+ * Translate a URL path to a file relative to the walkthrough
+ * output dir. Mirrors the deployed val's routing rules so the
+ * local preview matches what ships.
+ */
+export function routeToFile(
+  slug: string,
+  urlPath: string,
+  partIds: ReadonlySet<number>,
+  { hasDocuments }: { hasDocuments: boolean },
+): string | undefined {
+  if (urlPath === '' || urlPath === '/') {
+    return 'index.html'
+  }
+  // Strip leading slash for downstream processing
+  const clean = urlPath.replace(/^\/+/, '').replace(/\/+$/, '')
+  // Slug-prefixed root
+  if (clean === slug) {
+    return 'index.html'
+  }
+  // /:slug/part/:n
+  const partMatch = clean.match(
+    new RegExp(`^${escapeRegex(slug)}/part/(\\d+)$`),
+  )
+  if (partMatch) {
+    const n = Number(partMatch[1])
+    if (partIds.has(n)) {
+      return `part-${n}.html`
+    }
+    return undefined
+  }
+  // /:slug/documents
+  if (hasDocuments && clean === `${slug}/documents`) {
+    return 'documents.html'
+  }
+  // Strip slug prefix from asset-shaped requests so /<slug>/file.css
+  // and /file.css both resolve to the same file on disk.
+  const slugPrefix = `${slug}/`
+  const asset = clean.startsWith(slugPrefix)
+    ? clean.slice(slugPrefix.length)
+    : clean
+  return asset
+}
+
 export type ServeResult = {
-  server: import('node:http').Server
+  server: Server
   port: number
   url: string
 }
@@ -157,7 +161,7 @@ export async function serve(
   let outDirName = 'pages'
   try {
     const raw = JSON.parse(readFileSync(configPath, 'utf-8')) as {
-      outDir?: string
+      outDir?: string | undefined
     }
     if (
       typeof raw.outDir === 'string' &&
@@ -170,7 +174,7 @@ export async function serve(
   }
   const outDir = path.join(rootDir, outDirName)
   if (!existsSync(outDir)) {
-    console.error(
+    logger.fail(
       `No emit dir found at ${outDir}.\n` +
         `Run \`meander generate ${configPath}\` first, or use \`pnpm run dev\`.`,
     )
@@ -198,7 +202,7 @@ export async function serve(
       decoded = '/'
     }
 
-    const relative = routeToFile(slug, decoded, partIds, hasDocuments)
+    const relative = routeToFile(slug, decoded, partIds, { hasDocuments })
     if (relative === undefined) {
       res.writeHead(404).end('not found')
       return
@@ -218,6 +222,7 @@ export async function serve(
     }
 
     try {
+      // oxlint-disable-next-line socket/prefer-exists-sync -- need the metadata: stat() to reject directory targets via isDirectory(), not a bare existence check.
       const stats = await fs.stat(target)
       if (stats.isDirectory()) {
         res.writeHead(404).end('not found')
@@ -246,12 +251,12 @@ export async function serve(
       const boundPort =
         typeof addr === 'object' && addr && 'port' in addr ? addr.port : port
       const url = `http://127.0.0.1:${boundPort}${basePath}/`
-      console.log(`meander serving ${outDir} at ${url}`)
+      logger.log(`meander serving ${outDir} at ${url}`)
       /* v8 ignore next 3 -- slug is empty only when the manifest.json fallback-scan path runs without a slug. */
       if (slug) {
-        console.log(`  try: ${url}${slug}/part/${[...partIds][0] ?? 1}`)
+        logger.log(`  try: ${url}${slug}/part/${[...partIds][0] ?? 1}`)
       }
-      console.log('  Ctrl+C to stop')
+      logger.log('  Ctrl+C to stop')
       resolve({ server, port: boundPort, url })
     })
   })

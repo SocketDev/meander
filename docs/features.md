@@ -230,16 +230,18 @@ script on the page (before or after meander's bundle — the
 array is a stable symbol-keyed handle either way):
 
 ```js
-const reg = (window[Symbol.for("meander:inline-tokenizers")] ??= []);
+const reg = (window[Symbol.for('meander:inline-tokenizers')] ??= [])
 reg.push({
-  name: "purl",
-  classify: (text) => /^pkg:[a-z]+\//.test(text),
-  tokenize: (text) => {
+  name: 'purl',
+  classify: text => /^pkg:[a-z]+\//.test(text),
+  tokenize: text => {
     /* return escaped HTML; meander sets it via innerHTML */
-    return `<span class="hljs-keyword">${text.slice(0, 3)}</span>` +
-           escape(text.slice(3));
+    return (
+      `<span class="hljs-keyword">${text.slice(0, 3)}</span>` +
+      escape(text.slice(3))
+    )
   },
-});
+})
 ```
 
 Each entry:
@@ -398,6 +400,7 @@ with extra metadata:
 ```
 
 Fields:
+
 - `source` (required): path to the markdown file, relative to
   `meander.config.json`.
 - `filename` (optional): URL-friendly slug. When set, links in
@@ -540,11 +543,11 @@ pass against emitted assets:
 
 Typical savings on the fixture:
 
-| Asset | Before  | After   | Saved |
-| ----- | ------- | ------- | ----- |
-| HTML  | 113 KB  | 54 KB   | 52%   |
-| CSS   | 48 KB   | 31 KB   | 36%   |
-| SW    | 4.4 KB  | 1.2 KB  | 72%   |
+| Asset | Before | After  | Saved |
+| ----- | ------ | ------ | ----- |
+| HTML  | 113 KB | 54 KB  | 52%   |
+| CSS   | 48 KB  | 31 KB  | 36%   |
+| SW    | 4.4 KB | 1.2 KB | 72%   |
 
 ### Enabling
 

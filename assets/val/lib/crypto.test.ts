@@ -1,8 +1,8 @@
 /**
- * @fileoverview Tests for assets/val/lib/crypto.ts. Runs under
- * `node --test` (see package.json test:val). The helpers use
- * Web Crypto only, so the Node copy behaves identically to the
- * Deno runtime the val ships on.
+ * @file Tests for assets/val/lib/crypto.ts. Runs under
+ *   `node --test` (see package.json test:val). The helpers use
+ *   Web Crypto only, so the Node copy behaves identically to the
+ *   Deno runtime the val ships on.
  */
 
 import { strict as assert } from 'node:assert'
@@ -20,7 +20,9 @@ import {
   wrapKey,
 } from './crypto.ts'
 
-const FRESH_BYTES = (): Uint8Array => randomDataKeyBytes()
+export function FRESH_BYTES() {
+  return randomDataKeyBytes()
+}
 
 test('importKey: rejects wrong size', async () => {
   await assert.rejects(() => importKey(new Uint8Array(16)), /32 bytes/)

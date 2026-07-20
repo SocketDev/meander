@@ -1,4 +1,6 @@
-/** @fileoverview Unit tests for Val Town token resolution. */
+/**
+ * @file Unit tests for Val Town token resolution.
+ */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 

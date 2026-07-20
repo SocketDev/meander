@@ -1,11 +1,10 @@
 /**
- * @fileoverview Tests for src/db-key.mts ceremony commands.
- *
- * Each ceremony function takes a CeremonyDeps struct (env client,
- * admin client, IO channel, random source). We pass in the fakes
- * from test/utils/fake-deps.mts and exercise the full
- * orchestration logic — no fetch mocks, no readline shimming, no
- * live val needed.
+ * @file Tests for src/db-key.mts ceremony commands.
+ *   Each ceremony function takes a CeremonyDeps struct (env client,
+ *   admin client, IO channel, random source). We pass in the fakes
+ *   from test/utils/fake-deps.mts and exercise the full
+ *   orchestration logic — no fetch mocks, no readline shimming, no
+ *   live val needed.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -52,16 +51,16 @@ describe('dbKeyInit', () => {
 
   it('rejects threshold < 2', async () => {
     const deps = makeDeps()
-    await expect(
-      dbKeyInit({ threshold: 1, shares: 3 }, deps),
-    ).rejects.toThrow(/threshold/)
+    await expect(dbKeyInit({ threshold: 1, shares: 3 }, deps)).rejects.toThrow(
+      /threshold/,
+    )
   })
 
   it('rejects shares < threshold', async () => {
     const deps = makeDeps()
-    await expect(
-      dbKeyInit({ threshold: 3, shares: 2 }, deps),
-    ).rejects.toThrow(/shares/)
+    await expect(dbKeyInit({ threshold: 3, shares: 2 }, deps)).rejects.toThrow(
+      /shares/,
+    )
   })
 
   it('rejects shares > 255', async () => {
@@ -80,14 +79,19 @@ describe('dbKeyInit', () => {
     const lines = deps.io.output
     const shareBase58: string[] = []
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i] && lines[i]!.startsWith('Share ') && lines[i]!.endsWith(':')) {
+      if (
+        lines[i] &&
+        lines[i]!.startsWith('Share ') &&
+        lines[i]!.endsWith(':')
+      ) {
         shareBase58.push(lines[i + 1]!)
       }
     }
     expect(shareBase58).toHaveLength(3)
     /* (We don't combine here — that's tested exhaustively in
      *  test/shamir.test.mts. Just sanity-check the wire format.) */
-    for (const s of shareBase58) {
+    for (let i = 0, { length } = shareBase58; i < length; i += 1) {
+      const s = shareBase58[i]!
       expect(s).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/)
     }
   })
@@ -106,10 +110,10 @@ describe('dbKeyRotate', () => {
   function setupRotateDeps(opts: {
     fromGen: number
     fromKeyByte: number
-    rewrapBatches?: Array<{ rewrapped: number; remaining: number }>
-    newKeyByte?: number
-    threshold?: number
-    sharesCount?: number
+    rewrapBatches?: Array<{ rewrapped: number; remaining: number }> | undefined
+    newKeyByte?: number | undefined
+    threshold?: number | undefined
+    sharesCount?: number | undefined
   }) {
     const threshold = opts.threshold ?? 2
     const sharesCount = opts.sharesCount ?? 3
@@ -131,7 +135,11 @@ describe('dbKeyRotate', () => {
     return makeDeps({
       envInitial: env,
       shares: validShares.map(encodeShare),
-      audit: { visibleGenerations: [opts.fromGen], currentGeneration: opts.fromGen, rowCounts: {} },
+      audit: {
+        visibleGenerations: [opts.fromGen],
+        currentGeneration: opts.fromGen,
+        rowCounts: {},
+      },
       rewrap: () => {
         const batch = batches[cursor] ?? { rewrapped: 0, remaining: 0 }
         cursor++
@@ -379,9 +387,9 @@ describe('dbKeyRetire', () => {
         MEANDER_DB_KEY_CURRENT: '1',
       },
     })
-    await expect(
-      dbKeyRetire({ generation: 1 }, deps),
-    ).rejects.toThrow(/current generation/)
+    await expect(dbKeyRetire({ generation: 1 }, deps)).rejects.toThrow(
+      /current generation/,
+    )
   })
 
   it('refuses when target generation is not in env', async () => {
@@ -391,9 +399,9 @@ describe('dbKeyRetire', () => {
         MEANDER_DB_KEY_CURRENT: '1',
       },
     })
-    await expect(
-      dbKeyRetire({ generation: 99 }, deps),
-    ).rejects.toThrow(/not present in env/)
+    await expect(dbKeyRetire({ generation: 99 }, deps)).rejects.toThrow(
+      /not present in env/,
+    )
   })
 
   it('refuses when rows still reference the target generation', async () => {
@@ -409,9 +417,9 @@ describe('dbKeyRetire', () => {
         rowCounts: { '1': 5, '2': 100 },
       },
     })
-    await expect(
-      dbKeyRetire({ generation: 1 }, deps),
-    ).rejects.toThrow(/still reference/)
+    await expect(dbKeyRetire({ generation: 1 }, deps)).rejects.toThrow(
+      /still reference/,
+    )
   })
 
   it('handles deleteEnvVar reporting "not present" gracefully', async () => {

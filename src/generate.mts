@@ -1,34 +1,45 @@
+/* max-file-lines: generator — the walkthrough static-site build pipeline
+ * (parse walkthrough comments -> sections -> symbol table -> per-page HTML
+ * render -> post-process -> manifest). The render helpers share the
+ * module-level asset/CDN/marked state and run only through generate(), so
+ * the stages form one build unit rather than independently useful modules. */
 import {
   copyFileSync,
-  readFileSync,
-  writeFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
+  writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { marked, Marked, Renderer, type Tokens } from 'marked'
+import { marked, Marked, Renderer } from 'marked'
+import type { Tokens } from 'marked'
 
 import {
   isEmail,
   isPurl,
   isScopedPackage,
   isUrl,
-  _PURL_RE,
+  PURL_RE,
 } from './classifiers.mts'
-import {
-  loadMeanderConfig,
-  type DocEntry,
-  type WalkthroughPart,
-} from './config.mts'
+import { loadMeanderConfig } from './config.mts'
+import type { DocEntry, WalkthroughPart } from './config.mts'
 import { polishProse } from './prose-polishers.mts'
+import type { minifyEmittedHtml } from './minify.mts'
+import type { MermaidRenderer, MermaidTheme } from './render-mermaid.mts'
+import type { injectCspMeta, injectSriIntegrity } from './security.mts'
+import type { applyBasePathToHtml } from './url-rewrite.mts'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
+
+const logger = getDefaultLogger()
 
 /* ------------------------------------------------------------------ */
 /*  Internal types                                                     */
 /* ------------------------------------------------------------------ */
 
-type Block = {
+export type Block = {
   file: string
   startLine: number
   endLine: number
@@ -36,7 +47,7 @@ type Block = {
   cleanText: string
 }
 
-type Section = {
+export type Section = {
   id: string
   partId: number
   file: string
@@ -52,12 +63,12 @@ type Section = {
 /* ------------------------------------------------------------------ */
 
 const FILE_LANG: Record<string, string> = {
+  '.js': 'javascript',
+  '.json': 'json',
+  '.mjs': 'javascript',
+  '.sh': 'bash',
   '.ts': 'typescript',
   '.tsx': 'tsx',
-  '.js': 'javascript',
-  '.mjs': 'javascript',
-  '.json': 'json',
-  '.sh': 'bash',
 }
 
 /* Pinned highlight.js CDN assets. Hashes are sha384 for SRI —
@@ -110,192 +121,6 @@ const HLJS_PRELOAD_HINTS = [
     `integrity="${HLJS_CDN.tsGrammarSri}" crossorigin="anonymous" />`,
 ].join('\n  ')
 
-function getAssetsDir(): string {
-  const thisFile = fileURLToPath(import.meta.url)
-  // In dist/generate.js → assets is at ../assets
-  return path.join(path.dirname(thisFile), '..', 'assets')
-}
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
-
-function lineNumberAt(text: string, index: number): number {
-  let line = 1
-  for (let i = 0; i < index; i += 1) {
-    if (text.charCodeAt(i) === 10) {
-      line += 1
-    }
-  }
-  return line
-}
-
-function cleanCommentText(raw: string): string {
-  const withoutDelimiters = raw.replace(/^\/\*/, '').replace(/\*\/$/, '')
-  const lines = withoutDelimiters
-    .split('\n')
-    .map(line => line.replace(/^\s*\*\s?/, ''))
-  const filtered = lines.filter(
-    (line, i, arr) =>
-      !(line.trim().length === 0 && (i === 0 || i === arr.length - 1)),
-  )
-  return filtered.join('\n').trim()
-}
-
-function parseWalkthroughBlocks(file: string, source: string): Block[] {
-  const blocks: Block[] = []
-  const pattern = /\/\*[\s\S]*?\*\//g
-  let match: RegExpExecArray | null = pattern.exec(source)
-  while (match) {
-    const full = match[0]
-    const startIndex = match.index
-    const endIndex = startIndex + full.length
-    const startLine = lineNumberAt(source, startIndex)
-    const endLine = lineNumberAt(source, endIndex)
-    blocks.push({
-      file,
-      startLine,
-      endLine,
-      text: full,
-      cleanText: cleanCommentText(full),
-    })
-    match = pattern.exec(source)
-  }
-  return blocks
-}
-
-function scoreForPart(
-  part: WalkthroughPart,
-  file: string,
-  blockText: string,
-): number {
-  const lower = blockText.toLowerCase()
-  let score = 0
-  for (const keyword of part.keywords) {
-    if (lower.includes(keyword.toLowerCase())) {
-      score += 2
-    }
-    if (file.toLowerCase().includes(keyword.toLowerCase())) {
-      score += 1
-    }
-  }
-  return score
-}
-
-function getLanguageClass(file: string): string {
-  return FILE_LANG[path.extname(file)] ?? 'plaintext'
-}
-
-function stripMultilineCommentsPreserveLines(code: string): string {
-  return code.replace(/\/\*[\s\S]*?\*\//g, match => {
-    const newlineCount = (match.match(/\n/g) ?? []).length
-    if (newlineCount === 0) {
-      return ' '
-    }
-    return '\n'.repeat(newlineCount)
-  })
-}
-
-/* ------------------------------------------------------------------ */
-/*  Annotation markdown renderer                                       */
-/* ------------------------------------------------------------------ */
-
-/* Inline <code> classifiers live in ./classifiers; these
- * helpers wrap each kind in semantic markup so consumers can
- * style them per-kind. Helpers return a full HTML string on
- * match or `null` to fall through to marked's default. The
- * codespan renderer tries them in decreasing specificity so a
- * PURL (which could also pass isUrl broadly) is caught first. */
-
-const span = (cls: string, content: string): string =>
-  `<span class="${cls}">${escapeHtml(content)}</span>`
-
-/**
- * Emit a PURL as segmented spans. Reuses the compiled regex
- * from ./classifiers so the character-class definition lives
- * in one place. Splits path into namespace + name on the last
- * slash.
- */
-function tokenizePurlString(text: string): string | null {
-  const match = _PURL_RE.exec(text)
-  if (!match) {
-    return null
-  }
-  const [, scheme, type, path, version, query, fragment] = match
-  const pathMatch = path!.match(/^\/(.+)\/([^/]+)$/)
-  const pathHtml = pathMatch
-    ? `/${span('purl-namespace', pathMatch[1]!)}/${span('purl-name', pathMatch[2]!)}`
-    : `/${span('purl-name', path!.slice(1))}`
-  return (
-    `<code class="purl">` +
-    span('purl-scheme', scheme!) +
-    span('purl-type', type!) +
-    pathHtml +
-    (version ? span('purl-version', version) : '') +
-    (query ? span('purl-query', query) : '') +
-    (fragment ? span('purl-fragment', fragment) : '') +
-    `</code>`
-  )
-}
-
-/** Email inside a <code> — render as a clickable mailto pill. */
-function tokenizeEmailString(text: string): string | null {
-  if (!isEmail(text)) {
-    return null
-  }
-  return `<code class="email"><a href="mailto:${escapeHtml(text)}">${escapeHtml(text)}</a></code>`
-}
-
-/** Scoped npm/jsr package (`@scope/name`) — two-tone chip. */
-function tokenizeScopedPackageString(text: string): string | null {
-  if (!isScopedPackage(text)) {
-    return null
-  }
-  const slash = text.indexOf('/')
-  const scope = text.slice(0, slash)
-  const name = text.slice(slash + 1)
-  return (
-    `<code class="package-scoped">` +
-    span('package-scope', scope) +
-    `/` +
-    span('package-name', name) +
-    `</code>`
-  )
-}
-
-/** Absolute URL — clickable external link inside a <code>. */
-function tokenizeUrlString(text: string): string | null {
-  if (!isUrl(text)) {
-    return null
-  }
-  return `<code class="url"><a href="${escapeHtml(text)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a></code>`
-}
-
-/**
- * Try each tokenizer in specificity order. PURL first (most
- * specific — scheme + structured path + optional query/frag);
- * then email (unambiguous shape); then scoped package (leading
- * `@` + single `/`); then URL (any scheme + `://`). First match
- * wins; all misses return null and marked's default codespan
- * renderer handles the span. */
-function tokenizeInlineCode(text: string): string | null {
-  return (
-    tokenizePurlString(text) ??
-    tokenizeEmailString(text) ??
-    tokenizeScopedPackageString(text) ??
-    tokenizeUrlString(text)
-  )
-}
-
 /**
  * Known JSDoc tags — only these wrap into .annotation-block cards.
  * Unknown `@foo` tokens in prose pass through untouched.
@@ -334,70 +159,6 @@ const JSDOC_TAGS = new Set([
   'type',
   'typedef',
 ])
-
-/**
- * Splits an annotation markdown string on JSDoc tag boundaries.
- * Each returned chunk is either a tag block (`kind: 'tag'`) or
- * preamble prose (`kind: 'prose'`). A tag block runs from its
- * `@tag` line up to (but not including) the next `@tag` line or
- * end-of-input, so multi-line @example bodies stay with their tag.
- */
-function splitAnnotationByTags(markdown: string): Array<
-  | { kind: 'prose'; text: string }
-  | {
-      kind: 'tag'
-      tag: string
-      type: string | null
-      body: string
-    }
-> {
-  const lines = markdown.split('\n')
-  const out: Array<
-    | { kind: 'prose'; text: string }
-    | { kind: 'tag'; tag: string; type: string | null; body: string }
-  > = []
-  let buffer: string[] = []
-  let currentTag: { tag: string; type: string | null; body: string[] } | null =
-    null
-  const flushProse = () => {
-    if (buffer.length > 0 && buffer.join('').trim() !== '') {
-      out.push({ kind: 'prose', text: buffer.join('\n') })
-    }
-    buffer = []
-  }
-  const flushTag = () => {
-    if (currentTag) {
-      out.push({
-        kind: 'tag',
-        tag: currentTag.tag,
-        type: currentTag.type,
-        body: currentTag.body.join('\n').trim(),
-      })
-      currentTag = null
-    }
-  }
-  for (const line of lines) {
-    const match = /^@([A-Za-z]+)(?:\s+(\{[^}]*\}))?\s*(.*)$/.exec(line.trim())
-    if (match && JSDOC_TAGS.has(match[1]!.toLowerCase())) {
-      flushProse()
-      flushTag()
-      currentTag = {
-        tag: match[1]!.toLowerCase(),
-        type: match[2] ?? null,
-        body: match[3] ? [match[3]] : [],
-      }
-      continue
-    }
-    if (currentTag) {
-      currentTag.body.push(line)
-    } else {
-      buffer.push(line)
-    }
-  }
-  flushProse()
-  flushTag()
-  return out
-}
 
 /**
  * Render one annotation as a sequence of .annotation-block cards
@@ -448,68 +209,6 @@ annotationMarked.use({
   },
 })
 
-function renderAnnotationMarkdown(markdown: string): string {
-  const chunks = splitAnnotationByTags(markdown.trim())
-  const blocks: Array<{ html: string; order: number }> = []
-  let preamble: string | null = null
-  let hasExplicitDescription = false
-
-  for (const chunk of chunks) {
-    if (chunk.kind === 'prose') {
-      if (preamble === null) {
-        preamble = chunk.text
-      } else {
-        preamble = `${preamble}\n\n${chunk.text}`
-      }
-      continue
-    }
-    if (chunk.tag === 'description') {
-      hasExplicitDescription = true
-    }
-    const typeHtml = chunk.type
-      ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
-      : ''
-    const bodyHtml = chunk.body
-      ? polishProse(annotationMarked.parse(chunk.body) as string)
-      : ''
-    const order =
-      chunk.tag === 'fileoverview' ? 0 : chunk.tag === 'description' ? 1 : 2
-    blocks.push({
-      html:
-        `<div class="annotation-block" data-tag="${chunk.tag}">` +
-        `<span class="annotation-tag">@${chunk.tag}</span>` +
-        (typeHtml ? ` ${typeHtml}` : '') +
-        `<div class="annotation-body">${bodyHtml}</div>` +
-        `</div>`,
-      order,
-    })
-  }
-  /* Preamble becomes a synthetic @description when no explicit
-   * one exists. Keeps the "description leads the card stack"
-   * ordering while still surfacing free-floating prose. */
-  if (preamble !== null && !hasExplicitDescription) {
-    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
-    blocks.push({
-      html:
-        `<div class="annotation-block" data-tag="description">` +
-        `<span class="annotation-tag">@description</span>` +
-        `<div class="annotation-body">${bodyHtml}</div>` +
-        `</div>`,
-      order: 1,
-    })
-  } else if (preamble !== null) {
-    /* Explicit @description exists — keep the preamble as plain
-     * prose above the cards so nothing is silently dropped. */
-    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
-    blocks.unshift({
-      html: `<div class="annotation-prose">${bodyHtml}</div>`,
-      order: -1,
-    })
-  }
-  blocks.sort((a, b) => a.order - b.order)
-  return blocks.map(b => b.html).join('')
-}
-
 /* ------------------------------------------------------------------ */
 /*  Symbol table (go-to-definition)                                    */
 /* ------------------------------------------------------------------ */
@@ -521,7 +220,7 @@ function renderAnnotationMarkdown(markdown: string): string {
  * mirrors how a debugger prints a location — file, then line,
  * then part (analogous to column in a stack frame).
  */
-type SymbolLocation = readonly [file: string, line: number, part: number]
+export type SymbolLocation = readonly [file: string, line: number, part: number]
 
 /**
  * Symbol table: exported-name → array of source locations.
@@ -540,90 +239,95 @@ type SymbolLocation = readonly [file: string, line: number, part: number]
  * `window[Symbol.for("meander:syms")]` so it doesn't pollute
  * the plain-property namespace.
  */
-type SymbolTable = Record<string, SymbolLocation[]>
+export type SymbolTable = Record<string, SymbolLocation[]>
 
-type ExtractedSymbol = { name: string; line: number }
+export type ExtractedSymbol = { name: string; line: number }
 
-function extractSymbols(source: string): ExtractedSymbol[] {
-  const out: ExtractedSymbol[] = []
-  const lines = source.split('\n')
-  const pattern =
-    /^export\s+(?:async\s+)?(?:type|interface|class|function|const|enum)\s+([A-Za-z][A-Za-z0-9_]*)/
-  for (let i = 0; i < lines.length; i++) {
-    const match = pattern.exec(lines[i]!.trim())
-    if (match?.[1]) {
-      out.push({ name: match[1], line: i + 1 })
-    }
-  }
-  return out
+export type RenderedDocData = {
+  filePath: string
+  html: string
+  headings: Array<{ id: string; text: string; level: number }>
 }
 
-function buildSymbols(
-  parts: readonly WalkthroughPart[],
-  sources: Map<string, string>,
-): SymbolTable {
-  const byName = new Map<string, SymbolLocation[]>()
-  for (const part of parts) {
-    for (const file of part.files) {
-      const source = sources.get(file)
-      if (!source) {
-        continue
-      }
-      for (const sym of extractSymbols(source)) {
-        const loc: SymbolLocation = [file, sym.line, part.id]
-        const existing = byName.get(sym.name)
-        if (existing) {
-          existing.push(loc)
-        } else {
-          byName.set(sym.name, [loc])
-        }
-      }
-    }
-  }
-
-  const table: SymbolTable = {}
-  for (const [name, locs] of byName) {
-    /* Skip short names (`id`, `fn`, etc.) — too noisy against
-     * real code. 3-char floor matches the previous filter.
-     * Ambiguous names (defined in multiple files, or with
-     * overload signatures on separate lines) flow through
-     * unchanged — the array shape preserves every location so
-     * consumers can disambiguate instead of silently losing
-     * them. */
-    if (name.length < 3) {
-      continue
-    }
-    table[name] = locs
-  }
-  return table
+export type RenderedDocument = {
+  html: string
+  headings: Array<{ id: string; text: string; level: number }>
+  blockCount: number
 }
 
-function uniqueFiles(parts: readonly WalkthroughPart[]): string[] {
-  const set = new Set<string>()
-  for (const part of parts) {
-    for (const file of part.files) {
-      set.add(file)
-    }
-  }
-  return [...set]
+export type ResolvedDocRef = {
+  docIndex: number
+  anchor: string
+  /**
+   * True when the link targets the same document it appears in.
+   */
+  sameDoc?: boolean | undefined
 }
 
-function loadSources(
-  rootDir: string,
-  files: readonly string[],
-): Map<string, string> {
-  const map = new Map<string, string>()
-  for (const file of files) {
-    const fullPath = path.join(rootDir, file)
-    if (!existsSync(fullPath)) {
-      throw new Error(`Missing file from part plan: ${file}`)
-    }
-    map.set(file, readFileSync(fullPath, 'utf-8'))
-  }
-  return map
+/**
+ * URL path segment for a part. Uses /<slug>/parts/<filename>
+ * when the part sets a filename; falls back to /<slug>/part/<id>.
+ * The numeric-id form is kept for back-compat so existing
+ * consumers see no change.
+ */
+/**
+ * Build the standard footer HTML for a page. Renders meander's
+ * attribution by default; consumers can override the text and
+ * link or disable entirely via config.footer.
+ */
+/* Curated rotating taglines. Two registers — trail / walking /
+ * exploration AND reading / articles / walkthroughs — since
+ * meander serves both. All end "…with meander" so the brand
+ * sits at the end of the eye's path. JS picks one per page
+ * load via the data-taglines attr; the first entry is the
+ * no-JS fallback. */
+const DEFAULT_TAGLINES: readonly string[] = [
+  'Begin your journey with meander',
+  'Chart your course with meander',
+  'Find your way with meander',
+  'Trust the path with meander',
+  'Follow the thread with meander',
+  'Nestle between the lines with meander',
+  'Savor the moment with meander',
+]
+
+/**
+ * Normalized doc entry shape. Consumers pass strings or full
+ * objects; the generator walks this shape everywhere.
+ */
+export type NormalizedDocEntry = {
+  source: string
+  filename: string | undefined
+  title: string | undefined
+  summary: string | undefined
+  kind: 'code' | 'article'
 }
 
-function buildSections(
+/* ------------------------------------------------------------------ */
+/*  Main                                                               */
+/* ------------------------------------------------------------------ */
+
+export type GenerateOptions = {
+  /**
+   * URL path prefix. When the site is hosted under a subpath
+   * (e.g. GitHub Pages at `/my-repo/`), every emitted `href` /
+   * `src` to a same-site asset is rewritten from `/meander.css`
+   * to `{basePath}/meander.css`. It's a path, not a URL —
+   * matches Next.js `basePath` semantics, not Vite's `base`
+   * (which allows full URLs).
+   * Default: "" (site hosted at origin root).
+   */
+  basePath?: string | undefined
+  /**
+   * Subdirectory under the output dir where emitted static
+   * assets (currently `meander.css`) land. Default: ""
+   * (emit flat). Example: `--asset-dir assets` writes
+   * `assets/meander.css` and rewrites the <link href>.
+   */
+  assetDir?: string | undefined
+}
+
+export function buildSections(
   parts: readonly WalkthroughPart[],
   sourceMap: Map<string, string>,
 ): Section[] {
@@ -684,7 +388,8 @@ function buildSections(
       if (owners.length > 1) {
         let best = owner
         let bestScore = -1
-        for (const part of owners) {
+        for (let oi = 0, { length } = owners; oi < length; oi += 1) {
+          const part = owners[oi]!
           const score = scoreForPart(part, file, combinedAnnotation)
           if (score > bestScore) {
             bestScore = score
@@ -709,7 +414,7 @@ function buildSections(
     }
   }
 
-  return sections.sort((a, b) => {
+  return sections.toSorted((a, b) => {
     if (a.partId !== b.partId) {
       return a.partId - b.partId
     }
@@ -722,1065 +427,100 @@ function buildSections(
   })
 }
 
-function renderPartNav(
-  slug: string,
+export function buildSymbols(
   parts: readonly WalkthroughPart[],
-  activePartId: number,
-  hasDocuments: boolean,
-  basePath: string,
-): string {
-  /* Three-zone pill strip: label, part pills (with compact
-   * one-word titles via firstSignificantWord), then docs pill
-   * (when present). Label + docs are styled separately so the
-   * eye reads "Topics: A B C | Docs" as one nav block. */
-  const label = `<span class="mdr-parts-label">Topics:</span>`
-  const partLinks = parts
-    .map(part => {
-      const cls = part.id === activePartId ? 'active' : ''
-      const shortTitle = firstSignificantWord(part.title)
-      const full = part.title
-      return `<a class="${cls}" href="${partUrl(slug, part, basePath)}" title="${escapeHtml(full)}">${escapeHtml(shortTitle)}</a>`
-    })
-    .join('\n')
-  const docsLink = hasDocuments
-    ? `<a class="mdr-topic-doc ${activePartId === 0 ? 'active' : ''}" href="${basePath}/${slug}/documents" title="Documents">Docs</a>`
-    : ''
-  return `${label}${partLinks}${docsLink}`
-}
-
-function renderPartHtml(
-  slug: string,
-  parts: readonly WalkthroughPart[],
-  part: WalkthroughPart,
-  sections: readonly Section[],
-  inlineJs: string,
-  symbols: SymbolTable,
-  hasDocuments: boolean,
-  basePath: string,
-  cssHref: string,
-  headExtra: string,
-  footerHtml: string,
-  commentBackendAttr: string,
-): string {
-  const sectionsByFile = new Map<string, Section[]>()
-  for (const section of sections) {
-    const existing = sectionsByFile.get(section.file)
-    if (existing) {
-      existing.push(section)
-    } else {
-      sectionsByFile.set(section.file, [section])
+  sources: Map<string, string>,
+): SymbolTable {
+  const byName = new Map<string, SymbolLocation[]>()
+  for (const part of parts) {
+    for (const file of part.files) {
+      const source = sources.get(file)
+      if (!source) {
+        continue
+      }
+      for (const sym of extractSymbols(source)) {
+        const loc: SymbolLocation = [file, sym.line, part.id]
+        const existing = byName.get(sym.name)
+        if (existing) {
+          existing.push(loc)
+        } else {
+          byName.set(sym.name, [loc])
+        }
+      }
     }
   }
 
-  const orderedFiles = part.files.filter(file => sectionsByFile.has(file))
-
-  /* Stable anchor ID per file — for jump-to-file menu links and
-   * IntersectionObserver-driven "current file" highlighting. */
-  const fileAnchor = (file: string): string =>
-    `file-${file.replaceAll(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`
-  const fileEntries = orderedFiles.map(file => ({
-    path: file,
-    anchor: fileAnchor(file),
-  }))
-
-  const fileBlocks = orderedFiles
-    .map(file => {
-      const fileSections = sectionsByFile.get(file) ?? []
-      const thisAnchor = fileAnchor(file)
-
-      /* Section row labels used by both the file-head sections
-       * menu AND every per-chunk chip that clones from it. The
-       * section's id is the anchor target (matches what each
-       * .code-section emits as its DOM id). */
-      const sectionRows = fileSections
-        .map((section, i) => {
-          const label = `Section ${i + 1}`
-          const meta =
-            section.endLine > section.startLine
-              ? `Lines ${section.startLine}–${section.endLine}`
-              : `Line ${section.startLine}`
-          return `        <a href="#${section.id}"><span class="mdr-section-label">${label}</span><span class="mdr-section-meta">${meta}</span></a>`
-        })
-        .join('\n')
-
-      const pairedRows = fileSections
-        .map((section, i) => {
-          const codeLines = section.code.split('\n')
-          const tableRows = codeLines
-            .map((line, j) => {
-              const lineNum = section.startLine + j
-              return `<tr><td class="line-num">${lineNum}</td><td class="line-code"><code class="language-${section.languageClass}">${escapeHtml(line)}</code></td></tr>`
-            })
-            .join('\n')
-
-          const annotationHtml = renderAnnotationMarkdown(section.annotation)
-          /* Per-chunk chip — a compact sections dropdown at the
-           * top of each .code-section. Panel starts empty; the
-           * first open clones the file-head menu's panel in
-           * nav-menus.js and marks this chunk's anchor active.
-           * Empty panel on disk saves repeat markup when a file
-           * has many sections. Suppressed on single-section
-           * files — nothing to navigate to. */
-          const chip =
-            fileSections.length > 1
-              ? `  <details class="mdr-sections-menu mdr-section-chip" data-sections-for="${thisAnchor}" data-active-id="${section.id}">
-    <summary class="count">Section ${i + 1} of ${fileSections.length}</summary>
-    <div class="mdr-sections-panel"></div>
-  </details>
-`
-              : ''
-          return `<article class="annotation-card" id="ann-${section.id}">
-  <div class="annotation-md">${annotationHtml}</div>
-</article>
-<section class="code-section" id="${section.id}">
-${chip}  <pre><table class="code-table" data-file="${escapeHtml(section.file)}">${tableRows}</table></pre>
-</section>`
-        })
-        .join('\n')
-
-      /* Only render the jump-to-file menu when there are at least
-       * two files — a dropdown with one row is noise. */
-      const pathCell =
-        fileEntries.length > 1
-          ? `<details class="mdr-files-menu">
-      <summary class="path">${escapeHtml(file)}</summary>
-      <div class="mdr-files-panel">
-${fileEntries
-  .map(f => {
-    const active = f.anchor === thisAnchor ? ' class="active"' : ''
-    return `        <a href="#${f.anchor}"${active}>${escapeHtml(f.path)}</a>`
-  })
-  .join('\n')}
-      </div>
-    </details>`
-          : `<span class="path">${escapeHtml(file)}</span>`
-
-      /* Same rule: ≥2 sections → dropdown, single section →
-       * plain count text (no useless menu). */
-      const countCell =
-        fileSections.length > 1
-          ? `<details class="mdr-sections-menu">
-      <summary class="count">${fileSections.length} sections</summary>
-      <div class="mdr-sections-panel">
-${sectionRows}
-      </div>
-    </details>`
-          : `<span class="count">1 section</span>`
-
-      return `<section class="file-block" id="${thisAnchor}">
-  <header class="file-head">
-    ${pathCell}
-    ${countCell}
-  </header>
-  <div class="pair-grid file-grid">
-    ${pairedRows || '<div class="empty">No walkthrough prose found for this file.</div><div class="empty">No source ranges found for this file.</div>'}
-  </div>
-</section>`
-    })
-    .join('\n')
-
-  /* hotlinks.js reads this to resolve `./foo.js` quoted paths
-   * inside code back to a .file-block anchor on this page.
-   * Tuple form keeps the JSON small when a part has many
-   * files. */
-  const fileAnchorData = JSON.stringify(
-    fileEntries.map(f => [f.path, f.anchor]),
-  )
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(part.title)}</title>
-  ${HLJS_PRELOAD_HINTS}
-  ${headExtra}
-  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
-  ${HLJS_LINK_CSS}
-</head>
-<body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'${commentBackendAttr}>
-  <header class="topbar">
-    <h1>${escapeHtml(part.title)}</h1>
-    <p>${escapeHtml(part.objective)}</p>
-    <div class="part-nav">
-      ${renderPartNav(slug, parts, part.id, hasDocuments, basePath)}
-    </div>
-  </header>
-
-  <main class="files-stack">
-    ${fileBlocks || '<div class="empty">No walkthrough sections matched this part.</div>'}
-  </main>
-  ${footerHtml}
-
-  ${HLJS_SCRIPT_JS}
-  <script>
-    for (const block of document.querySelectorAll('.line-code code')) {
-      hljs.highlightElement(block);
+  const table: SymbolTable = {}
+  for (const [name, locs] of byName) {
+    /* Skip short names (`id`, `fn`, etc.) — too noisy against
+     * real code. 3-char floor matches the previous filter.
+     * Ambiguous names (defined in multiple files, or with
+     * overload signatures on separate lines) flow through
+     * unchanged — the array shape preserves every location so
+     * consumers can disambiguate instead of silently losing
+     * them. */
+    if (name.length < 3) {
+      continue
     }
-  </script>
-  <script>window[Symbol.for("meander:syms")] = ${JSON.stringify(symbols)};</script>
-  <script>${inlineJs}</script>
-</body>
-</html>`
-}
-
-/**
- * Resolve `config.layout` (plus an `auto` count threshold) to a
- * concrete layout. 12 markers is where the card grid starts to
- * read as a wall instead of a curated set; auto promotes to rows
- * at that count. Documents (articles) count toward the threshold
- * when the rows path will fold them into the same list.
- */
-function resolveIndexLayout(
-  layout: 'cards' | 'rows' | 'auto' | undefined,
-  markerCount: number,
-): 'cards' | 'rows' {
-  if (layout === 'cards' || layout === 'rows') {
-    return layout
+    table[name] = locs
   }
-  return markerCount >= 12 ? 'rows' : 'cards'
+  return table
 }
 
-function renderIndexHtml(
-  slug: string,
-  title: string,
-  parts: readonly WalkthroughPart[],
-  partKinds: Map<number, 'code' | 'article'>,
-  partCounts: Map<number, number>,
-  hasDocuments: boolean,
-  documents: readonly NormalizedDocEntry[],
-  basePath: string,
-  cssHref: string,
-  headExtra: string,
-  partLineCounts: Map<number, number>,
-  sizeTiersEnabled: boolean,
-  layout: 'cards' | 'rows' | 'auto' | undefined,
-  hero: { subtitle?: string; description?: string } | undefined,
-  footerHtml: string,
-  bodyAttrs: string,
-  trailFilterJs: string,
-): string {
-  /* Document rows merge into the trail at row layout — count them
-   * for the auto-promote threshold. Card layout keeps the legacy
-   * "Docs" tile so the threshold ignores them there. */
-  const effectiveLayout = resolveIndexLayout(
-    layout,
-    parts.length + (layout === 'cards' ? 0 : documents.length),
+export function cleanCommentText(raw: string): string {
+  const withoutDelimiters = raw.replace(/^\/\*/, '').replace(/\*\/$/, '')
+  const lines = withoutDelimiters
+    .split('\n')
+    .map(line => line.replace(/^\s*\*\s?/, ''))
+  const filtered = lines.filter(
+    (line, i, arr) =>
+      !(line.trim().length === 0 && (i === 0 || i === arr.length - 1)),
   )
-  const totalRowCount = parts.length + documents.length
-  const filterScriptTag =
-    effectiveLayout === 'rows' && totalRowCount >= 24 && trailFilterJs
-      ? `<script>${trailFilterJs}</script>`
-      : ''
-
-  /* Hero is optional; consumer provides subtitle + description.
-   * Inline markdown (bold, italic, code, links) is supported in
-   * description via marked.parseInline. Subtitle is plain text.
-   * Hero description runs through polishProse like every other
-   * prose surface — number highlighting + parenthetical italics
-   * stay consistent across pages. The description markdown is
-   * inline (no headings), so anchorifyHeadings is a no-op here. */
-  const heroHtml = hero
-    ? `<section class="mdr-hero">
-    ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ''}
-    ${hero.description ? `<p class="mdr-hero-desc">${polishProse(marked.parseInline(hero.description) as string)}</p>` : ''}
-  </section>`
-    : ''
-
-  const tocSection =
-    effectiveLayout === 'rows'
-      ? renderTrailList(
-          slug,
-          parts,
-          partKinds,
-          partCounts,
-          documents,
-          basePath,
-          partLineCounts,
-          sizeTiersEnabled,
-        )
-      : renderCardGrid(
-          slug,
-          parts,
-          partCounts,
-          hasDocuments,
-          basePath,
-          partLineCounts,
-          sizeTiersEnabled,
-        )
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(title)}</title>
-  ${headExtra}
-  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
-</head>
-<body${bodyAttrs}>
-  <header class="topbar">
-    <h1>${escapeHtml(title)}</h1>
-  </header>
-  <main class="mdr-index">
-    ${heroHtml}
-    ${tocSection}
-  </main>
-  ${footerHtml}
-  ${filterScriptTag}
-</body>
-</html>`
-}
-
-/**
- * Legacy card-grid layout. Each marker becomes a vertical card
- * with number, title, summary, and section count. Documents (if
- * any) get a single "Docs" card linking to /<slug>/documents.
- * Reads well at ≤8 markers; degrades past that.
- */
-function renderCardGrid(
-  slug: string,
-  parts: readonly WalkthroughPart[],
-  partCounts: Map<number, number>,
-  hasDocuments: boolean,
-  basePath: string,
-  partLineCounts: Map<number, number>,
-  sizeTiersEnabled: boolean,
-): string {
-  const partCards = parts
-    .map(part => {
-      const count = partCounts.get(part.id) ?? 0
-      const tier = sizeTiersEnabled
-        ? sizeTier(partLineCounts.get(part.id) ?? 0)
-        : null
-      const badge = tier
-        ? `<span class="mdr-size-tier mdr-size-tier-${tier}">${tier}</span>`
-        : ''
-      return `<a class="mdr-toc-card" href="${partUrl(slug, part, basePath)}">
-          <span class="mdr-toc-card-header">
-            <span class="mdr-toc-card-num">Marker ${part.id}</span>
-            ${badge}
-          </span>
-          <span class="mdr-toc-card-title">${escapeHtml(part.title)}</span>
-          <span class="mdr-toc-card-desc">${polishProse(escapeHtml(part.objective))}</span>
-          <span class="mdr-toc-card-meta">${count} section${count === 1 ? '' : 's'}</span>
-        </a>`
-    })
-    .join('\n')
-
-  const docsCard = hasDocuments
-    ? `<a class="mdr-toc-card mdr-toc-card-docs" href="${basePath}/${slug}/documents">
-          <span class="mdr-toc-card-header">
-            <span class="mdr-toc-card-num">Docs</span>
-          </span>
-          <span class="mdr-toc-card-title">Reference documents</span>
-          <span class="mdr-toc-card-desc">Companion markdown docs for this walkthrough.</span>
-        </a>`
-    : ''
-
-  return `<section class="mdr-toc">
-      <h2>Markers</h2>
-      <div class="mdr-toc-grid">
-        ${partCards}
-        ${docsCard}
-      </div>
-    </section>`
-}
-
-/**
- * Row-list layout — the "trail" view. Each marker is a row with
- * a leading tabular-num index, an optional kind glyph (only
- * shown when the trail mixes code + article kinds), a title +
- * summary block, and a trailing size pill. Documents fold into
- * the same list as additional rows. At 24+ rows we prepend a
- * search filter input that the inline trail-filter.js wires up.
- */
-function renderTrailList(
-  slug: string,
-  parts: readonly WalkthroughPart[],
-  partKinds: Map<number, 'code' | 'article'>,
-  partCounts: Map<number, number>,
-  documents: readonly NormalizedDocEntry[],
-  basePath: string,
-  partLineCounts: Map<number, number>,
-  sizeTiersEnabled: boolean,
-): string {
-  const partRows = parts.map((part, idx) => {
-    const num = String(idx + 1).padStart(2, '0')
-    const kind = partKinds.get(part.id) ?? 'code'
-    const count = partCounts.get(part.id) ?? 0
-    const tier = sizeTiersEnabled
-      ? sizeTier(partLineCounts.get(part.id) ?? 0)
-      : null
-    return {
-      kind,
-      html: trailRowHtml(
-        partUrl(slug, part, basePath),
-        num,
-        kind,
-        part.title,
-        part.objective,
-        tier,
-        partLineCounts.get(part.id),
-        count,
-        (part.keywords ?? []).join(' '),
-      ),
-    }
-  })
-
-  const docsBaseHref = `${basePath}/${slug}/documents`
-  const docRows = documents.map((doc, idx) => {
-    const num = String(parts.length + idx + 1).padStart(2, '0')
-    const title = doc.title ?? doc.source.replace(/^.*\//, '')
-    const summary = doc.summary ?? ''
-    return {
-      kind: doc.kind,
-      html: trailRowHtml(
-        docsBaseHref,
-        num,
-        doc.kind,
-        title,
-        summary,
-        null,
-        undefined,
-        0,
-        '',
-      ),
-    }
-  })
-
-  const allRows = [...partRows, ...docRows]
-  const totalCount = allRows.length
-
-  /* Hide the kind glyph when every row is the same kind — at that
-   * point the column reads as visual noise. The class on .mdr-trail
-   * lets the CSS suppress display without re-rendering. */
-  const kinds = new Set(allRows.map(r => r.kind))
-  const mixedKinds = kinds.size > 1
-  const trailClasses =
-    'mdr-trail' + (mixedKinds ? ' mdr-trail-mixed' : ' mdr-trail-single')
-
-  /* Filter input only when the list is long enough to warrant
-   * one. Below 24 rows the user can scan; above, search earns
-   * its keep. */
-  const filterUi =
-    totalCount >= 24
-      ? `<div class="mdr-trail-toolbar">
-          <input class="mdr-trail-filter" type="search" placeholder="Filter markers…" aria-label="Filter markers" autocomplete="off" />
-          <span class="mdr-trail-count" aria-live="polite" aria-atomic="true" aria-label="Markers visible">${totalCount}</span>
-        </div>`
-      : ''
-
-  return `<section class="${trailClasses}" data-count="${totalCount}">
-      <h2>Markers</h2>
-      ${filterUi}
-      <ol class="mdr-trail-list">
-        ${allRows.map(r => r.html).join('\n        ')}
-      </ol>
-    </section>`
-}
-
-/**
- * Render one trail row. `tier` may be null when sizeTiers is
- * disabled (suppresses the trailing pill); `lines` is used only
- * for the pill's hover title. `searchHaystack` is concatenated
- * onto a data-attribute the filter script reads to match against
- * keywords without re-tokenising the visible text.
- */
-function trailRowHtml(
-  href: string,
-  num: string,
-  kind: 'code' | 'article',
-  title: string,
-  summary: string,
-  tier: ReturnType<typeof sizeTier> | null,
-  lines: number | undefined,
-  sectionCount: number,
-  searchHaystack: string,
-): string {
-  const kindGlyph = kind === 'code' ? '⌘' : '❡'
-  const sizePill = tier
-    ? `<span class="mdr-trail-size mdr-trail-size-${tier}"${lines ? ` title="~${lines} lines"` : ''}>${tier}</span>`
-    : ''
-  const summaryHtml = summary
-    ? `<span class="mdr-trail-summary">${polishProse(escapeHtml(summary))}</span>`
-    : ''
-  const meta =
-    sectionCount > 0
-      ? ` <span class="mdr-trail-meta">${sectionCount} section${sectionCount === 1 ? '' : 's'}</span>`
-      : ''
-  const haystackAttr = searchHaystack
-    ? ` data-keywords="${escapeHtml(searchHaystack)}"`
-    : ''
-  return `<li class="mdr-trail-row" data-kind="${kind}"${haystackAttr}>
-          <span class="mdr-trail-num">${num}</span>
-          <span class="mdr-trail-kind" aria-label="${kind}">${kindGlyph}</span>
-          <a class="mdr-trail-link" href="${href}">
-            <span class="mdr-trail-title">${escapeHtml(title)}</span>
-            ${summaryHtml}${meta}
-          </a>
-          ${sizePill}
-        </li>`
-}
-
-type RenderedDocData = {
-  filePath: string
-  html: string
-  headings: Array<{ id: string; text: string; level: number }>
-}
-
-function renderDocumentsHtml(
-  slug: string,
-  parts: readonly WalkthroughPart[],
-  documents: readonly NormalizedDocEntry[],
-  renderedDocs: RenderedDocData[],
-  inlineJs: string,
-  basePath: string,
-  cssHref: string,
-  headExtra: string,
-  footerHtml: string,
-  commentBackendAttr: string,
-): string {
-  // Build tab bar
-  const tabButtons = renderedDocs
-    .map((doc, index) => {
-      const fileName = doc.filePath.split('/').pop() ?? doc.filePath
-      const activeClass = index === 0 ? ' active' : ''
-      return `<button class="doc-tab-btn${activeClass}" data-doc-index="${index}">${escapeHtml(fileName)}</button>`
-    })
-    .join('\n    ')
-
-  // Build tab panes — first pane gets the "active" class so CSS display:none
-  // doesn't hide it before doc-tabs.js initialises.
-  const tabPanes = renderedDocs
-    .map((doc, index) => {
-      const activeClass = index === 0 ? ' active' : ''
-      const display = index === 0 ? '' : ' style="display:none"'
-      return `<div class="doc-tab-pane${activeClass}" data-doc-index="${index}" data-doc-file="${escapeHtml(doc.filePath)}"${display}>
-    <article class="doc-content">${doc.html}</article>
-  </div>`
-    })
-    .join('\n  ')
-
-  // Generic description for the documents section header
-  const objective = 'Reference documents for this walkthrough.'
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Documents - ${escapeHtml(slug)}</title>
-  ${HLJS_PRELOAD_HINTS}
-  ${headExtra}
-  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
-  ${HLJS_LINK_CSS}
-</head>
-<body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents"${commentBackendAttr}>
-  <header class="topbar">
-    <h1>Documents</h1>
-    <p>${escapeHtml(objective)}</p>
-    <div class="part-nav">
-      ${renderPartNav(slug, parts, 0, true, basePath)}
-    </div>
-  </header>
-
-  <nav class="doc-tab-bar">
-    ${tabButtons}
-  </nav>
-
-  <main class="doc-container">
-    ${tabPanes}
-  </main>
-  ${footerHtml}
-
-  ${HLJS_SCRIPT_JS}
-  <script>
-    for (const block of document.querySelectorAll('.doc-content pre code')) {
-      hljs.highlightElement(block);
-    }
-  </script>
-  <script>
-    window[Symbol.for("meander:toc")] = ${JSON.stringify(
-      renderedDocs.map(d => ({ file: d.filePath, headings: d.headings })),
-    )};
-  </script>
-  <script>${inlineJs}</script>
-</body>
-</html>`
+  return filtered.join('\n').trim()
 }
 
 /* ------------------------------------------------------------------ */
-/*  Markdown document rendering                                        */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-/**
- * Converts arbitrary text to a heading ID slug — the same transformation
- * used by the heading renderer and by link anchor normalisation, so
- * cross-reference anchors always match the generated heading IDs.
- */
-function slugifyHeading(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+export function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
-type RenderedDocument = {
-  html: string
-  headings: Array<{ id: string; text: string; level: number }>
-  blockCount: number
-}
-
-type ResolvedDocRef = {
-  docIndex: number
-  anchor: string
-  /** True when the link targets the same document it appears in. */
-  sameDoc?: boolean
-}
-
-/**
- * Resolves a link href to another document in the walkthrough.
- * Returns null if the link is not a cross-document reference.
- */
-function resolveDocRef(
-  href: string,
-  currentDocPath: string,
-  allDocPaths: readonly string[],
-): ResolvedDocRef | null {
-  if (!href) {
-    return null
-  }
-
-  // Check if this is a link to another markdown file
-  // Supports formats like: ./other.md, other.md, ../other.md, other.md#anchor
-  let targetPath = href
-  let anchor = ''
-
-  // Extract anchor if present and slugify it so it matches the generated
-  // heading ID (e.g. "C++ Design" → "c-design", same as the heading renderer).
-  const hashIndex = href.indexOf('#')
-  if (hashIndex !== -1) {
-    targetPath = href.slice(0, hashIndex)
-    const rawAnchor = href.slice(hashIndex + 1)
-    // Only slugify if the anchor looks like a heading text; if it's already a
-    // valid slug (all lowercase word chars and hyphens) leave it as-is.
-    anchor = /^[a-z0-9-]+$/.test(rawAnchor)
-      ? rawAnchor
-      : slugifyHeading(rawAnchor)
-  }
-
-  // Must reference a markdown file
-  if (!targetPath.endsWith('.md')) {
-    return null
-  }
-
-  // Resolve the target path relative to the current document's directory.
-  // This handles ./, ../, and plain filenames uniformly.
-  // All doc paths use forward slashes (they come from the config JSON).
-  const currentDir = path.dirname(currentDocPath).replace(/\\/g, '/')
-  const base = currentDir === '.' ? targetPath : `${currentDir}/${targetPath}`
-  // Normalize away any ../ or ./ segments, keeping forward slashes
-  const resolvedTarget = base
-    .split('/')
-    .reduce((acc: string[], seg) => {
-      if (seg === '..') {
-        acc.pop()
-      } else if (seg !== '.') {
-        acc.push(seg)
-      }
-      return acc
-    }, [])
-    .join('/')
-
-  // Find the target document in allDocPaths
-  for (let i = 0; i < allDocPaths.length; i++) {
-    const docPath = allDocPaths[i]!
-    // Normalize stored doc path: forward slashes, no leading ./
-    const normalizedDocPath = docPath.replace(/\\/g, '/').replace(/^\.\//, '')
-    if (normalizedDocPath === resolvedTarget) {
-      // Link targets this document — treat as a same-doc anchor
-      if (docPath === currentDocPath) {
-        return { docIndex: i, anchor, sameDoc: true }
-      }
-      return { docIndex: i, anchor }
+export function extractSymbols(source: string): ExtractedSymbol[] {
+  const out: ExtractedSymbol[] = []
+  const lines = source.split('\n')
+  // Match an exported top-level declaration and capture its name:
+  // ^export\s+ the export keyword, (?:async\s+)? an optional async,
+  // (?:class|const|enum|function|interface|type) the declaration
+  // kind, \s+ a space, ([A-Za-z][A-Za-z0-9_]*) the identifier name.
+  const pattern =
+    /^export\s+(?:async\s+)?(?:class|const|enum|function|interface|type)\s+([A-Za-z][A-Za-z0-9_]*)/
+  for (let i = 0; i < lines.length; i++) {
+    const match = pattern.exec(lines[i]!.trim())
+    if (match?.[1]) {
+      out.push({ name: match[1], line: i + 1 })
     }
   }
-
-  return null
-}
-
-/**
- * Wraps block-level elements in .doc-block containers with sequential data-block-id attributes.
- */
-function wrapBlocks(html: string): { wrapped: string; blockCount: number } {
-  const BLOCK_TAGS = /^<(h[1-6]|p|ul|ol|blockquote|pre|table|hr|details)[\s>]/i
-
-  const lines = html.split('\n')
-  const result: string[] = []
-  let blockId = 0
-  let inBlock = false
-  let depth = 0
-  let currentTag = ''
-  let blockLines: string[] = []
-
-  for (const line of lines) {
-    if (!inBlock) {
-      // Check if this line starts a block element
-      const match = line.match(BLOCK_TAGS)
-      if (match) {
-        inBlock = true
-        currentTag = match[1]!.toLowerCase()
-        depth = 1
-        blockLines = [line]
-
-        // Check if this is a self-contained block on one line.
-        // For <hr> (void element) or any element whose opening line already
-        // contains the matching close tag, count open/close tag occurrences
-        // using regex — more robust than a plain string search which could
-        // match closing tags inside attribute values or text content.
-        const openPat = new RegExp(`<${currentTag}[\\s>]`, 'gi')
-        const closePat = new RegExp(`</${currentTag}>`, 'gi')
-        const opensOnLine = (line.match(openPat) || []).length
-        const closesOnLine = (line.match(closePat) || []).length
-        if (currentTag === 'hr' || closesOnLine >= opensOnLine) {
-          // Wrap the block
-          result.push(
-            `<div class="doc-block" data-block-id="${blockId}">`,
-            `<div class="doc-block-gutter"></div>`,
-            ...blockLines,
-            `</div>`,
-          )
-          blockId += 1
-          inBlock = false
-          blockLines = []
-          continue
-        }
-      } else {
-        // Not a block element, pass through
-        result.push(line)
-      }
-    } else {
-      // We're inside a block, track depth
-      blockLines.push(line)
-
-      // Count opening and closing tags for the current element
-      // Use regex to find all occurrences of the current tag
-      const openPattern = new RegExp(`<${currentTag}[\\s>]`, 'gi')
-      const closePattern = new RegExp(`</${currentTag}>`, 'gi')
-
-      const opens = (line.match(openPattern) || []).length
-      const closes = (line.match(closePattern) || []).length
-
-      // Adjust depth: add any additional opens, subtract closes
-      // Initial depth=1 already counts the opening tag that started this block
-      depth += opens
-      depth -= closes
-
-      if (depth <= 0) {
-        // Block is complete, wrap it
-        result.push(
-          `<div class="doc-block" data-block-id="${blockId}">`,
-          `<div class="doc-block-gutter"></div>`,
-          ...blockLines,
-          `</div>`,
-        )
-        blockId += 1
-        inBlock = false
-        blockLines = []
-      }
-    }
-  }
-
-  // Handle any remaining unclosed block (shouldn't happen with valid HTML)
-  if (inBlock && blockLines.length > 0) {
-    result.push(
-      `<div class="doc-block" data-block-id="${blockId}">`,
-      `<div class="doc-block-gutter"></div>`,
-      ...blockLines,
-      `</div>`,
-    )
-    blockId += 1
-  }
-
-  return { wrapped: result.join('\n'), blockCount: blockId }
-}
-
-/**
- * Renders a markdown document to HTML with block wrappers and cross-reference support.
- *
- * @param filePath - Absolute path to the markdown file
- * @param docIndex - Index of this document in the allDocPaths array
- * @param allDocPaths - Array of all document paths in the walkthrough
- * @returns Rendered document with HTML, headings, and block count
- */
-async function renderMarkdownDocument(
-  filePath: string,
-  docIndex: number,
-  allDocPaths: readonly string[],
-  mermaidRenderer?: import('./render-mermaid.mts').MermaidRenderer,
-  mermaidTheme: import('./render-mermaid.mts').MermaidTheme = 'default',
-): Promise<RenderedDocument> {
-  let markdown = readFileSync(filePath, 'utf-8')
-  /* Pre-pass: swap ```mermaid fences for opaque tokens so marked
-   * doesn't try to highlight them. SVGs are inlined after
-   * marked.parse + polishers so we don't run the HTML transforms
-   * over every diagram's <text>/<path>. */
-  let mermaidSvgs: Map<string, string> | null = null
-  if (mermaidRenderer) {
-    const { preRenderMermaidBlocks } = await import('./render-mermaid.mts')
-    const pre = await preRenderMermaidBlocks(markdown, mermaidRenderer, {
-      theme: mermaidTheme,
-    })
-    markdown = pre.markdown
-    mermaidSvgs = pre.svgByToken
-  }
-  const headings: Array<{ id: string; text: string; level: number }> = []
-
-  // Get the relative path for this document (for cross-reference resolution)
-  const relativePath = allDocPaths[docIndex] ?? filePath
-
-  // Create custom renderer
-  const renderer = new Renderer()
-
-  // Track seen heading slugs for deduplication
-  const seenSlugs = new Map<string, number>()
-
-  // Override heading to add IDs and collect headings for TOC.
-  // In marked v17, data.text is raw markdown — use marked.parseInline() to
-  // render inline formatting (bold, code, etc.) and strip tags for plain text.
-  renderer.heading = function (data: { text: string; depth: number }): string {
-    const { text, depth } = data
-    // Render inline markdown (e.g. **bold**, `code`) to HTML
-    const renderedText = marked.parseInline(text) as string
-    // Strip HTML tags for the slug and TOC display text
-    const plainText = renderedText.replace(/<[^>]*>/g, '')
-    let slug = slugifyHeading(plainText)
-
-    // Deduplicate: append -1, -2, ... for repeated slugs (GitHub convention).
-    const count = seenSlugs.get(slug) ?? 0
-    seenSlugs.set(slug, count + 1)
-    if (count > 0) {
-      slug = `${slug}-${count}`
-    }
-
-    // Collect heading for TOC with plain text (no HTML tags)
-    headings.push({ id: slug, text: plainText, level: depth })
-
-    // Trailing \n ensures wrapBlocks sees this as its own line, not merged
-    // with the next block element
-    return `<h${depth} id="${escapeHtml(slug)}">${renderedText}</h${depth}>\n`
-  }
-
-  // Override code to add language class for highlight.js.
-  // Escape lang to prevent attribute injection, and add trailing \n.
-  renderer.code = function (data: { text: string; lang?: string }): string {
-    const { text, lang } = data
-    const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : ''
-    return `<pre><code${langClass}>${escapeHtml(text)}</code></pre>\n`
-  }
-
-  // Override link to resolve cross-document references.
-  // In marked v17, data.text is raw markdown — use marked.parseInline() to
-  // render inline formatting within link text.
-  renderer.link = function (data: { href: string; text: string }): string {
-    const { href, text } = data
-    const renderedText = marked.parseInline(text) as string
-
-    // Same-document anchor link (e.g. #section-one) — render as plain anchor
-    if (href.startsWith('#')) {
-      return `<a href="${escapeHtml(href)}">${renderedText}</a>`
-    }
-
-    // Try to resolve as a cross-document reference
-    const resolved = resolveDocRef(href, relativePath, allDocPaths)
-
-    if (resolved) {
-      if (resolved.sameDoc) {
-        if (resolved.anchor) {
-          // Same document with anchor — plain in-page link
-          return `<a href="#${escapeHtml(resolved.anchor)}">${renderedText}</a>`
-        }
-        // Same document, no anchor — render as non-navigating inline text
-        // to avoid href="#" scrolling the page to the top.
-        return `<span class="doc-self-link">${renderedText}</span>`
-      }
-      // Cross-document link — use data attributes for client-side handling
-      return `<a href="#" data-doc-ref="${resolved.docIndex}" data-doc-anchor="${escapeHtml(resolved.anchor)}">${renderedText}</a>`
-    }
-
-    // External link — open in new tab
-    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${renderedText}</a>`
-  }
-
-  // Parse markdown with custom renderer
-  const rawHtml = marked.parse(markdown, { renderer }) as string
-
-  /* Prose polishers (generic, idempotent):
-   *   - strip "Further reading" README cross-reference lists,
-   *   - tag ASCII repo-tree blocks for CSS,
-   *   - add permalink anchors to h2/h3/h4,
-   *   - accent-color numeric tokens,
-   *   - italicize parentheticals.
-   * Runs before wrapBlocks so block-wrapping logic sees the
-   * transformed markup — headings carry their new ids when they
-   * become anchor targets, tree blocks carry their classes. */
-  let polishedHtml = polishProse(rawHtml)
-
-  if (mermaidSvgs && mermaidSvgs.size > 0) {
-    const { inlineMermaidSvgs } = await import('./render-mermaid.mts')
-    polishedHtml = inlineMermaidSvgs(polishedHtml, mermaidSvgs)
-  }
-
-  // Wrap blocks
-  const { wrapped, blockCount } = wrapBlocks(polishedHtml)
-
-  return {
-    html: wrapped,
-    headings,
-    blockCount,
-  }
-}
-
-/**
- * URL path segment for a part. Uses /<slug>/parts/<filename>
- * when the part sets a filename; falls back to /<slug>/part/<id>.
- * The numeric-id form is kept for back-compat so existing
- * consumers see no change.
- */
-/**
- * Build the standard footer HTML for a page. Renders meander's
- * attribution by default; consumers can override the text and
- * link or disable entirely via config.footer.
- */
-/* Curated rotating taglines. Two registers — trail / walking /
- * exploration AND reading / articles / walkthroughs — since
- * meander serves both. All end "…with meander" so the brand
- * sits at the end of the eye's path. JS picks one per page
- * load via the data-taglines attr; the first entry is the
- * no-JS fallback. */
-const DEFAULT_TAGLINES: readonly string[] = [
-  'Begin your journey with meander',
-  'Chart your course with meander',
-  'Find your way with meander',
-  'Trust the path with meander',
-  'Follow the thread with meander',
-  'Nestle between the lines with meander',
-  'Savor the moment with meander',
-]
-
-/* Strip the trailing " meander" so the rotator can render the
- * prefix as plain text and the brand word as the actual link.
- * Taglines that don't end with " meander" round-trip unchanged
- * (consumer override) and the rotator falls back to wrapping
- * the whole string. */
-function splitTagline(tagline: string): { prefix: string; isStandard: boolean } {
-  const m = /^(.*?)\s*meander\s*$/i.exec(tagline)
-  if (m && m[1]) {
-    return { prefix: m[1].trim(), isStandard: true }
-  }
-  return { prefix: tagline, isStandard: false }
-}
-
-function renderFooter(
-  footer:
-    | boolean
-    | { text?: string; href?: string; taglines?: readonly string[] }
-    | undefined,
-): string {
-  if (footer === false) {
-    return ''
-  }
-  const defaultHref = 'https://github.com/SocketDev/meander'
-  const cfg = typeof footer === 'object' ? footer : {}
-  const href = cfg.href ?? defaultHref
-  /* Three modes:
-   *   1. cfg.text       — explicit override, no rotation
-   *   2. cfg.taglines   — consumer-supplied rotation pool
-   *   3. (default)      — DEFAULT_TAGLINES, JS rotates per load
-   */
-  if (cfg.text) {
-    /* Custom text: render as a single linked phrase. Consumer
-     * picks the entire copy; we don't tease apart "meander". */
-    return `<footer class="mdr-footer">
-    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.text)}</a>
-  </footer>`
-  }
-  const pool =
-    cfg.taglines && cfg.taglines.length > 0 ? cfg.taglines : DEFAULT_TAGLINES
-  /* Encode the pool as prefixes only when every tagline matches
-   * the standard "<prefix> meander" shape. The link is always
-   * the literal word "meander"; the prefix is plain text and
-   * the rotator only swaps the prefix span. If a consumer's
-   * pool breaks the convention, fall back to the legacy
-   * whole-string-as-link behavior. */
-  const split = pool.map(splitTagline)
-  const allStandard = split.every(s => s.isStandard)
-  if (!allStandard) {
-    const fallback = pool[0]!
-    const taglineData = JSON.stringify(pool)
-    return `<footer class="mdr-footer">
-    <a class="mdr-footer-tagline" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-taglines='${escapeHtml(taglineData)}'>${escapeHtml(fallback)}</a>
-  </footer>`
-  }
-  const prefixes = split.map(s => s.prefix)
-  const fallbackPrefix = prefixes[0]!
-  const prefixData = JSON.stringify(prefixes)
-  return `<footer class="mdr-footer">
-    <span class="mdr-footer-tagline" data-tagline-prefixes='${escapeHtml(prefixData)}'>${escapeHtml(fallbackPrefix)}</span>
-    <a class="mdr-footer-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">meander</a>
-  </footer>`
-}
-
-/**
- * Normalized doc entry shape. Consumers pass strings or full
- * objects; the generator walks this shape everywhere.
- */
-type NormalizedDocEntry = {
-  source: string
-  filename: string | undefined
-  title: string | undefined
-  summary: string | undefined
-  kind: 'code' | 'article'
-}
-
-function normalizeDocs(
-  docs: readonly DocEntry[] | undefined,
-): NormalizedDocEntry[] {
-  if (!docs) {
-    return []
-  }
-  return docs.map((d): NormalizedDocEntry => {
-    if (typeof d === 'string') {
-      return {
-        source: d,
-        filename: undefined,
-        title: undefined,
-        summary: undefined,
-        kind: 'article',
-      }
-    }
-    return {
-      source: d.source,
-      filename: d.filename,
-      title: d.title,
-      summary: d.summary,
-      kind: d.kind ?? 'article',
-    }
-  })
+  return out
 }
 
 /**
  * First "significant" word of a title — the first token that
  * isn't a stopword. Useful when rendering a compact label
  * that should still carry the title's subject:
- *   "Anatomy of a PURL"              → "Anatomy"
- *   "Building & Stringifying PURLs"  → "Building"
- *   "The Security Model"             → "Security"
+ * "Anatomy of a PURL"              → "Anatomy"
+ * "Building & Stringifying PURLs"  → "Building"
+ * "The Security Model"             → "Security"
  * Trailing punctuation is stripped from each token so
  * "Anatomy, of a PURL" still lands on "Anatomy".
  */
-function firstSignificantWord(title: string): string {
+export function firstSignificantWord(title: string): string {
   /* Articles, conjunctions, short prepositions, and verb-particle
    * tails (`Setting *Up*`, `Rolling *Out*`) never carry the
    * title's meaning — always skip. */
@@ -1826,7 +566,8 @@ function firstSignificantWord(title: string): string {
   const cleanWord = (w: string) => w.replace(/[,:;.!?]+$/, '')
   const words = title.split(/\s+/)
   const significant: string[] = []
-  for (const w of words) {
+  for (let i = 0, { length } = words; i < length; i += 1) {
+    const w = words[i]!
     const cleaned = cleanWord(w)
     if (cleaned && !stop.has(cleaned.toLowerCase())) {
       significant.push(cleaned)
@@ -1840,103 +581,6 @@ function firstSignificantWord(title: string): string {
     return significant[1]!
   }
   return first
-}
-
-/**
- * Classify a line count into a t-shirt size. Tiers are skewed
- * low to make very-small parts stand out — most tour parts
- * land in "medium" or "small", "x-large" is reserved for the
- * rare sweeping part.
- */
-function sizeTier(
-  lines: number,
-): 'x-small' | 'small' | 'medium' | 'large' | 'x-large' {
-  if (lines <= 100) {
-    return 'x-small'
-  }
-  if (lines <= 400) {
-    return 'small'
-  }
-  if (lines <= 1000) {
-    return 'medium'
-  }
-  if (lines <= 2500) {
-    return 'large'
-  }
-  return 'x-large'
-}
-
-function partUrl(
-  slug: string,
-  part: { id: number; filename?: string },
-  basePath: string,
-): string {
-  const suffix = part.filename
-    ? `${slug}/parts/${part.filename}`
-    : `${slug}/part/${part.id}`
-  return `${basePath}/${suffix}`
-}
-
-/**
- * Output filename (without path) for a part. Parts-with-
- * filename land at `parts/<filename>.html`; bare parts land
- * at `part-<id>.html`. Returned relative to outDir.
- */
-function partOutputFilename(part: { id: number; filename?: string }): string {
-  return part.filename ? `parts/${part.filename}.html` : `part-${part.id}.html`
-}
-
-/* ------------------------------------------------------------------ */
-/*  Main                                                               */
-/* ------------------------------------------------------------------ */
-
-export type GenerateOptions = {
-  /**
-   * URL path prefix. When the site is hosted under a subpath
-   * (e.g. GitHub Pages at `/my-repo/`), every emitted `href` /
-   * `src` to a same-site asset is rewritten from `/meander.css`
-   * to `{basePath}/meander.css`. It's a path, not a URL —
-   * matches Next.js `basePath` semantics, not Vite's `base`
-   * (which allows full URLs).
-   * Default: "" (site hosted at origin root).
-   */
-  basePath?: string | undefined
-  /**
-   * Subdirectory under the output dir where emitted static
-   * assets (currently `meander.css`) land. Default: ""
-   * (emit flat). Example: `--asset-dir assets` writes
-   * `assets/meander.css` and rewrites the <link href>.
-   */
-  assetDir?: string | undefined
-}
-
-/**
- * Normalise a user-supplied base path so it starts with `/` and
- * has no trailing slash. Empty input → empty string (no prefixing).
- */
-function normaliseBasePath(basePath: string | undefined): string {
-  if (!basePath) {
-    return ''
-  }
-  let out = basePath.trim()
-  if (out === '' || out === '/') {
-    return ''
-  }
-  if (!out.startsWith('/')) {
-    out = '/' + out
-  }
-  return out.replace(/\/$/, '')
-}
-
-/**
- * Normalise a user-supplied asset dir — drop any leading/trailing
- * slashes so we can join it cleanly, and collapse empty values.
- */
-function normaliseAssetDir(assetDir: string | undefined): string {
-  if (!assetDir) {
-    return ''
-  }
-  return assetDir.trim().replace(/^\/+|\/+$/g, '')
 }
 
 export async function generate(
@@ -1957,6 +601,8 @@ export async function generate(
    * Both parts are optional. Empty → assets at site root, flat. */
   const assetHref = (filename: string): string => {
     const segments = [basePath, assetDir, filename]
+      // Trim leading/trailing slashes per segment: ^\/+ slashes at the
+      // start, or (|) \/+$ slashes at the end.
       .map(p => p.replace(/^\/+|\/+$/g, ''))
       .filter(Boolean)
     return '/' + segments.join('/')
@@ -1983,7 +629,7 @@ export async function generate(
         throw new Error(`Document file not found: ${d.source}`)
       }
     }
-    console.log(`Documents: ${documents.length} files`)
+    logger.log(`Documents: ${documents.length} files`)
   }
   /* Config-driven emit dir. Defaults to "pages" when the
    * .meander.config.json doesn't set outDir. The resolved value
@@ -2053,10 +699,7 @@ export async function generate(
   const footerTaglineJs =
     config.footer === false
       ? ''
-      : readFileSync(
-          path.join(bundledAssetsDir, 'footer-tagline.js'),
-          'utf-8',
-        )
+      : readFileSync(path.join(bundledAssetsDir, 'footer-tagline.js'), 'utf-8')
   const jsdocWrapJs = readFileSync(
     path.join(bundledAssetsDir, 'jsdoc-wrap.js'),
     'utf-8',
@@ -2160,7 +803,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       ].join('\n')
     : [blockSelectJs, docTabsJs, docTocJs].join('\n')
 
-  console.log(`Symbol table: ${Object.keys(symbols).length} unique names`)
+  logger.log(`Symbol table: ${Object.keys(symbols).length} unique names`)
 
   const sectionsByPart = new Map<number, Section[]>()
   for (const part of parts) {
@@ -2208,18 +851,18 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   const faviconOpt = config.favicon
   const faviconEnabled = faviconOpt !== false
   type FaviconAssets = {
-    svg?: string // filename in outDir
-    ico?: string
-    png16?: string
-    png32?: string
-    png48?: string
-    png180?: string
+    svg?: string | undefined // filename in outDir
+    ico?: string | undefined
+    png16?: string | undefined
+    png32?: string | undefined
+    png48?: string | undefined
+    png180?: string | undefined
   }
   const faviconAssets: FaviconAssets = {}
   if (faviconEnabled) {
     const bundledFavDir = path.join(bundledAssetsDir, 'favicon')
     const override =
-      faviconOpt && typeof faviconOpt === 'object' ? faviconOpt : null
+      faviconOpt && typeof faviconOpt === 'object' ? faviconOpt : undefined
     /* For each slot, prefer the consumer's override path
      * (resolved relative to meander.config.json's dir), falling
      * back to the bundled default if the override isn't
@@ -2348,18 +991,23 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   const sriEnabled = !!config.sri
   const cspOpts = typeof config.csp === 'object' ? config.csp : undefined
   const sriOpts = typeof config.sri === 'object' ? config.sri : undefined
-  let securityMod: typeof import('./security.mts') | null = null
+  let securityMod: {
+    injectCspMeta: typeof injectCspMeta
+    injectSriIntegrity: typeof injectSriIntegrity
+  } | null = null
   if (cspEnabled || sriEnabled) {
     securityMod = await import('./security.mts')
   }
-  let minifyMod: typeof import('./minify.mts') | null = null
+  let minifyMod: { minifyEmittedHtml: typeof minifyEmittedHtml } | null = null
   if (minifyEnabled) {
     minifyMod = await import('./minify.mts')
   }
   /* Lazy-loaded URL rewriter for user-authored root-relative
    * links that bypassed the build-time assetHref/partUrl
    * helpers. Only imported when basePath is non-empty. */
-  let urlRewriteMod: typeof import('./url-rewrite.mts') | null = null
+  let urlRewriteMod: {
+    applyBasePathToHtml: typeof applyBasePathToHtml
+  } | null = null
   if (basePath) {
     urlRewriteMod = await import('./url-rewrite.mts')
   }
@@ -2412,7 +1060,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       partSections,
       inlineJs,
       symbols,
-      hasDocuments,
+      { hasDocuments },
       basePath,
       emitStyles ? assetHref('meander.css') : '',
       headExtra,
@@ -2439,13 +1087,12 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     parts,
     partKinds,
     counts,
-    hasDocuments,
+    { hasDocuments, sizeTiersEnabled: !!config.sizeTiers },
     documents,
     basePath,
     emitStyles ? assetHref('meander.css') : '',
     headExtra,
     lineCounts,
-    !!config.sizeTiers,
     config.layout,
     config.hero,
     footerHtml,
@@ -2460,7 +1107,6 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
      * cost is paid at most once. `config.mermaid` can be `true`
      * (defaults), `false` / missing (disabled), or an object
      * with theme + cacheDir overrides. */
-    type MermaidRenderer = import('./render-mermaid.mts').MermaidRenderer
     let mermaidRenderer: MermaidRenderer | null = null
     if (config.mermaid) {
       const { createMermaidRenderer } = await import('./render-mermaid.mts')
@@ -2472,7 +1118,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
           : path.join(rootDir, 'node_modules', '.cache', 'meander', 'mermaid'),
       })
     }
-    const mermaidTheme: import('./render-mermaid.mts').MermaidTheme =
+    const mermaidTheme: MermaidTheme =
       (typeof config.mermaid === 'object' ? config.mermaid.theme : undefined) ??
       'default'
     const renderedDocs: RenderedDocData[] = []
@@ -2511,7 +1157,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       path.join(outDir, 'documents.html'),
       await finalizeHtml(documentsHtml),
     )
-    console.log(`Generated documents.html with ${documents.length} documents`)
+    logger.log(`Generated documents.html with ${documents.length} documents`)
   }
 
   const summary = {
@@ -2575,8 +1221,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         ? abs(`${basePath}/${slug}/docs/${d.filename}`)
         : abs(`${basePath}/${slug}/documents#${encodeURIComponent(d.source)}`)
       const name = d.title ?? d.source.split('/').pop() ?? d.source
-      const summary = d.summary ? ` — ${d.summary}` : ''
-      return `- [${name}](${url})${summary}`
+      const docSummary = d.summary ? ` — ${d.summary}` : ''
+      return `- [${name}](${url})${docSummary}`
     })
     const lines: string[] = [`# ${title}`, '', '## Parts', '', ...partLines]
     if (docLines.length > 0) {
@@ -2618,7 +1264,1442 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     JSON.stringify(fileAnchors, null, 2) + '\n',
   )
 
-  console.log(
+  logger.log(
     `Generated ${parts.length} part files + index + manifest in ${outDir}`,
   )
+}
+
+export function getAssetsDir(): string {
+  const thisFile = fileURLToPath(import.meta.url)
+  // In dist/generate.js → assets is at ../assets
+  return path.join(path.dirname(thisFile), '..', 'assets')
+}
+
+export function getLanguageClass(file: string): string {
+  return FILE_LANG[path.extname(file)] ?? 'plaintext'
+}
+
+export function lineNumberAt(text: string, index: number): number {
+  let line = 1
+  for (let i = 0; i < index; i += 1) {
+    if (text.charCodeAt(i) === 10) {
+      line += 1
+    }
+  }
+  return line
+}
+
+export function loadSources(
+  rootDir: string,
+  files: readonly string[],
+): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const file of files) {
+    const fullPath = path.join(rootDir, file)
+    if (!existsSync(fullPath)) {
+      throw new Error(`Missing file from part plan: ${file}`)
+    }
+    map.set(file, readFileSync(fullPath, 'utf-8'))
+  }
+  return map
+}
+
+/**
+ * Normalise a user-supplied asset dir — drop any leading/trailing
+ * slashes so we can join it cleanly, and collapse empty values.
+ */
+export function normaliseAssetDir(assetDir: string | undefined): string {
+  if (!assetDir) {
+    return ''
+  }
+  // Trim leading/trailing slashes: ^\/+ one or more slashes at the
+  // start, or (|) \/+$ one or more slashes at the end.
+  return assetDir.trim().replace(/^\/+|\/+$/g, '')
+}
+
+/**
+ * Normalise a user-supplied base path so it starts with `/` and
+ * has no trailing slash. Empty input → empty string (no prefixing).
+ */
+export function normaliseBasePath(basePath: string | undefined): string {
+  if (!basePath) {
+    return ''
+  }
+  let out = basePath.trim()
+  if (out === '' || out === '/') {
+    return ''
+  }
+  if (!out.startsWith('/')) {
+    out = '/' + out
+  }
+  return out.replace(/\/$/, '')
+}
+
+export function normalizeDocs(
+  docs: readonly DocEntry[] | undefined,
+): NormalizedDocEntry[] {
+  if (!docs) {
+    return []
+  }
+  return docs.map((d): NormalizedDocEntry => {
+    if (typeof d === 'string') {
+      return {
+        source: d,
+        filename: undefined,
+        title: undefined,
+        summary: undefined,
+        kind: 'article',
+      }
+    }
+    return {
+      source: d.source,
+      filename: d.filename,
+      title: d.title,
+      summary: d.summary,
+      kind: d.kind ?? 'article',
+    }
+  })
+}
+
+export function parseWalkthroughBlocks(file: string, source: string): Block[] {
+  const blocks: Block[] = []
+  const pattern = /\/\*[\s\S]*?\*\//g
+  let match: RegExpExecArray | null = pattern.exec(source)
+  while (match) {
+    const full = match[0]
+    const startIndex = match.index
+    const endIndex = startIndex + full.length
+    const startLine = lineNumberAt(source, startIndex)
+    const endLine = lineNumberAt(source, endIndex)
+    blocks.push({
+      file,
+      startLine,
+      endLine,
+      text: full,
+      cleanText: cleanCommentText(full),
+    })
+    match = pattern.exec(source)
+  }
+  return blocks
+}
+
+/**
+ * Output filename (without path) for a part. Parts-with-
+ * filename land at `parts/<filename>.html`; bare parts land
+ * at `part-<id>.html`. Returned relative to outDir.
+ */
+export function partOutputFilename(part: {
+  id: number
+  filename?: string | undefined
+}): string {
+  return part.filename ? `parts/${part.filename}.html` : `part-${part.id}.html`
+}
+
+export function partUrl(
+  slug: string,
+  part: { id: number; filename?: string | undefined },
+  basePath: string,
+): string {
+  const suffix = part.filename
+    ? `${slug}/parts/${part.filename}`
+    : `${slug}/part/${part.id}`
+  return `${basePath}/${suffix}`
+}
+
+export function renderAnnotationMarkdown(markdown: string): string {
+  const chunks = splitAnnotationByTags(markdown.trim())
+  const blocks: Array<{ html: string; order: number }> = []
+  let preamble: string | null = null
+  let hasExplicitDescription = false
+
+  for (const chunk of chunks) {
+    if (chunk.kind === 'prose') {
+      if (preamble === null) {
+        preamble = chunk.text
+      } else {
+        preamble = `${preamble}\n\n${chunk.text}`
+      }
+      continue
+    }
+    if (chunk.tag === 'description') {
+      hasExplicitDescription = true
+    }
+    const typeHtml = chunk.type
+      ? `<code class="annotation-type">${escapeHtml(chunk.type)}</code>`
+      : ''
+    const bodyHtml = chunk.body
+      ? polishProse(annotationMarked.parse(chunk.body) as string)
+      : ''
+    const order =
+      chunk.tag === 'fileoverview' ? 0 : chunk.tag === 'description' ? 1 : 2
+    blocks.push({
+      html:
+        `<div class="annotation-block" data-tag="${chunk.tag}">` +
+        `<span class="annotation-tag">@${chunk.tag}</span>` +
+        (typeHtml ? ` ${typeHtml}` : '') +
+        `<div class="annotation-body">${bodyHtml}</div>` +
+        `</div>`,
+      order,
+    })
+  }
+  /* Preamble becomes a synthetic @description when no explicit
+   * one exists. Keeps the "description leads the card stack"
+   * ordering while still surfacing free-floating prose. */
+  if (preamble !== null && !hasExplicitDescription) {
+    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
+    blocks.push({
+      html:
+        `<div class="annotation-block" data-tag="description">` +
+        `<span class="annotation-tag">@description</span>` +
+        `<div class="annotation-body">${bodyHtml}</div>` +
+        `</div>`,
+      order: 1,
+    })
+  } else if (preamble !== null) {
+    /* Explicit @description exists — keep the preamble as plain
+     * prose above the cards so nothing is silently dropped. */
+    const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
+    blocks.unshift({
+      html: `<div class="annotation-prose">${bodyHtml}</div>`,
+      order: -1,
+    })
+  }
+  blocks.sort((a, b) => a.order - b.order)
+  return blocks.map(b => b.html).join('')
+}
+
+/**
+ * Legacy card-grid layout. Each marker becomes a vertical card
+ * with number, title, summary, and section count. Documents (if
+ * any) get a single "Docs" card linking to /<slug>/documents.
+ * Reads well at ≤8 markers; degrades past that.
+ */
+export function renderCardGrid(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  partCounts: Map<number, number>,
+  {
+    hasDocuments,
+    sizeTiersEnabled,
+  }: {
+    hasDocuments?: boolean | undefined
+    sizeTiersEnabled?: boolean | undefined
+  },
+  basePath: string,
+  partLineCounts: Map<number, number>,
+): string {
+  const partCards = parts
+    .map(part => {
+      const count = partCounts.get(part.id) ?? 0
+      const tier = sizeTiersEnabled
+        ? sizeTier(partLineCounts.get(part.id) ?? 0)
+        : undefined
+      const badge = tier
+        ? `<span class="mdr-size-tier mdr-size-tier-${tier}">${tier}</span>`
+        : ''
+      return `<a class="mdr-toc-card" href="${partUrl(slug, part, basePath)}">
+          <span class="mdr-toc-card-header">
+            <span class="mdr-toc-card-num">Marker ${part.id}</span>
+            ${badge}
+          </span>
+          <span class="mdr-toc-card-title">${escapeHtml(part.title)}</span>
+          <span class="mdr-toc-card-desc">${polishProse(escapeHtml(part.objective))}</span>
+          <span class="mdr-toc-card-meta">${count} section${count === 1 ? '' : 's'}</span>
+        </a>`
+    })
+    .join('\n')
+
+  const docsCard = hasDocuments
+    ? `<a class="mdr-toc-card mdr-toc-card-docs" href="${basePath}/${slug}/documents">
+          <span class="mdr-toc-card-header">
+            <span class="mdr-toc-card-num">Docs</span>
+          </span>
+          <span class="mdr-toc-card-title">Reference documents</span>
+          <span class="mdr-toc-card-desc">Companion markdown docs for this walkthrough.</span>
+        </a>`
+    : ''
+
+  return `<section class="mdr-toc">
+      <h2>Markers</h2>
+      <div class="mdr-toc-grid">
+        ${partCards}
+        ${docsCard}
+      </div>
+    </section>`
+}
+
+export function renderDocumentsHtml(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  documents: readonly NormalizedDocEntry[],
+  renderedDocs: RenderedDocData[],
+  inlineJs: string,
+  basePath: string,
+  cssHref: string,
+  headExtra: string,
+  footerHtml: string,
+  commentBackendAttr: string,
+): string {
+  // Build tab bar
+  const tabButtons = renderedDocs
+    .map((doc, index) => {
+      const fileName = doc.filePath.split('/').pop() ?? doc.filePath
+      const activeClass = index === 0 ? ' active' : ''
+      return `<button class="doc-tab-btn${activeClass}" data-doc-index="${index}">${escapeHtml(fileName)}</button>`
+    })
+    .join('\n    ')
+
+  // Build tab panes — first pane gets the "active" class so CSS display:none
+  // doesn't hide it before doc-tabs.js initialises.
+  const tabPanes = renderedDocs
+    .map((doc, index) => {
+      const activeClass = index === 0 ? ' active' : ''
+      const display = index === 0 ? '' : ' style="display:none"'
+      return `<div class="doc-tab-pane${activeClass}" data-doc-index="${index}" data-doc-file="${escapeHtml(doc.filePath)}"${display}>
+    <article class="doc-content">${doc.html}</article>
+  </div>`
+    })
+    .join('\n  ')
+
+  // Generic description for the documents section header
+  const objective = 'Reference documents for this walkthrough.'
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Documents - ${escapeHtml(slug)}</title>
+  ${HLJS_PRELOAD_HINTS}
+  ${headExtra}
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
+  ${HLJS_LINK_CSS}
+</head>
+<body data-slug="${escapeHtml(slug)}" data-part="0" data-page-type="documents"${commentBackendAttr}>
+  <header class="topbar">
+    <h1>Documents</h1>
+    <p>${escapeHtml(objective)}</p>
+    <div class="part-nav">
+      ${renderPartNav(slug, parts, 0, { hasDocuments: true }, basePath)}
+    </div>
+  </header>
+
+  <nav class="doc-tab-bar">
+    ${tabButtons}
+  </nav>
+
+  <main class="doc-container">
+    ${tabPanes}
+  </main>
+  ${footerHtml}
+
+  ${HLJS_SCRIPT_JS}
+  <script>
+    for (const block of document.querySelectorAll('.doc-content pre code')) {
+      hljs.highlightElement(block);
+    }
+  </script>
+  <script>
+    window[Symbol.for("meander:toc")] = ${JSON.stringify(
+      renderedDocs.map(d => ({ file: d.filePath, headings: d.headings })),
+    )};
+  </script>
+  <script>${inlineJs}</script>
+</body>
+</html>`
+}
+
+export function renderFooter(
+  footer:
+    | boolean
+    | {
+        text?: string | undefined
+        href?: string | undefined
+        taglines?: readonly string[] | undefined
+      }
+    | undefined,
+): string {
+  if (footer === false) {
+    return ''
+  }
+  const defaultHref = 'https://github.com/SocketDev/meander'
+  const cfg = typeof footer === 'object' ? footer : {}
+  const href = cfg.href ?? defaultHref
+  /* Three modes:
+   *   1. cfg.text       — explicit override, no rotation
+   *   2. cfg.taglines   — consumer-supplied rotation pool
+   *   3. (default)      — DEFAULT_TAGLINES, JS rotates per load
+   */
+  if (cfg.text) {
+    /* Custom text: render as a single linked phrase. Consumer
+     * picks the entire copy; we don't tease apart "meander". */
+    return `<footer class="mdr-footer">
+    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.text)}</a>
+  </footer>`
+  }
+  const pool =
+    cfg.taglines && cfg.taglines.length > 0 ? cfg.taglines : DEFAULT_TAGLINES
+  /* Encode the pool as prefixes only when every tagline matches
+   * the standard "<prefix> meander" shape. The link is always
+   * the literal word "meander"; the prefix is plain text and
+   * the rotator only swaps the prefix span. If a consumer's
+   * pool breaks the convention, fall back to the legacy
+   * whole-string-as-link behavior. */
+  const split = pool.map(splitTagline)
+  const allStandard = split.every(s => s.isStandard)
+  if (!allStandard) {
+    const fallback = pool[0]!
+    const taglineData = JSON.stringify(pool)
+    return `<footer class="mdr-footer">
+    <a class="mdr-footer-tagline" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-taglines='${escapeHtml(taglineData)}'>${escapeHtml(fallback)}</a>
+  </footer>`
+  }
+  const prefixes = split.map(s => s.prefix)
+  const fallbackPrefix = prefixes[0]!
+  const prefixData = JSON.stringify(prefixes)
+  return `<footer class="mdr-footer">
+    <span class="mdr-footer-tagline" data-tagline-prefixes='${escapeHtml(prefixData)}'>${escapeHtml(fallbackPrefix)}</span>
+    <a class="mdr-footer-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">meander</a>
+  </footer>`
+}
+
+export function renderIndexHtml(
+  slug: string,
+  title: string,
+  parts: readonly WalkthroughPart[],
+  partKinds: Map<number, 'code' | 'article'>,
+  partCounts: Map<number, number>,
+  {
+    hasDocuments,
+    sizeTiersEnabled,
+  }: {
+    hasDocuments?: boolean | undefined
+    sizeTiersEnabled?: boolean | undefined
+  },
+  documents: readonly NormalizedDocEntry[],
+  basePath: string,
+  cssHref: string,
+  headExtra: string,
+  partLineCounts: Map<number, number>,
+  layout: 'cards' | 'rows' | 'auto' | undefined,
+  hero:
+    | { subtitle?: string | undefined; description?: string | undefined }
+    | undefined,
+  footerHtml: string,
+  bodyAttrs: string,
+  trailFilterJs: string,
+): string {
+  /* Document rows merge into the trail at row layout — count them
+   * for the auto-promote threshold. Card layout keeps the legacy
+   * "Docs" tile so the threshold ignores them there. */
+  const effectiveLayout = resolveIndexLayout(
+    layout,
+    parts.length + (layout === 'cards' ? 0 : documents.length),
+  )
+  const totalRowCount = parts.length + documents.length
+  const filterScriptTag =
+    effectiveLayout === 'rows' && totalRowCount >= 24 && trailFilterJs
+      ? `<script>${trailFilterJs}</script>`
+      : ''
+
+  /* Hero is optional; consumer provides subtitle + description.
+   * Inline markdown (bold, italic, code, links) is supported in
+   * description via marked.parseInline. Subtitle is plain text.
+   * Hero description runs through polishProse like every other
+   * prose surface — number highlighting + parenthetical italics
+   * stay consistent across pages. The description markdown is
+   * inline (no headings), so anchorifyHeadings is a no-op here. */
+  const heroHtml = hero
+    ? `<section class="mdr-hero">
+    ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ''}
+    ${hero.description ? `<p class="mdr-hero-desc">${polishProse(marked.parseInline(hero.description) as string)}</p>` : ''}
+  </section>`
+    : ''
+
+  const tocSection =
+    effectiveLayout === 'rows'
+      ? renderTrailList(
+          slug,
+          parts,
+          partKinds,
+          partCounts,
+          documents,
+          basePath,
+          partLineCounts,
+          { sizeTiersEnabled },
+        )
+      : renderCardGrid(
+          slug,
+          parts,
+          partCounts,
+          { hasDocuments, sizeTiersEnabled },
+          basePath,
+          partLineCounts,
+        )
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  ${headExtra}
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
+</head>
+<body${bodyAttrs}>
+  <header class="topbar">
+    <h1>${escapeHtml(title)}</h1>
+  </header>
+  <main class="mdr-index">
+    ${heroHtml}
+    ${tocSection}
+  </main>
+  ${footerHtml}
+  ${filterScriptTag}
+</body>
+</html>`
+}
+
+/**
+ * Renders a markdown document to HTML with block wrappers and cross-reference
+ * support.
+ *
+ * @param filePath - Absolute path to the markdown file.
+ * @param docIndex - Index of this document in the allDocPaths array.
+ * @param allDocPaths - Array of all document paths in the walkthrough.
+ *
+ * @returns Rendered document with HTML, headings, and block count
+ */
+export async function renderMarkdownDocument(
+  filePath: string,
+  docIndex: number,
+  allDocPaths: readonly string[],
+  mermaidRenderer?: MermaidRenderer,
+  mermaidTheme: MermaidTheme = 'default',
+): Promise<RenderedDocument> {
+  let markdown = readFileSync(filePath, 'utf-8')
+  /* Pre-pass: swap ```mermaid fences for opaque tokens so marked
+   * doesn't try to highlight them. SVGs are inlined after
+   * marked.parse + polishers so we don't run the HTML transforms
+   * over every diagram's <text>/<path>. */
+  let mermaidSvgs: Map<string, string> | null = null
+  if (mermaidRenderer) {
+    const { preRenderMermaidBlocks } = await import('./render-mermaid.mts')
+    const pre = await preRenderMermaidBlocks(markdown, mermaidRenderer, {
+      theme: mermaidTheme,
+    })
+    markdown = pre.markdown
+    mermaidSvgs = pre.svgByToken
+  }
+  const headings: Array<{ id: string; text: string; level: number }> = []
+
+  // Get the relative path for this document (for cross-reference resolution)
+  const relativePath = allDocPaths[docIndex] ?? filePath
+
+  // Create custom renderer
+  const renderer = new Renderer()
+
+  // Track seen heading slugs for deduplication
+  const seenSlugs = new Map<string, number>()
+
+  // Override heading to add IDs and collect headings for TOC.
+  // In marked v17, data.text is raw markdown — use marked.parseInline() to
+  // render inline formatting (bold, code, etc.) and strip tags for plain text.
+  renderer.heading = function (data: { text: string; depth: number }): string {
+    const { text, depth } = data
+    // Render inline markdown (e.g. **bold**, `code`) to HTML
+    const renderedText = marked.parseInline(text) as string
+    // Strip HTML tags for the slug and TOC display text
+    const plainText = renderedText.replace(/<[^>]*>/g, '')
+    let slug = slugifyHeading(plainText)
+
+    // Deduplicate: append -1, -2, ... for repeated slugs (GitHub convention).
+    const count = seenSlugs.get(slug) ?? 0
+    seenSlugs.set(slug, count + 1)
+    if (count > 0) {
+      slug = `${slug}-${count}`
+    }
+
+    // Collect heading for TOC with plain text (no HTML tags)
+    headings.push({ id: slug, text: plainText, level: depth })
+
+    // Trailing \n ensures wrapBlocks sees this as its own line, not merged
+    // with the next block element
+    return `<h${depth} id="${escapeHtml(slug)}">${renderedText}</h${depth}>\n`
+  }
+
+  // Override code to add language class for highlight.js.
+  // Escape lang to prevent attribute injection, and add trailing \n.
+  renderer.code = function (data: {
+    text: string
+    lang?: string | undefined
+  }): string {
+    const { text, lang } = data
+    const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : ''
+    return `<pre><code${langClass}>${escapeHtml(text)}</code></pre>\n`
+  }
+
+  // Override link to resolve cross-document references.
+  // In marked v17, data.text is raw markdown — use marked.parseInline() to
+  // render inline formatting within link text.
+  renderer.link = function (data: { href: string; text: string }): string {
+    const { href, text } = data
+    const renderedText = marked.parseInline(text) as string
+
+    // Same-document anchor link (e.g. #section-one) — render as plain anchor
+    if (href.startsWith('#')) {
+      return `<a href="${escapeHtml(href)}">${renderedText}</a>`
+    }
+
+    // Try to resolve as a cross-document reference
+    const resolved = resolveDocRef(href, relativePath, allDocPaths)
+
+    if (resolved) {
+      if (resolved.sameDoc) {
+        if (resolved.anchor) {
+          // Same document with anchor — plain in-page link
+          return `<a href="#${escapeHtml(resolved.anchor)}">${renderedText}</a>`
+        }
+        // Same document, no anchor — render as non-navigating inline text
+        // to avoid href="#" scrolling the page to the top.
+        return `<span class="doc-self-link">${renderedText}</span>`
+      }
+      // Cross-document link — use data attributes for client-side handling
+      return `<a href="#" data-doc-ref="${resolved.docIndex}" data-doc-anchor="${escapeHtml(resolved.anchor)}">${renderedText}</a>`
+    }
+
+    // External link — open in new tab
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${renderedText}</a>`
+  }
+
+  // Parse markdown with custom renderer
+  const rawHtml = marked.parse(markdown, { renderer }) as string
+
+  /* Prose polishers (generic, idempotent):
+   *   - strip "Further reading" README cross-reference lists,
+   *   - tag ASCII repo-tree blocks for CSS,
+   *   - add permalink anchors to h2/h3/h4,
+   *   - accent-color numeric tokens,
+   *   - italicize parentheticals.
+   * Runs before wrapBlocks so block-wrapping logic sees the
+   * transformed markup — headings carry their new ids when they
+   * become anchor targets, tree blocks carry their classes. */
+  let polishedHtml = polishProse(rawHtml)
+
+  if (mermaidSvgs && mermaidSvgs.size > 0) {
+    const { inlineMermaidSvgs } = await import('./render-mermaid.mts')
+    polishedHtml = inlineMermaidSvgs(polishedHtml, mermaidSvgs)
+  }
+
+  // Wrap blocks
+  const { wrapped, blockCount } = wrapBlocks(polishedHtml)
+
+  return {
+    html: wrapped,
+    headings,
+    blockCount,
+  }
+}
+
+export function renderPartHtml(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  part: WalkthroughPart,
+  sections: readonly Section[],
+  inlineJs: string,
+  symbols: SymbolTable,
+  { hasDocuments }: { hasDocuments?: boolean | undefined },
+  basePath: string,
+  cssHref: string,
+  headExtra: string,
+  footerHtml: string,
+  commentBackendAttr: string,
+): string {
+  const sectionsByFile = new Map<string, Section[]>()
+  for (const section of sections) {
+    const existing = sectionsByFile.get(section.file)
+    if (existing) {
+      existing.push(section)
+    } else {
+      sectionsByFile.set(section.file, [section])
+    }
+  }
+
+  const orderedFiles = part.files.filter(file => sectionsByFile.has(file))
+
+  /* Stable anchor ID per file — for jump-to-file menu links and
+   * IntersectionObserver-driven "current file" highlighting. */
+  const fileAnchor = (file: string): string =>
+    // Trim hyphens left by the replaceAll: ^-+ one or more hyphens at
+    // the start, or (|) -+$ one or more hyphens at the end.
+    `file-${file.replaceAll(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`
+  const fileEntries = orderedFiles.map(file => ({
+    path: file,
+    anchor: fileAnchor(file),
+  }))
+
+  const fileBlocks = orderedFiles
+    .map(file => {
+      const fileSections = sectionsByFile.get(file) ?? []
+      const thisAnchor = fileAnchor(file)
+
+      /* Section row labels used by both the file-head sections
+       * menu AND every per-chunk chip that clones from it. The
+       * section's id is the anchor target (matches what each
+       * .code-section emits as its DOM id). */
+      const sectionRows = fileSections
+        .map((section, i) => {
+          const label = `Section ${i + 1}`
+          const meta =
+            section.endLine > section.startLine
+              ? `Lines ${section.startLine}–${section.endLine}`
+              : `Line ${section.startLine}`
+          return `        <a href="#${section.id}"><span class="mdr-section-label">${label}</span><span class="mdr-section-meta">${meta}</span></a>`
+        })
+        .join('\n')
+
+      const pairedRows = fileSections
+        .map((section, i) => {
+          const codeLines = section.code.split('\n')
+          const tableRows = codeLines
+            .map((line, j) => {
+              const lineNum = section.startLine + j
+              return `<tr><td class="line-num">${lineNum}</td><td class="line-code"><code class="language-${section.languageClass}">${escapeHtml(line)}</code></td></tr>`
+            })
+            .join('\n')
+
+          const annotationHtml = renderAnnotationMarkdown(section.annotation)
+          /* Per-chunk chip — a compact sections dropdown at the
+           * top of each .code-section. Panel starts empty; the
+           * first open clones the file-head menu's panel in
+           * nav-menus.js and marks this chunk's anchor active.
+           * Empty panel on disk saves repeat markup when a file
+           * has many sections. Suppressed on single-section
+           * files — nothing to navigate to. */
+          const chip =
+            fileSections.length > 1
+              ? `  <details class="mdr-sections-menu mdr-section-chip" data-sections-for="${thisAnchor}" data-active-id="${section.id}">
+    <summary class="count">Section ${i + 1} of ${fileSections.length}</summary>
+    <div class="mdr-sections-panel"></div>
+  </details>
+`
+              : ''
+          return `<article class="annotation-card" id="ann-${section.id}">
+  <div class="annotation-md">${annotationHtml}</div>
+</article>
+<section class="code-section" id="${section.id}">
+${chip}  <pre><table class="code-table" data-file="${escapeHtml(section.file)}">${tableRows}</table></pre>
+</section>`
+        })
+        .join('\n')
+
+      /* Only render the jump-to-file menu when there are at least
+       * two files — a dropdown with one row is noise. */
+      const pathCell =
+        fileEntries.length > 1
+          ? `<details class="mdr-files-menu">
+      <summary class="path">${escapeHtml(file)}</summary>
+      <div class="mdr-files-panel">
+${fileEntries
+  .map(f => {
+    const active = f.anchor === thisAnchor ? ' class="active"' : ''
+    return `        <a href="#${f.anchor}"${active}>${escapeHtml(f.path)}</a>`
+  })
+  .join('\n')}
+      </div>
+    </details>`
+          : `<span class="path">${escapeHtml(file)}</span>`
+
+      /* Same rule: ≥2 sections → dropdown, single section →
+       * plain count text (no useless menu). */
+      const countCell =
+        fileSections.length > 1
+          ? `<details class="mdr-sections-menu">
+      <summary class="count">${fileSections.length} sections</summary>
+      <div class="mdr-sections-panel">
+${sectionRows}
+      </div>
+    </details>`
+          : `<span class="count">1 section</span>`
+
+      return `<section class="file-block" id="${thisAnchor}">
+  <header class="file-head">
+    ${pathCell}
+    ${countCell}
+  </header>
+  <div class="pair-grid file-grid">
+    ${pairedRows || '<div class="empty">No walkthrough prose found for this file.</div><div class="empty">No source ranges found for this file.</div>'}
+  </div>
+</section>`
+    })
+    .join('\n')
+
+  /* hotlinks.js reads this to resolve `./foo.js` quoted paths
+   * inside code back to a .file-block anchor on this page.
+   * Tuple form keeps the JSON small when a part has many
+   * files. */
+  const fileAnchorData = JSON.stringify(
+    fileEntries.map(f => [f.path, f.anchor]),
+  )
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(part.title)}</title>
+  ${HLJS_PRELOAD_HINTS}
+  ${headExtra}
+  ${cssHref ? `<link rel="stylesheet" href="${cssHref}" />` : ''}
+  ${HLJS_LINK_CSS}
+</head>
+<body data-slug="${escapeHtml(slug)}" data-part="${part.id}" data-file-anchors='${escapeHtml(fileAnchorData)}'${commentBackendAttr}>
+  <header class="topbar">
+    <h1>${escapeHtml(part.title)}</h1>
+    <p>${escapeHtml(part.objective)}</p>
+    <div class="part-nav">
+      ${renderPartNav(slug, parts, part.id, { hasDocuments }, basePath)}
+    </div>
+  </header>
+
+  <main class="files-stack">
+    ${fileBlocks || '<div class="empty">No walkthrough sections matched this part.</div>'}
+  </main>
+  ${footerHtml}
+
+  ${HLJS_SCRIPT_JS}
+  <script>
+    for (const block of document.querySelectorAll('.line-code code')) {
+      hljs.highlightElement(block);
+    }
+  </script>
+  <script>window[Symbol.for("meander:syms")] = ${JSON.stringify(symbols)};</script>
+  <script>${inlineJs}</script>
+</body>
+</html>`
+}
+
+export function renderPartNav(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  activePartId: number,
+  { hasDocuments }: { hasDocuments?: boolean | undefined },
+  basePath: string,
+): string {
+  /* Three-zone pill strip: label, part pills (with compact
+   * one-word titles via firstSignificantWord), then docs pill
+   * (when present). Label + docs are styled separately so the
+   * eye reads "Topics: A B C | Docs" as one nav block. */
+  const label = `<span class="mdr-parts-label">Topics:</span>`
+  const partLinks = parts
+    .map(part => {
+      const cls = part.id === activePartId ? 'active' : ''
+      const shortTitle = firstSignificantWord(part.title)
+      const full = part.title
+      return `<a class="${cls}" href="${partUrl(slug, part, basePath)}" title="${escapeHtml(full)}">${escapeHtml(shortTitle)}</a>`
+    })
+    .join('\n')
+  const docsLink = hasDocuments
+    ? `<a class="mdr-topic-doc ${activePartId === 0 ? 'active' : ''}" href="${basePath}/${slug}/documents" title="Documents">Docs</a>`
+    : ''
+  return `${label}${partLinks}${docsLink}`
+}
+
+/**
+ * Row-list layout — the "trail" view. Each marker is a row with
+ * a leading tabular-num index, an optional kind glyph (only
+ * shown when the trail mixes code + article kinds), a title +
+ * summary block, and a trailing size pill. Documents fold into
+ * the same list as additional rows. At 24+ rows we prepend a
+ * search filter input that the inline trail-filter.js wires up.
+ */
+export function renderTrailList(
+  slug: string,
+  parts: readonly WalkthroughPart[],
+  partKinds: Map<number, 'code' | 'article'>,
+  partCounts: Map<number, number>,
+  documents: readonly NormalizedDocEntry[],
+  basePath: string,
+  partLineCounts: Map<number, number>,
+  { sizeTiersEnabled }: { sizeTiersEnabled?: boolean | undefined },
+): string {
+  const partRows = parts.map((part, idx) => {
+    const num = String(idx + 1).padStart(2, '0')
+    const kind = partKinds.get(part.id) ?? 'code'
+    const count = partCounts.get(part.id) ?? 0
+    const tier = sizeTiersEnabled
+      ? sizeTier(partLineCounts.get(part.id) ?? 0)
+      : undefined
+    return {
+      kind,
+      html: trailRowHtml(
+        partUrl(slug, part, basePath),
+        num,
+        kind,
+        part.title,
+        part.objective,
+        tier,
+        partLineCounts.get(part.id),
+        count,
+        (part.keywords ?? []).join(' '),
+      ),
+    }
+  })
+
+  const docsBaseHref = `${basePath}/${slug}/documents`
+  const docRows = documents.map((doc, idx) => {
+    const num = String(parts.length + idx + 1).padStart(2, '0')
+    const title = doc.title ?? doc.source.replace(/^.*\//, '')
+    const summary = doc.summary ?? ''
+    return {
+      kind: doc.kind,
+      html: trailRowHtml(
+        docsBaseHref,
+        num,
+        doc.kind,
+        title,
+        summary,
+        undefined,
+        undefined,
+        0,
+        '',
+      ),
+    }
+  })
+
+  const allRows = [...partRows, ...docRows]
+  const totalCount = allRows.length
+
+  /* Hide the kind glyph when every row is the same kind — at that
+   * point the column reads as visual noise. The class on .mdr-trail
+   * lets the CSS suppress display without re-rendering. */
+  const kinds = new Set(allRows.map(r => r.kind))
+  const mixedKinds = kinds.size > 1
+  const trailClasses =
+    'mdr-trail' + (mixedKinds ? ' mdr-trail-mixed' : ' mdr-trail-single')
+
+  /* Filter input only when the list is long enough to warrant
+   * one. Below 24 rows the user can scan; above, search earns
+   * its keep. */
+  const filterUi =
+    totalCount >= 24
+      ? `<div class="mdr-trail-toolbar">
+          <input class="mdr-trail-filter" type="search" placeholder="Filter markers…" aria-label="Filter markers" autocomplete="off" />
+          <span class="mdr-trail-count" aria-live="polite" aria-atomic="true" aria-label="Markers visible">${totalCount}</span>
+        </div>`
+      : ''
+
+  return `<section class="${trailClasses}" data-count="${totalCount}">
+      <h2>Markers</h2>
+      ${filterUi}
+      <ol class="mdr-trail-list">
+        ${allRows.map(r => r.html).join('\n        ')}
+      </ol>
+    </section>`
+}
+
+/**
+ * Resolves a link href to another document in the walkthrough.
+ * Returns undefined if the link is not a cross-document reference.
+ */
+export function resolveDocRef(
+  href: string,
+  currentDocPath: string,
+  allDocPaths: readonly string[],
+): ResolvedDocRef | undefined {
+  if (!href) {
+    return undefined
+  }
+
+  // Check if this is a link to another markdown file
+  // Supports formats like: ./other.md, other.md, ../other.md, other.md#anchor
+  let targetPath = href
+  let anchor = ''
+
+  // Extract anchor if present and slugify it so it matches the generated
+  // heading ID (e.g. "C++ Design" → "c-design", same as the heading renderer).
+  const hashIndex = href.indexOf('#')
+  if (hashIndex !== -1) {
+    targetPath = href.slice(0, hashIndex)
+    const rawAnchor = href.slice(hashIndex + 1)
+    // Only slugify if the anchor looks like a heading text; if it's already a
+    // valid slug (all lowercase word chars and hyphens) leave it as-is.
+    anchor = /^[a-z0-9-]+$/.test(rawAnchor)
+      ? rawAnchor
+      : slugifyHeading(rawAnchor)
+  }
+
+  // Must reference a markdown file
+  if (!targetPath.endsWith('.md')) {
+    return undefined
+  }
+
+  // Resolve the target path relative to the current document's directory.
+  // This handles ./, ../, and plain filenames uniformly.
+  // All doc paths use forward slashes (they come from the config JSON).
+  const currentDir = normalizePath(path.dirname(currentDocPath))
+  const base = currentDir === '.' ? targetPath : `${currentDir}/${targetPath}`
+  // Normalize away any ../ or ./ segments, keeping forward slashes
+  const resolvedTarget = normalizePath(base)
+    .split('/')
+    .reduce((acc: string[], seg) => {
+      if (seg === '..') {
+        acc.pop()
+      } else if (seg !== '.') {
+        acc.push(seg)
+      }
+      return acc
+    }, [])
+    .join('/')
+
+  // Find the target document in allDocPaths
+  for (let i = 0; i < allDocPaths.length; i++) {
+    const docPath = allDocPaths[i]!
+    // Normalize stored doc path: forward slashes, no leading ./
+    const normalizedDocPath = normalizePath(docPath).replace(/^\.\//, '')
+    if (normalizedDocPath === resolvedTarget) {
+      // Link targets this document — treat as a same-doc anchor
+      if (docPath === currentDocPath) {
+        return { docIndex: i, anchor, sameDoc: true }
+      }
+      return { docIndex: i, anchor }
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Resolve `config.layout` (plus an `auto` count threshold) to a
+ * concrete layout. 12 markers is where the card grid starts to
+ * read as a wall instead of a curated set; auto promotes to rows
+ * at that count. Documents (articles) count toward the threshold
+ * when the rows path will fold them into the same list.
+ */
+export function resolveIndexLayout(
+  layout: 'cards' | 'rows' | 'auto' | undefined,
+  markerCount: number,
+): 'cards' | 'rows' {
+  if (layout === 'cards' || layout === 'rows') {
+    return layout
+  }
+  return markerCount >= 12 ? 'rows' : 'cards'
+}
+
+export function scoreForPart(
+  part: WalkthroughPart,
+  file: string,
+  blockText: string,
+): number {
+  const lower = blockText.toLowerCase()
+  let score = 0
+  for (const keyword of part.keywords) {
+    if (lower.includes(keyword.toLowerCase())) {
+      score += 2
+    }
+    if (file.toLowerCase().includes(keyword.toLowerCase())) {
+      score += 1
+    }
+  }
+  return score
+}
+
+/**
+ * Classify a line count into a t-shirt size. Tiers are skewed
+ * low to make very-small parts stand out — most tour parts
+ * land in "medium" or "small", "x-large" is reserved for the
+ * rare sweeping part.
+ */
+export function sizeTier(
+  lines: number,
+): 'x-small' | 'small' | 'medium' | 'large' | 'x-large' {
+  if (lines <= 100) {
+    return 'x-small'
+  }
+  if (lines <= 400) {
+    return 'small'
+  }
+  if (lines <= 1000) {
+    return 'medium'
+  }
+  if (lines <= 2500) {
+    return 'large'
+  }
+  return 'x-large'
+}
+
+/* ------------------------------------------------------------------ */
+/*  Markdown document rendering                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Converts arbitrary text to a heading ID slug — the same transformation
+ * used by the heading renderer and by link anchor normalisation, so
+ * cross-reference anchors always match the generated heading IDs.
+ */
+export function slugifyHeading(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^\w]+/g, '-')
+      // Trim leading/trailing hyphens: ^-+ one or more hyphens at the
+      // start, or (|) -+$ one or more hyphens at the end.
+      .replace(/^-+|-+$/g, '')
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Annotation markdown renderer                                       */
+/* ------------------------------------------------------------------ */
+
+/* Inline <code> classifiers live in ./classifiers; these
+ * helpers wrap each kind in semantic markup so consumers can
+ * style them per-kind. Helpers return a full HTML string on
+ * match or `null` to fall through to marked's default. The
+ * codespan renderer tries them in decreasing specificity so a
+ * PURL (which could also pass isUrl broadly) is caught first. */
+
+export function span(cls: string, content: string) {
+  return `<span class="${cls}">${escapeHtml(content)}</span>`
+}
+
+/**
+ * Splits an annotation markdown string on JSDoc tag boundaries.
+ * Each returned chunk is either a tag block (`kind: 'tag'`) or
+ * preamble prose (`kind: 'prose'`). A tag block runs from its
+ * `@tag` line up to (but not including) the next `@tag` line or
+ * end-of-input, so multi-line @example bodies stay with their tag.
+ */
+export function splitAnnotationByTags(markdown: string): Array<
+  | { kind: 'prose'; text: string }
+  | {
+      kind: 'tag'
+      tag: string
+      type: string | undefined
+      body: string
+    }
+> {
+  const lines = markdown.split('\n')
+  const out: Array<
+    | { kind: 'prose'; text: string }
+    | { kind: 'tag'; tag: string; type: string | undefined; body: string }
+  > = []
+  let buffer: string[] = []
+  let currentTag:
+    | { tag: string; type: string | undefined; body: string[] }
+    | undefined = undefined
+  const flushProse = () => {
+    if (buffer.length > 0 && buffer.join('').trim() !== '') {
+      out.push({ kind: 'prose', text: buffer.join('\n') })
+    }
+    buffer = []
+  }
+  const flushTag = () => {
+    if (currentTag) {
+      out.push({
+        kind: 'tag',
+        tag: currentTag.tag,
+        type: currentTag.type,
+        body: currentTag.body.join('\n').trim(),
+      })
+      currentTag = undefined
+    }
+  }
+  for (let i = 0, { length } = lines; i < length; i += 1) {
+    const line = lines[i]!
+    // Parse a JSDoc tag line: ^@ the leading at-sign, ([A-Za-z]+)
+    // the tag name, (?:\s+(\{[^}]*\}))? an optional {type} in
+    // braces after whitespace, \s* separating space, (.*)$ the
+    // remainder of the line as the tag body.
+    const match = /^@([A-Za-z]+)(?:\s+(\{[^}]*\}))?\s*(.*)$/.exec(line.trim())
+    if (match && JSDOC_TAGS.has(match[1]!.toLowerCase())) {
+      flushProse()
+      flushTag()
+      currentTag = {
+        tag: match[1]!.toLowerCase(),
+        type: match[2] ?? undefined,
+        body: match[3] ? [match[3]] : [],
+      }
+      continue
+    }
+    if (currentTag) {
+      currentTag.body.push(line)
+    } else {
+      buffer.push(line)
+    }
+  }
+  flushProse()
+  flushTag()
+  return out
+}
+
+/* Strip the trailing " meander" so the rotator can render the
+ * prefix as plain text and the brand word as the actual link.
+ * Taglines that don't end with " meander" round-trip unchanged
+ * (consumer override) and the rotator falls back to wrapping
+ * the whole string. */
+export function splitTagline(tagline: string): {
+  prefix: string
+  isStandard: boolean
+} {
+  const m = /^(.*?)\s*meander\s*$/i.exec(tagline)
+  if (m?.[1]) {
+    return { prefix: m[1].trim(), isStandard: true }
+  }
+  return { prefix: tagline, isStandard: false }
+}
+
+export function stripMultilineCommentsPreserveLines(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, match => {
+    const newlineCount = (match.match(/\n/g) ?? []).length
+    if (newlineCount === 0) {
+      return ' '
+    }
+    return '\n'.repeat(newlineCount)
+  })
+}
+
+/**
+ * Email inside a <code> — render as a clickable mailto pill.
+ */
+export function tokenizeEmailString(text: string): string | undefined {
+  if (!isEmail(text)) {
+    return undefined
+  }
+  return `<code class="email"><a href="mailto:${escapeHtml(text)}">${escapeHtml(text)}</a></code>`
+}
+
+/**
+ * Try each tokenizer in specificity order. PURL first (most
+ * specific — scheme + structured path + optional query/frag);
+ * then email (unambiguous shape); then scoped package (leading
+ * `@` + single `/`); then URL (any scheme + `://`). First match
+ * wins; all misses return null and marked's default codespan
+ * renderer handles the span.
+ */
+export function tokenizeInlineCode(text: string): string | undefined {
+  return (
+    tokenizePurlString(text) ??
+    tokenizeEmailString(text) ??
+    tokenizeScopedPackageString(text) ??
+    tokenizeUrlString(text)
+  )
+}
+
+/**
+ * Emit a PURL as segmented spans. Reuses the compiled regex
+ * from ./classifiers so the character-class definition lives
+ * in one place. Splits path into namespace + name on the last
+ * slash.
+ */
+export function tokenizePurlString(text: string): string | undefined {
+  const match = PURL_RE.exec(text)
+  if (!match) {
+    return undefined
+  }
+  const [, scheme, type, purlPath, version, query, fragment] = match
+  // Split the PURL path on its LAST slash into namespace + name:
+  // ^\/ the leading slash, (.+) the greedy namespace (consumes
+  // through the final slash), \/ that separator, ([^/]+) the
+  // trailing name with no slashes, $ end of string.
+  const pathMatch = purlPath!.match(/^\/(.+)\/([^/]+)$/)
+  const pathHtml = pathMatch
+    ? `/${span('purl-namespace', pathMatch[1]!)}/${span('purl-name', pathMatch[2]!)}`
+    : `/${span('purl-name', purlPath!.slice(1))}`
+  return (
+    `<code class="purl">` +
+    span('purl-scheme', scheme!) +
+    span('purl-type', type!) +
+    pathHtml +
+    (version ? span('purl-version', version) : '') +
+    (query ? span('purl-query', query) : '') +
+    (fragment ? span('purl-fragment', fragment) : '') +
+    `</code>`
+  )
+}
+
+/**
+ * Scoped npm/jsr package (`@scope/name`) — two-tone chip.
+ */
+export function tokenizeScopedPackageString(text: string): string | undefined {
+  if (!isScopedPackage(text)) {
+    return undefined
+  }
+  const slash = text.indexOf('/')
+  const scope = text.slice(0, slash)
+  const name = text.slice(slash + 1)
+  return (
+    `<code class="package-scoped">` +
+    span('package-scope', scope) +
+    `/` +
+    span('package-name', name) +
+    `</code>`
+  )
+}
+
+/**
+ * Absolute URL — clickable external link inside a <code>.
+ */
+export function tokenizeUrlString(text: string): string | undefined {
+  if (!isUrl(text)) {
+    return undefined
+  }
+  return `<code class="url"><a href="${escapeHtml(text)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a></code>`
+}
+
+/**
+ * Render one trail row. `tier` may be null when sizeTiers is
+ * disabled (suppresses the trailing pill); `lines` is used only
+ * for the pill's hover title. `searchHaystack` is concatenated
+ * onto a data-attribute the filter script reads to match against
+ * keywords without re-tokenising the visible text.
+ */
+export function trailRowHtml(
+  href: string,
+  num: string,
+  kind: 'code' | 'article',
+  title: string,
+  summary: string,
+  tier: ReturnType<typeof sizeTier> | undefined,
+  lines: number | undefined,
+  sectionCount: number,
+  searchHaystack: string,
+): string {
+  const kindGlyph = kind === 'code' ? '⌘' : '❡'
+  const sizePill = tier
+    ? `<span class="mdr-trail-size mdr-trail-size-${tier}"${lines ? ` title="~${lines} lines"` : ''}>${tier}</span>`
+    : ''
+  const summaryHtml = summary
+    ? `<span class="mdr-trail-summary">${polishProse(escapeHtml(summary))}</span>`
+    : ''
+  const meta =
+    sectionCount > 0
+      ? ` <span class="mdr-trail-meta">${sectionCount} section${sectionCount === 1 ? '' : 's'}</span>`
+      : ''
+  const haystackAttr = searchHaystack
+    ? ` data-keywords="${escapeHtml(searchHaystack)}"`
+    : ''
+  return `<li class="mdr-trail-row" data-kind="${kind}"${haystackAttr}>
+          <span class="mdr-trail-num">${num}</span>
+          <span class="mdr-trail-kind" aria-label="${kind}">${kindGlyph}</span>
+          <a class="mdr-trail-link" href="${href}">
+            <span class="mdr-trail-title">${escapeHtml(title)}</span>
+            ${summaryHtml}${meta}
+          </a>
+          ${sizePill}
+        </li>`
+}
+
+export function uniqueFiles(parts: readonly WalkthroughPart[]): string[] {
+  const set = new Set<string>()
+  for (const part of parts) {
+    for (const file of part.files) {
+      set.add(file)
+    }
+  }
+  return [...set]
+}
+
+/**
+ * Wraps block-level elements in .doc-block containers with sequential
+ * data-block-id attributes.
+ */
+export function wrapBlocks(html: string): {
+  wrapped: string
+  blockCount: number
+} {
+  // Line starts with an opening HTML block tag: `<`, then one of the block
+  // elements (h1-h6, p, ul, ol, blockquote, pre, table, hr, details),
+  // followed by whitespace or `>` (so `<pre>` matches but `<param>` doesn't).
+  const BLOCK_TAGS = /^<(h[1-6]|p|ul|ol|blockquote|pre|table|hr|details)[\s>]/i
+
+  const lines = html.split('\n')
+  const result: string[] = []
+  let blockId = 0
+  let inBlock = false
+  let depth = 0
+  let currentTag = ''
+  let blockLines: string[] = []
+
+  for (let i = 0, { length } = lines; i < length; i += 1) {
+    const line = lines[i]!
+    if (!inBlock) {
+      // Check if this line starts a block element
+      const match = line.match(BLOCK_TAGS)
+      if (match) {
+        inBlock = true
+        currentTag = match[1]!.toLowerCase()
+        depth = 1
+        blockLines = [line]
+
+        // Check if this is a self-contained block on one line.
+        // For <hr> (void element) or any element whose opening line already
+        // contains the matching close tag, count open/close tag occurrences
+        // using regex — more robust than a plain string search which could
+        // match closing tags inside attribute values or text content.
+        const openPat = new RegExp(`<${currentTag}[\\s>]`, 'gi')
+        const closePat = new RegExp(`</${currentTag}>`, 'gi')
+        const opensOnLine = (line.match(openPat) || []).length
+        const closesOnLine = (line.match(closePat) || []).length
+        if (currentTag === 'hr' || closesOnLine >= opensOnLine) {
+          // Wrap the block
+          result.push(
+            `<div class="doc-block" data-block-id="${blockId}">`,
+            `<div class="doc-block-gutter"></div>`,
+            ...blockLines,
+            `</div>`,
+          )
+          blockId += 1
+          inBlock = false
+          blockLines = []
+          continue
+        }
+      } else {
+        // Not a block element, pass through
+        result.push(line)
+      }
+    } else {
+      // We're inside a block, track depth
+      blockLines.push(line)
+
+      // Count opening and closing tags for the current element
+      // Use regex to find all occurrences of the current tag
+      const openPattern = new RegExp(`<${currentTag}[\\s>]`, 'gi')
+      const closePattern = new RegExp(`</${currentTag}>`, 'gi')
+
+      const opens = (line.match(openPattern) || []).length
+      const closes = (line.match(closePattern) || []).length
+
+      // Adjust depth: add any additional opens, subtract closes
+      // Initial depth=1 already counts the opening tag that started this block
+      depth += opens
+      depth -= closes
+
+      if (depth <= 0) {
+        // Block is complete, wrap it
+        result.push(
+          `<div class="doc-block" data-block-id="${blockId}">`,
+          `<div class="doc-block-gutter"></div>`,
+          ...blockLines,
+          `</div>`,
+        )
+        blockId += 1
+        inBlock = false
+        blockLines = []
+      }
+    }
+  }
+
+  // Handle any remaining unclosed block (shouldn't happen with valid HTML)
+  if (inBlock && blockLines.length > 0) {
+    result.push(
+      `<div class="doc-block" data-block-id="${blockId}">`,
+      `<div class="doc-block-gutter"></div>`,
+      ...blockLines,
+      `</div>`,
+    )
+    blockId += 1
+  }
+
+  return { wrapped: result.join('\n'), blockCount: blockId }
 }

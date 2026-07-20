@@ -10,8 +10,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { Type, type Static } from '@sinclair/typebox'
+import { Type } from '@sinclair/typebox'
+import type { Static } from '@sinclair/typebox'
 import { Value } from '@sinclair/typebox/value'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { errorMessage } from '@socketsecurity/lib-stable/errors/message'
+
+const logger = getDefaultLogger()
 
 const ChecksumSchema = Type.Object({
   asset: Type.String({ minLength: 1 }),
@@ -75,9 +80,9 @@ if (isMain) {
   try {
     const tools = validateExternalTools(toolsPath)
     const count = Object.keys(tools).length
-    console.log(`✓ external-tools.json valid (${count} tools)`)
+    logger.log(`✓ external-tools.json valid (${count} tools)`)
   } catch (e) {
-    console.error(e instanceof Error ? e.message : String(e))
+    logger.fail(errorMessage(e))
     process.exitCode = 1
   }
 }

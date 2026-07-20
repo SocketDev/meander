@@ -28,12 +28,12 @@ threat model.
 Meander uses the token in two places, with different scope
 needs:
 
-| Command              | Scope needed                              |
-| -------------------- | ----------------------------------------- |
+| Command              | Scope needed                                |
+| -------------------- | ------------------------------------------- |
 | `meander deploy-val` | `val:write` (create/update vals + env vars) |
-| `meander publish`    | `blob:write` (upload walkthrough HTML)    |
-| `meander db key *`   | `val:write` (manage val env vars)         |
-| `meander blob key *` | `val:write` (manage val env vars)         |
+| `meander publish`    | `blob:write` (upload walkthrough HTML)      |
+| `meander db key *`   | `val:write` (manage val env vars)           |
+| `meander blob key *` | `val:write` (manage val env vars)           |
 
 For CI deploys of the comment backend (via
 `.github/workflows/valtown.yml`), scope the token to
@@ -58,16 +58,16 @@ export VALTOWN_TOKEN=vtwn_...
 The val itself reads several env vars, all set by `meander
 deploy-val` or one of the key ceremonies:
 
-| Var                            | Set by                            | Purpose                                                          |
-| ------------------------------ | --------------------------------- | ---------------------------------------------------------------- |
-| `MEANDER_JWT_SECRET`           | `deploy-val` (preserved)          | Signs session tokens. Rotation logs every user out.              |
-| `MEANDER_ADMIN_TOKEN`          | `deploy-val` (preserved)          | Authorizes `/admin/*` endpoints used by `db key` ceremonies.     |
-| `MEANDER_ALLOWED_EMAIL_DOMAINS`| `deploy-val`                      | Comma-separated allowlist for comment writes. Empty → refused.   |
-| `MEANDER_OUT_DIR`              | `deploy-val`                      | Blob-key prefix (default `pages`).                               |
-| `MEANDER_DEMO_MODE`            | `deploy-val` (`--demo-mode`)      | When `true`, writes return 403 + the UI shows a banner.          |
-| `MEANDER_DB_KEY_<n>`           | `meander db key init / rotate`    | Comment-store wrapping key, generation N. Hex-encoded.           |
-| `MEANDER_DB_KEY_CURRENT`       | `meander db key init / rotate`    | Integer pointing at the current generation.                      |
-| `MEANDER_BLOB_KEY`             | `meander blob key init / rotate`  | Blob wrapping key (only when `encryptBlobs: true`).              |
+| Var                             | Set by                           | Purpose                                                        |
+| ------------------------------- | -------------------------------- | -------------------------------------------------------------- |
+| `MEANDER_JWT_SECRET`            | `deploy-val` (preserved)         | Signs session tokens. Rotation logs every user out.            |
+| `MEANDER_ADMIN_TOKEN`           | `deploy-val` (preserved)         | Authorizes `/admin/*` endpoints used by `db key` ceremonies.   |
+| `MEANDER_ALLOWED_EMAIL_DOMAINS` | `deploy-val`                     | Comma-separated allowlist for comment writes. Empty → refused. |
+| `MEANDER_OUT_DIR`               | `deploy-val`                     | Blob-key prefix (default `pages`).                             |
+| `MEANDER_DEMO_MODE`             | `deploy-val` (`--demo-mode`)     | When `true`, writes return 403 + the UI shows a banner.        |
+| `MEANDER_DB_KEY_<n>`            | `meander db key init / rotate`   | Comment-store wrapping key, generation N. Hex-encoded.         |
+| `MEANDER_DB_KEY_CURRENT`        | `meander db key init / rotate`   | Integer pointing at the current generation.                    |
+| `MEANDER_BLOB_KEY`              | `meander blob key init / rotate` | Blob wrapping key (only when `encryptBlobs: true`).            |
 
 `deploy-val` and the key ceremonies don't overlap: deploy-val
 manages code + non-key config; the ceremonies own all key material.
@@ -96,13 +96,13 @@ can `meander publish` with envelope-encrypted blobs.
 
 ### deploy-val flags
 
-| Flag                       | Purpose                                                              |
-| -------------------------- | -------------------------------------------------------------------- |
-| `--allowed-domains=<csv>`  | Email-domain allowlist for comment writes. Empty → writes refused.   |
-| `--out-dir=<name>`         | Blob-key prefix (default `pages`). Must match what `publish` uses.   |
-| `--demo-mode`              | Deploy with the demo banner + writes returning 403. Public showcases.|
-| `--graceful`               | Skip + exit 0 instead of erroring when `VALTOWN_TOKEN` is unset.     |
-| `--token-env=<NAME>`       | Override the env-var name to read the bearer token from.             |
+| Flag                      | Purpose                                                               |
+| ------------------------- | --------------------------------------------------------------------- |
+| `--allowed-domains=<csv>` | Email-domain allowlist for comment writes. Empty → writes refused.    |
+| `--out-dir=<name>`        | Blob-key prefix (default `pages`). Must match what `publish` uses.    |
+| `--demo-mode`             | Deploy with the demo banner + writes returning 403. Public showcases. |
+| `--graceful`              | Skip + exit 0 instead of erroring when `VALTOWN_TOKEN` is unset.      |
+| `--token-env=<NAME>`      | Override the env-var name to read the bearer token from.              |
 
 ## Publish loop (Val Town blob path, optional)
 

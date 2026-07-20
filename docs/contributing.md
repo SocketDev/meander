@@ -21,13 +21,13 @@ pnpm build    # tsc emits dist/
 | Command         | What it does                                                                  |
 | --------------- | ----------------------------------------------------------------------------- |
 | `pnpm dev`      | Generate the fixture and serve it at http://127.0.0.1:8080 with file-watcher. |
-| `pnpm test`     | Run the vitest suite under `test/`.                                            |
-| `pnpm test:val` | Run the val's co-located `node:test` suite under `assets/val/lib/`.            |
-| `pnpm cover`    | vitest + type-coverage, prints a combined summary.                             |
-| `pnpm check`    | lint + type-check (what CI runs).                                              |
-| `pnpm fix`      | oxfmt + oxlint --fix; mutates files in place.                                  |
-| `pnpm clean`    | Remove `dist/`, `coverage/`, fixture emit dirs.                                |
-| `pnpm build`    | `tsc`; emits `.mjs` + `.d.mts` to `dist/`.                                      |
+| `pnpm test`     | Run the vitest suite under `test/`.                                           |
+| `pnpm test:val` | Run the val's co-located `node:test` suite under `assets/val/lib/`.           |
+| `pnpm cover`    | vitest + type-coverage, prints a combined summary.                            |
+| `pnpm check`    | lint + type-check (what CI runs).                                             |
+| `pnpm fix`      | oxfmt + oxlint --fix; mutates files in place.                                 |
+| `pnpm clean`    | Remove `dist/`, `coverage/`, fixture emit dirs.                               |
+| `pnpm build`    | `tsc`; emits `.mjs` + `.d.mts` to `dist/`.                                    |
 
 ## Tests
 
@@ -64,7 +64,7 @@ there.
 ## CI
 
 - `.github/workflows/ci.yml` — lint + type-check + smoke test
-  + full test suite with coverage.
+  - full test suite with coverage.
 - `.github/workflows/pages.yml` — builds the fixture under
   `--base-path=/meander` and deploys it to
   `https://socketdev.github.io/meander/` as a live demo.

@@ -1,13 +1,18 @@
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { httpJson } from '@socketsecurity/lib-stable/http-request'
+const logger = getDefaultLogger()
+
 ;(function () {
   'use strict'
 
   const slug = document.body.getAttribute('data-slug')
-  if (!slug) {return}
+  if (!slug) {
+    return
+  }
 
   const ns = window[Symbol.for('meander:pages')]
   const apiBase = '/' + slug + '/api/comments/unresolved'
-  let dropdown = null
-  let unresolvedCount = 0
+  let dropdown = undefined
 
   /* Resolve a part id to its human title via the body's
    * data-part-titles map (emitted by generate.mts). Falls back
@@ -27,7 +32,9 @@
     }
   })()
   function partLabel(partId) {
-    if (partId === 0) {return 'Documents'}
+    if (partId === 0) {
+      return 'Documents'
+    }
     const title = partTitlesById[String(partId)]
     return title || 'Marker ' + partId
   }
@@ -86,9 +93,10 @@
   }
 
   function updateBadge(count) {
-    unresolvedCount = count
     const badge = document.querySelector('.unresolved-badge')
-    if (!badge) {return}
+    if (!badge) {
+      return
+    }
     if (count > 0) {
       badge.textContent = count
       badge.style.display = 'inline-flex'
@@ -129,9 +137,13 @@
   }
 
   function positionDropdown() {
-    if (!dropdown) {return}
+    if (!dropdown) {
+      return
+    }
     const btn = document.querySelector('.unresolved-btn')
-    if (!btn) {return}
+    if (!btn) {
+      return
+    }
     const rect = btn.getBoundingClientRect()
     dropdown.style.position = 'fixed'
     dropdown.style.top = rect.bottom + 8 + 'px'
@@ -146,7 +158,7 @@
     if (!dropdown) {
       dropdown = createDropdown()
     }
-    if (ns && ns.popovers) {
+    if (ns?.popovers) {
       ns.popovers.openExclusive(closeDropdown)
     }
     positionDropdown()
@@ -177,7 +189,9 @@
     }
   }
 
-  if (ns && ns.popovers) {ns.popovers.register(closeDropdown)}
+  if (ns?.popovers) {
+    ns.popovers.register(closeDropdown)
+  }
 
   /* ------------------------------------------------------------------ */
   /*  API                                                                */
@@ -195,22 +209,19 @@
       '<span class="visually-hidden" role="status">Loading unresolved comments…</span>'
     empty.style.display = 'none'
 
-    fetch(apiBase, {
+    httpJson(apiBase, {
       signal:
         typeof AbortSignal !== 'undefined' &&
         typeof AbortSignal.timeout === 'function'
-          ? AbortSignal.timeout(10000)
+          ? AbortSignal.timeout(10_000)
           : undefined,
     })
-      .then(function (r) {
-        return r.json()
-      })
       .then(function (comments) {
         updateBadge(comments.length)
         renderComments(comments)
       })
       .catch(function (err) {
-        console.error('Failed to fetch unresolved comments:', err)
+        logger.fail('Failed to fetch unresolved comments:', err)
         list.innerHTML = '<div class="unresolved-error">Failed to load</div>'
       })
   }
@@ -233,7 +244,9 @@
     for (let i = 0; i < comments.length; i++) {
       const c = comments[i]
       const key = partLabel(c.part)
-      if (!grouped[key]) {grouped[key] = []}
+      if (!grouped[key]) {
+        grouped[key] = []
+      }
       grouped[key].push(c)
     }
 
@@ -319,7 +332,9 @@
   }
 
   function truncate(str, max) {
-    if (str.length <= max) {return str}
+    if (str.length <= max) {
+      return str
+    }
     return str.substring(0, max - 3) + '...'
   }
 
@@ -328,14 +343,22 @@
       const d = new Date(iso)
       const now = new Date()
       const diffMs = now - d
-      const diffMins = Math.floor(diffMs / 60000)
-      const diffHours = Math.floor(diffMs / 3600000)
-      const diffDays = Math.floor(diffMs / 86400000)
+      const diffMins = Math.floor(diffMs / 60_000)
+      const diffHours = Math.floor(diffMs / 3_600_000)
+      const diffDays = Math.floor(diffMs / 86_400_000)
 
-      if (diffMins < 1) {return 'just now'}
-      if (diffMins < 60) {return diffMins + 'm ago'}
-      if (diffHours < 24) {return diffHours + 'h ago'}
-      if (diffDays < 7) {return diffDays + 'd ago'}
+      if (diffMins < 1) {
+        return 'just now'
+      }
+      if (diffMins < 60) {
+        return diffMins + 'm ago'
+      }
+      if (diffHours < 24) {
+        return diffHours + 'h ago'
+      }
+      if (diffDays < 7) {
+        return diffDays + 'd ago'
+      }
       return d.toLocaleDateString()
     } catch (_) {
       return iso
@@ -348,7 +371,9 @@
 
   function init() {
     const topbar = document.querySelector('.topbar')
-    if (!topbar) {return}
+    if (!topbar) {
+      return
+    }
 
     let actions = topbar.querySelector('.topbar-actions')
     if (!actions) {
@@ -364,7 +389,7 @@
      * panel is created on first open, so we bind on the next
      * tick after the click handler creates it. The trigger key
      * bindings live on the button regardless. */
-    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+    if (ns?.popovers && ns.popovers.bindKeyboard) {
       const lazyBind = () => {
         if (!dropdown) {
           dropdown = createDropdown()
@@ -386,9 +411,12 @@
 
     // Hide dropdown when clicking outside
     document.addEventListener('click', function (e) {
-      if (!dropdown) {return}
-      const btn = document.querySelector('.unresolved-btn')
-      const isClickInside = dropdown.contains(e.target) || btn.contains(e.target)
+      if (!dropdown) {
+        return
+      }
+      const triggerBtn = document.querySelector('.unresolved-btn')
+      const isClickInside =
+        dropdown.contains(e.target) || triggerBtn.contains(e.target)
       if (!isClickInside) {
         closeDropdown()
       }
@@ -407,16 +435,13 @@
   }
 
   function loadUnresolved() {
-    fetch(apiBase, {
+    httpJson(apiBase, {
       signal:
         typeof AbortSignal !== 'undefined' &&
         typeof AbortSignal.timeout === 'function'
-          ? AbortSignal.timeout(10000)
+          ? AbortSignal.timeout(10_000)
           : undefined,
     })
-      .then(function (r) {
-        return r.json()
-      })
       .then(function (comments) {
         updateBadge(comments.length)
       })

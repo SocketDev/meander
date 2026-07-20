@@ -1,0 +1,176 @@
+name: 🚀 GitHub release
+
+# The wheelhouse's GitHub release IS the fleet scaffolding bundle. One
+# workflow, two jobs, routed by trigger:
+#
+#   orchestrate (workflow_dispatch) — the release orchestrator
+#   (scripts/repo/github-release.mts): gate → green → bump → tag → push.
+#   The gate (update / fix --all / check --all / cover) runs IN this job, so
+#   passing it IS the green signal — github-release.mts runs with
+#   --skip-ci-wait rather than circularly waiting on a separate ci.yml run.
+#   A dispatch is a DRY-RUN (gate + plan, no mutations) unless `release: true`;
+#   `release-as` picks the semver level. Pushing the bump commit + tag (with
+#   the release-app token) triggers ci.yml (post-hoc verification) and this
+#   same workflow's release-bundle job (the tag → GitHub Release cut).
+#
+#   release-bundle (push: v*/fleet-* tags) — builds the bundle
+#   (scripts/repo/bundle-release.mts --build-only) and cuts the immutable
+#   3-step GitHub Release via the fleet base action
+#   (.github/actions/fleet/github-release). Members CONSUME the release via
+#   scripts/fleet/fetch-fleet-bundle.mts; they never produce it. A dispatch
+#   with `bundle-dry-run: true` exercises this job without mutating.
+#
+# Wheelhouse-only — lives in the wheelhouse's own .github/workflows (NOT
+# template/base, which would cascade it to members); members get a seed-once
+# starter from template/presets/ and release whatever THEY release.
+#
+# Auth: the release GitHub App token (SOCKET_RELEASE_APP_*) is minted per-job
+# via .github/actions/fleet/github-release-app-token. In orchestrate it is
+# used two ways — the origin remote is re-pointed at it so github-release.mts
+# can push the bump commit + tag, and it is handed to the script as GH_TOKEN
+# for the `gh release ...` calls. The committer identity is resolved from the
+# token's own bot user so the bump commit is attributed to the release app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Cut the release for real (false = dry-run gate + plan, the default).'
+        type: boolean
+        default: false
+      release-as:
+        description: 'Semver bump level for the release commit.'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      bundle-dry-run:
+        description: 'Instead of the orchestrator, dry-run the bundle build + release-cut plan.'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+      - 'fleet-*'
+
+permissions:
+  contents: read
+
+# Fleet no-phone-home posture: CI runners don't source the shell-rc that dev
+# machines get from setup-security-tools, so set every FLEET_ENV knob here or
+# the telemetry-env-is-disabled + package-manager-auto-update-is-disabled gates
+# (under `check --all`, which the release orchestrator runs) fail. Lockstep
+# source: .claude/hooks/fleet/_shared/fleet-env.mts.
+env:
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  COREPACK_ENABLE_PROJECT_SPEC: '0'
+  DISABLE_TELEMETRY: '1'
+  DO_NOT_TRACK: '1'
+  LINT_MARKDOWN: '1'
+  NO_UPDATE_NOTIFIER: '1'
+
+jobs:
+  orchestrate:
+    if: github.event_name == 'workflow_dispatch' && inputs.bundle-dry-run != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # Socket Firewall + CLI auth for the sfw-wrapped setup + pnpm install —
+      # sfw and socket-cli read SOCKET_API_KEY from the org-wide secret, so the
+      # enterprise firewall is used, not sfw-free.
+      SOCKET_API_KEY: ${{ secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 (2026-06-02)
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0 (2026-04-20)
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Bootstrap pnpm (download + SRI, no corepack)
+        run: node scripts/fleet/setup/setup-tools.mjs --ci
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Mint release-app token
+        id: app-token
+        uses: ./.github/actions/fleet/github-release-app-token
+        with:
+          client-id: ${{ vars.SOCKET_RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.SOCKET_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Configure git identity + push auth
+        if: ${{ inputs.release }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.slug }}
+        run: |
+          set -euo pipefail
+          # Attribute the bump commit to the release app's bot user. An app
+          # INSTALLATION token has no user, so `gh api /user` 403s ("not
+          # accessible by integration"); build the identity from the app slug
+          # instead and resolve the bot's numeric id via a by-name lookup
+          # (`/users/<slug>[bot]`), which an installation token CAN read.
+          login="${APP_SLUG}[bot]"
+          id="$(gh api "/users/${login}" --jq '.id')"
+          git config user.name "${login}"
+          git config user.email "${id}+${login}@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Run release orchestrator
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/repo/github-release.mts --skip-ci-wait --release-as ${{ inputs.release-as }} ${{ inputs.release && '--release' || '' }}
+
+  release-bundle:
+    if: github.event_name == 'push' || inputs.bundle-dry-run == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # Socket Firewall + CLI auth for the sfw-wrapped setup + pnpm install —
+      # see the orchestrate job.
+      SOCKET_API_KEY: ${{ secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 (2026-06-02)
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0 (2026-04-20)
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Bootstrap pnpm (download + SRI, no corepack)
+        run: node scripts/fleet/setup/setup-tools.mjs --ci
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Mint release-app token
+        id: app-token
+        uses: ./.github/actions/fleet/github-release-app-token
+        with:
+          client-id: ${{ vars.SOCKET_RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.SOCKET_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Build release bundle
+        id: bundle
+        env:
+          # bundle-release.mts verifies the tag is on origin via gh api.
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/repo/bundle-release.mts --build-only
+      - name: Cut immutable GitHub release
+        uses: ./.github/actions/fleet/github-release
+        with:
+          tag: ${{ steps.bundle.outputs.tag }}
+          title: Fleet bundle ${{ steps.bundle.outputs.version }}
+          notes: Fleet scaffolding bundle for template ${{ steps.bundle.outputs.version }}.
+          assets: |
+            ${{ steps.bundle.outputs.tarball }}
+            ${{ steps.bundle.outputs.manifest }}
+          dry-run: ${{ github.event_name != 'push' && 'true' || 'false' }}
+          token: ${{ steps.app-token.outputs.token }}

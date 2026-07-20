@@ -32,7 +32,7 @@
 
   const readStored = () => {
     const v = parseFloat(storageGet(SPLIT_KEY) || '')
-    return isFinite(v) && v >= MIN && v <= MAX ? v : null
+    return isFinite(v) && v >= MIN && v <= MAX ? v : undefined
   }
   const persist = value => storageSet(SPLIT_KEY, String(value))
 
@@ -48,7 +48,7 @@
   }
 
   const storedSplit = readStored()
-  if (storedSplit !== null) {
+  if (storedSplit !== undefined) {
     applySplit(storedSplit)
   }
 
@@ -82,7 +82,7 @@
      * reads the DOM (getBoundingClientRect after a style write
      * forces synchronous layout). Writes go to rAF-coalesced
      * property sets. */
-    let dragState = null
+    let dragState = undefined
     let rafId = 0
     const flush = () => {
       rafId = 0
@@ -97,20 +97,20 @@
         handleTop,
         handleHeight,
       } = dragState
-      if (pendingClientX !== null && gridWidth > 0) {
+      if (pendingClientX !== undefined && gridWidth > 0) {
         const pct = clamp(((pendingClientX - gridLeft) / gridWidth) * 100)
         applySplit(pct)
         dragState.lastPct = pct
       }
-      if (pendingClientY !== null && handleHeight > 0) {
+      if (pendingClientY !== undefined && handleHeight > 0) {
         const y = Math.max(
           0,
           Math.min(handleHeight, pendingClientY - handleTop),
         )
         hotspot.style.transform = `translate3d(-50%, ${y}px, 0)`
       }
-      dragState.pendingClientX = null
-      dragState.pendingClientY = null
+      dragState.pendingClientX = undefined
+      dragState.pendingClientY = undefined
     }
     const scheduleFlush = () => {
       if (rafId === 0) {
@@ -130,7 +130,7 @@
         handleHeight: handleRect.height,
         pendingClientX: event.clientX,
         pendingClientY: event.clientY,
-        lastPct: null,
+        lastPct: undefined,
       }
       scheduleFlush()
       handle.classList.add('dragging')
@@ -154,7 +154,7 @@
         handle.removeEventListener('pointercancel', onEnd)
         const finalPct = dragState?.lastPct ?? readCurrent()
         handle.setAttribute('aria-valuenow', String(Math.round(finalPct)))
-        dragState = null
+        dragState = undefined
         if (rafId !== 0) {
           cancelAnimationFrame(rafId)
           rafId = 0

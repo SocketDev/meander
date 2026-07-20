@@ -1,23 +1,21 @@
 /**
- * @fileoverview Build runner: bundles the CLI via esbuild + emits
- * type declarations via tsc.
- *
- * Two outputs:
+ * @file Build runner: bundles the CLI via esbuild + emits
+ *   type declarations via tsc.
+ *   Two outputs:
  *   dist/cli.mjs      single-file bundle, consumer-install entry.
  *   dist/*.d.mts      type declarations for programmatic consumers
- *                     (`import { generate } from '@socketsecurity/meander'`).
- *
- * Types come from `tsc --emitDeclarationOnly`; the bundle itself
- * is pure JS + uses esbuild's much faster transform pipeline.
+ *   (`import { generate } from '@socketsecurity/meander'`).
+ *   Types come from `tsc --emitDeclarationOnly`; the bundle itself
+ *   is pure JS + uses esbuild's much faster transform pipeline.
  */
 
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
-import type { Logger } from '@socketsecurity/lib/logger'
-import { getDefaultLogger } from '@socketsecurity/lib/logger'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
+import type { Logger } from '@socketsecurity/lib-stable/logger/logger'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 import { build } from 'esbuild'
 
 import { buildConfig } from '../.config/esbuild.config.mjs'

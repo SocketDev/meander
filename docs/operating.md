@@ -21,7 +21,7 @@ custodian must:
    - Hardware token's secure note slot
    - Offsite backup (safety-deposit box, family member's safe)
 
-   Examples that *do not* count as independent:
+   Examples that _do not_ count as independent:
    - Multiple entries in the same password vault
    - Email + Google Drive (same account)
    - Two laptops syncing to the same iCloud / OneDrive
@@ -130,7 +130,7 @@ meander publish meander.config.json
 ```
 
 If you need to abort mid-rotation: re-run `meander blob key
-rotate` and supply the *new* shares it just printed. The current
+rotate` and supply the _new_ shares it just printed. The current
 key is whatever's last planted on the val.
 
 ## Restoration drill
@@ -241,17 +241,17 @@ it.
 
 ## When to involve which custodian
 
-| Operation                     | Threshold custodians needed |
-| ----------------------------- | --------------------------- |
-| Read comments (val running)   | 0                           |
-| Read comments (val env wiped) | `threshold` (db key restore)|
-| New comment writes            | 0                           |
-| Annual rotation               | `threshold`                 |
-| Suspected compromise rotation | `threshold`                 |
-| Add a new custodian           | `threshold` (rotate to issue new shares) |
+| Operation                     | Threshold custodians needed                     |
+| ----------------------------- | ----------------------------------------------- |
+| Read comments (val running)   | 0                                               |
+| Read comments (val env wiped) | `threshold` (db key restore)                    |
+| New comment writes            | 0                                               |
+| Annual rotation               | `threshold`                                     |
+| Suspected compromise rotation | `threshold`                                     |
+| Add a new custodian           | `threshold` (rotate to issue new shares)        |
 | Remove a custodian            | `threshold` (rotate; old shares decommissioned) |
-| Retire an old generation      | 0 (no shares — val-only)    |
-| Audit                         | 0 (no shares — val-only)    |
+| Retire an old generation      | 0 (no shares — val-only)                        |
+| Audit                         | 0 (no shares — val-only)                        |
 
 Most day-to-day operation needs zero custodian involvement.
 Custodians are only invoked for rotation, restoration, and

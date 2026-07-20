@@ -36,7 +36,7 @@ docs site build, a CI artifact upload, etc.).
 import { generate } from '@socketsecurity/meander'
 
 await generate('./meander.config.json', {
-  basePath: '/meander',  // matches your hosting prefix
+  basePath: '/meander', // matches your hosting prefix
 })
 ```
 

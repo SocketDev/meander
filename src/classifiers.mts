@@ -8,10 +8,11 @@
  * so new predicates land in a stable spot.
  *
  * Exports:
- *   - isEmail         - user@domain.tld
- *   - isPurl          - pkg:type/ns/name@ver?q#frag
- *   - isScopedPackage - @babel/core
- *   - isUrl           - scheme://host/... (absolute)
+ *
+ * - IsEmail - user@domain.tld
+ * - IsPurl - pkg:type/ns/name@ver?q#frag
+ * - IsScopedPackage - @babel/core
+ * - IsUrl - scheme://host/... (absolute)
  */
 
 /* RFC 3986 unreserved + pct-encoded + sub-delims + ":" + "@" — the
@@ -26,7 +27,7 @@ const PURL_QCHAR = "A-Za-z0-9\\-._~!$'()*+,;=:@%"
 const PURL_VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%"
 
 const PURL_PATH_SEG = `[${PCHAR}]+`
-const PURL_RE = new RegExp(
+export const PURL_RE = new RegExp(
   `^(pkg:)` +
     `([A-Za-z][A-Za-z0-9.+\\-]*)` + // type
     `((?:\\/${PURL_PATH_SEG})+)` + // path
@@ -72,8 +73,3 @@ export function isScopedPackage(text: string): boolean {
 export function isUrl(text: string): boolean {
   return URL_RE.test(text)
 }
-
-/* Internal export for tokenizer use — lets the span-emitting
- * PURL helper reuse the compiled regex's capture groups
- * instead of re-matching. Not part of the public API. */
-export const _PURL_RE = PURL_RE

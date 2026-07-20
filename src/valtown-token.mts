@@ -6,40 +6,17 @@
  * their name without renaming the underlying secret. Two ways
  * to override the default `VALTOWN_TOKEN`:
  *
- *   1. Set `MEANDER_VALTOWN_TOKEN_ENV=MY_TOKEN_NAME` in the
- *      environment. meander reads that meta-var first, then
- *      looks up the named env var for the actual token.
- *   2. Pass `--token-env MY_TOKEN_NAME` to the CLI (wired by
- *      cli.mts; this module just consumes the resolved name).
+ * 1. Set `MEANDER_VALTOWN_TOKEN_ENV=MY_TOKEN_NAME` in the environment. meander
+ *    reads that meta-var first, then looks up the named env var for the actual
+ *    token.
+ * 2. Pass `--token-env MY_TOKEN_NAME` to the CLI (wired by cli.mts; this module
+ *    just consumes the resolved name).
  *
  * Returns `null` when no token is available. Callers decide
  * whether absence is fatal (deploy-val / publish require it)
  * or graceful (CI that wants to skip comment-backend deploys
  * on fork PRs or when the secret isn't provisioned).
  */
-
-export type TokenResolution = {
-  /** Name of the env var that was read (for error messages). */
-  envName: string
-  /** The token value, or null if unset / empty. */
-  token: string | null
-}
-
-export function resolveValTownToken(
-  envName?: string | undefined,
-): TokenResolution {
-  /* If caller didn't pass an explicit name, consult the
-   * meta-var. Fall back to `VALTOWN_TOKEN` — matches the
-   * convention used by the Val Town CLI and every fleet repo
-   * before meander gained configurability. */
-  const resolvedName =
-    envName ?? process.env['MEANDER_VALTOWN_TOKEN_ENV'] ?? 'VALTOWN_TOKEN'
-  const token = process.env[resolvedName] ?? null
-  return {
-    envName: resolvedName,
-    token: token && token.length > 0 ? token : null,
-  }
-}
 
 /**
  * Format a consistent "missing token" message. Used by both the
@@ -57,4 +34,32 @@ export function missingTokenMessage(envName: string): string {
     `  • pass --token-env <your-name> to the CLI command.`,
   ]
   return lines.join('\n  ')
+}
+
+export type TokenResolution = {
+  /**
+   * Name of the env var that was read (for error messages).
+   */
+  envName: string
+  /**
+   * The token value, or null if unset / empty.
+   */
+  token: string | null
+}
+
+export function resolveValTownToken(
+  envName?: string | undefined,
+): TokenResolution {
+  /* If caller didn't pass an explicit name, consult the
+   * meta-var. Fall back to `VALTOWN_TOKEN` — matches the
+   * convention used by the Val Town CLI and every fleet repo
+   * before meander gained configurability. */
+  const resolvedName =
+    envName ?? process.env['MEANDER_VALTOWN_TOKEN_ENV'] ?? 'VALTOWN_TOKEN'
+  const token = process.env[resolvedName] ?? undefined
+  return {
+    envName: resolvedName,
+    // oxlint-disable-next-line socket/prefer-undefined-over-null -- public TokenResolution contract: `null` signals "resolved, but no token present" (distinct from an unresolved name); callers branch on `!token` and tests assert toBeNull().
+    token: token && token.length > 0 ? token : null,
+  }
 }

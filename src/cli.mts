@@ -1,4 +1,8 @@
 import { parseArgs } from 'node:util'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { errorMessage } from '@socketsecurity/lib/errors/message'
+
+const logger = getDefaultLogger()
 
 const command = process.argv[2]
 const commandArgs = process.argv.slice(3)
@@ -52,106 +56,10 @@ Environment variables:
                              docs/encryption.md for the envelope scheme.`
 
 /**
- * The Val Town flags shared by `publish` + `deploy-val`:
- *   --token-env <NAME>  env var meander reads for the Val Town bearer token
- *                       (default: $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
- *   --graceful          missing token / creds warn + exit 0 instead of
- *                       throwing. For CI workflows that should not fail when
- *                       the secret isn't provisioned (fork PRs, demo setups).
- */
-function parseValTownFlags(args: readonly string[]): {
-  tokenEnv: string | undefined
-  graceful: boolean
-} {
-  const { values } = parseArgs({
-    args: args as string[],
-    options: {
-      'token-env': { type: 'string' },
-      graceful: { type: 'boolean', default: false },
-    },
-    strict: false,
-    allowPositionals: true,
-  })
-  return {
-    tokenEnv: values['token-env'] as string | undefined,
-    graceful: values['graceful'] === true,
-  }
-}
-
-function firstPositional(args: readonly string[]): string | undefined {
-  const { positionals } = parseArgs({
-    args: args as string[],
-    strict: false,
-    allowPositionals: true,
-  })
-  return positionals[0]
-}
-
-function usage(cmd: 'generate' | 'publish' | 'serve'): string {
-  const form = '<meander.config.json>'
-  switch (cmd) {
-    case 'generate':
-      return `Usage: meander generate ${form} [--base-path <path>] [--asset-dir <dir>]`
-    case 'publish':
-      return `Usage: meander publish ${form} [--token-env <name>] [--graceful]`
-    case 'serve':
-      return `Usage: meander serve ${form} [--port N] [--base-path <path>]`
-  }
-}
-
-type CeremonyParsedArgs = {
-  valName: string
-  tokenEnv: string | undefined
-  threshold: number | undefined
-  shares: number | undefined
-  shareFiles: readonly string[]
-  generation: number | undefined
-}
-
-function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
-  const { values, positionals } = parseArgs({
-    args: rest as string[],
-    options: {
-      'token-env': { type: 'string' },
-      threshold: { type: 'string' },
-      shares: { type: 'string' },
-      'share-file': { type: 'string', multiple: true },
-      generation: { type: 'string' },
-    },
-    strict: false,
-    allowPositionals: true,
-  })
-  const out: CeremonyParsedArgs = {
-    valName: positionals[0] ?? 'walkthrough',
-    tokenEnv: undefined,
-    threshold: undefined,
-    shares: undefined,
-    shareFiles: [],
-    generation: undefined,
-  }
-  if (typeof values['token-env'] === 'string') {
-    out.tokenEnv = values['token-env']
-  }
-  if (typeof values['threshold'] === 'string') {
-    out.threshold = Number(values['threshold'])
-  }
-  if (typeof values['shares'] === 'string') {
-    out.shares = Number(values['shares'])
-  }
-  if (Array.isArray(values['share-file'])) {
-    out.shareFiles = values['share-file'] as string[]
-  }
-  if (typeof values['generation'] === 'string') {
-    out.generation = Number(values['generation'])
-  }
-  return out
-}
-
-/**
  * Resolve the val + admin token + build the production
  * CeremonyDeps. Used by both `db key` and `blob key` dispatchers.
  */
-async function buildCeremonyDeps(args: CeremonyParsedArgs) {
+export async function buildCeremonyDeps(args: CeremonyParsedArgs) {
   const { resolveValTownToken, missingTokenMessage } =
     await import('./valtown-token.mts')
   const { resolveVal } = await import('./valtown-env.mts')
@@ -175,14 +83,68 @@ async function buildCeremonyDeps(args: CeremonyParsedArgs) {
 }
 
 /**
+ * Parse + dispatch `meander blob <subcommand>`. Today only the
+ * `blob key <verb>` subtree is implemented.
+ */
+export async function dispatchBlob(args: readonly string[]): Promise<void> {
+  const sub = args[0]
+  if (sub !== 'key') {
+    logger.fail(
+      `Usage: meander blob key <init|rotate|restore|show> [val-name] [flags]`,
+    )
+    process.exitCode = 1
+    return
+  }
+  const verb = args[1]
+  if (!verb) {
+    logger.fail(
+      `Usage: meander blob key <init|rotate|restore|show> [val-name] [flags]`,
+    )
+    process.exitCode = 1
+    return
+  }
+  const parsed = parseCeremonyArgs(args.slice(2))
+  const blobKey = await import('./blob-key.mts')
+  const opts = { threshold: parsed.threshold, shares: parsed.shares }
+  switch (verb) {
+    case 'init': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyInit(opts, deps)
+      break
+    }
+    case 'rotate': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyRotate(opts, deps)
+      break
+    }
+    case 'restore': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyRestore(opts, deps)
+      break
+    }
+    case 'show': {
+      const deps = await buildCeremonyDeps(parsed)
+      await blobKey.blobKeyShow(deps)
+      break
+    }
+    default:
+      logger.fail(
+        `Unknown subcommand: meander blob key ${verb}\n` +
+          `Usage: meander blob key <init|rotate|restore|show> [val-name]`,
+      )
+      process.exitCode = 1
+  }
+}
+
+/**
  * Parse + dispatch `meander db <subcommand>`. Today only the
  * `db key <verb>` subtree is implemented; future commands like
  * `db backup` / `db restore` slot in here.
  */
-async function dispatchDb(args: readonly string[]): Promise<void> {
+export async function dispatchDb(args: readonly string[]): Promise<void> {
   const sub = args[0]
   if (sub !== 'key') {
-    console.error(
+    logger.fail(
       `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
     )
     process.exitCode = 1
@@ -190,7 +152,7 @@ async function dispatchDb(args: readonly string[]): Promise<void> {
   }
   const verb = args[1]
   if (!verb) {
-    console.error(
+    logger.fail(
       `Usage: meander db key <init|rotate|restore|audit|retire> [val-name] [flags]`,
     )
     process.exitCode = 1
@@ -230,7 +192,7 @@ async function dispatchDb(args: readonly string[]): Promise<void> {
       break
     }
     default:
-      console.error(
+      logger.fail(
         `Unknown subcommand: meander db key ${verb}\n` +
           `Usage: meander db key <init|rotate|restore|audit|retire> [val-name]`,
       )
@@ -238,57 +200,99 @@ async function dispatchDb(args: readonly string[]): Promise<void> {
   }
 }
 
+export function firstPositional(args: readonly string[]): string | undefined {
+  const { positionals } = parseArgs({
+    args: args as string[],
+    strict: false,
+    allowPositionals: true,
+  })
+  return positionals[0]
+}
+
+export type CeremonyParsedArgs = {
+  valName: string
+  tokenEnv: string | undefined
+  threshold: number | undefined
+  shares: number | undefined
+  shareFiles: readonly string[]
+  generation: number | undefined
+}
+
+export function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
+  const { values, positionals } = parseArgs({
+    args: rest as string[],
+    options: {
+      'token-env': { type: 'string' },
+      threshold: { type: 'string' },
+      shares: { type: 'string' },
+      'share-file': { type: 'string', multiple: true },
+      generation: { type: 'string' },
+    },
+    strict: false,
+    allowPositionals: true,
+  })
+  const out: CeremonyParsedArgs = {
+    valName: positionals[0] ?? 'walkthrough',
+    tokenEnv: undefined,
+    threshold: undefined,
+    shares: undefined,
+    shareFiles: [],
+    generation: undefined,
+  }
+  if (typeof values['token-env'] === 'string') {
+    out.tokenEnv = values['token-env']
+  }
+  if (typeof values['threshold'] === 'string') {
+    out.threshold = Number(values['threshold'])
+  }
+  if (typeof values['shares'] === 'string') {
+    out.shares = Number(values['shares'])
+  }
+  if (Array.isArray(values['share-file'])) {
+    out.shareFiles = values['share-file'] as string[]
+  }
+  if (typeof values['generation'] === 'string') {
+    out.generation = Number(values['generation'])
+  }
+  return out
+}
+
 /**
- * Parse + dispatch `meander blob <subcommand>`. Today only the
- * `blob key <verb>` subtree is implemented.
+ * The Val Town flags shared by `publish` + `deploy-val`:
+ * --token-env <NAME>  env var meander reads for the Val Town bearer token
+ * (default: $MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN)
+ * --graceful          missing token / creds warn + exit 0 instead of
+ * throwing. For CI workflows that should not fail when
+ * the secret isn't provisioned (fork PRs, demo setups).
  */
-async function dispatchBlob(args: readonly string[]): Promise<void> {
-  const sub = args[0]
-  if (sub !== 'key') {
-    console.error(
-      `Usage: meander blob key <init|rotate|restore|show> [val-name] [flags]`,
-    )
-    process.exitCode = 1
-    return
+export function parseValTownFlags(args: readonly string[]): {
+  tokenEnv: string | undefined
+  graceful: boolean
+} {
+  const { values } = parseArgs({
+    args: args as string[],
+    options: {
+      'token-env': { type: 'string' },
+      graceful: { type: 'boolean', default: false },
+    },
+    strict: false,
+    allowPositionals: true,
+  })
+  return {
+    tokenEnv: values['token-env'] as string | undefined,
+    graceful: values['graceful'] === true,
   }
-  const verb = args[1]
-  if (!verb) {
-    console.error(
-      `Usage: meander blob key <init|rotate|restore|show> [val-name] [flags]`,
-    )
-    process.exitCode = 1
-    return
-  }
-  const parsed = parseCeremonyArgs(args.slice(2))
-  const blobKey = await import('./blob-key.mts')
-  const opts = { threshold: parsed.threshold, shares: parsed.shares }
-  switch (verb) {
-    case 'init': {
-      const deps = await buildCeremonyDeps(parsed)
-      await blobKey.blobKeyInit(opts, deps)
-      break
-    }
-    case 'rotate': {
-      const deps = await buildCeremonyDeps(parsed)
-      await blobKey.blobKeyRotate(opts, deps)
-      break
-    }
-    case 'restore': {
-      const deps = await buildCeremonyDeps(parsed)
-      await blobKey.blobKeyRestore(opts, deps)
-      break
-    }
-    case 'show': {
-      const deps = await buildCeremonyDeps(parsed)
-      await blobKey.blobKeyShow(deps)
-      break
-    }
-    default:
-      console.error(
-        `Unknown subcommand: meander blob key ${verb}\n` +
-          `Usage: meander blob key <init|rotate|restore|show> [val-name]`,
-      )
-      process.exitCode = 1
+}
+
+export function usage(cmd: 'generate' | 'publish' | 'serve'): string {
+  const form = '<meander.config.json>'
+  switch (cmd) {
+    case 'generate':
+      return `Usage: meander generate ${form} [--base-path <path>] [--asset-dir <dir>]`
+    case 'publish':
+      return `Usage: meander publish ${form} [--token-env <name>] [--graceful]`
+    case 'serve':
+      return `Usage: meander serve ${form} [--port N] [--base-path <path>]`
   }
 }
 
@@ -310,7 +314,7 @@ async function main() {
       })
       const configPath = positionals[0]
       if (!configPath) {
-        console.error(usage('generate'))
+        logger.fail(usage('generate'))
         process.exitCode = 1
         return
       }
@@ -332,7 +336,7 @@ async function main() {
     case 'publish': {
       const configPath = firstPositional(commandArgs)
       if (!configPath) {
-        console.error(usage('publish'))
+        logger.fail(usage('publish'))
         process.exitCode = 1
         return
       }
@@ -393,7 +397,7 @@ async function main() {
       })
       const configPath = positionals[0]
       if (!configPath) {
-        console.error(usage('serve'))
+        logger.fail(usage('serve'))
         process.exitCode = 1
         return
       }
@@ -415,9 +419,10 @@ async function main() {
       break
     }
     default: {
-      console.error(HELP_TEXT)
+      logger.fail(HELP_TEXT)
       if (command) {
-        console.error(`\nUnknown command: ${command}`)
+        logger.error('')
+        logger.fail(`Unknown command: ${command}`)
       }
       process.exitCode = 1
     }
@@ -425,6 +430,6 @@ async function main() {
 }
 
 main().catch(e => {
-  console.error(e instanceof Error ? (e.stack ?? e.message) : String(e))
+  logger.fail(e instanceof Error ? errorMessage(e) : String(e))
   process.exitCode = 1
 })

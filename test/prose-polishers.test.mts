@@ -1,4 +1,6 @@
-/** @fileoverview Tests for prose-polishers.mts. */
+/**
+ * @file Tests for prose-polishers.mts.
+ */
 
 import { describe, expect, it } from 'vitest'
 

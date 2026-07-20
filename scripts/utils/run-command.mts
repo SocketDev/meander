@@ -1,16 +1,20 @@
-/** @fileoverview Utility for running shell commands with error handling. */
+/**
+ * @file Utility for running shell commands with error handling.
+ */
 
-import process from 'node:process'
-
-import type { Logger } from '@socketsecurity/lib/logger'
-import { getDefaultLogger } from '@socketsecurity/lib/logger'
+import { WIN32 } from '@socketsecurity/lib-stable/constants/platform'
+import type { Logger } from '@socketsecurity/lib-stable/logger/logger'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 import type {
   SpawnErrorWithOutputString,
   SpawnOptions,
   SpawnSyncOptions,
   SpawnSyncReturns,
-} from '@socketsecurity/lib/spawn'
-import { spawn, spawnSync } from '@socketsecurity/lib/spawn'
+} from '@socketsecurity/lib-stable/process/spawn/child'
+import {
+  spawn,
+  spawnSync,
+} from '@socketsecurity/lib-stable/process/spawn/child'
 
 const logger: Logger = getDefaultLogger()
 
@@ -23,9 +27,9 @@ export type CommandResult = {
 }
 
 export type SequenceEntry = {
-  args?: string[]
+  args?: string[] | undefined
   command: string
-  options?: CommandOptions
+  options?: CommandOptions | undefined
 }
 
 /**
@@ -39,7 +43,7 @@ export async function runCommand(
   try {
     const result = await spawn(command, args, {
       stdio: 'inherit',
-      ...(process.platform === 'win32' && { shell: true }),
+      shell: WIN32,
       ...options,
     })
     return result.code
@@ -61,7 +65,7 @@ export function runCommandSync(
 ): number {
   const result: SpawnSyncReturns<string | Buffer> = spawnSync(command, args, {
     stdio: 'inherit',
-    ...(process.platform === 'win32' && { shell: true }),
+    shell: WIN32,
     ...options,
   })
 
@@ -118,7 +122,7 @@ export async function runCommandQuiet(
   try {
     const result = await spawn(command, args, {
       ...options,
-      ...(process.platform === 'win32' && { shell: true }),
+      shell: WIN32,
       stdio: 'pipe',
       stdioString: true,
     })

@@ -8,15 +8,15 @@ have different recoverability properties.
 
 ## At a glance
 
-| Data class                          | Encrypted?                | Key                        | Rotation                              |
-| ----------------------------------- | ------------------------- | -------------------------- | ------------------------------------- |
-| Comment `body` + `author`           | Always (envelope)         | `MEANDER_DB_KEY_<n>`       | Re-wrap DEKs, atomic generation flip  |
-| Comment metadata (id, file, lines)  | No (indexable plaintext)  | —                          | —                                     |
-| Walkthrough HTML in Val Town blobs  | Opt-in (`encryptBlobs`)   | `MEANDER_BLOB_KEY`         | Re-publish under a fresh key          |
-| Walkthrough HTML on GitHub Pages    | No (Pages-gated access)   | —                          | —                                     |
-| `meander.css`, `manifest.json`      | No                        | —                          | —                                     |
-| Magic-code hashes                   | One-way SHA-256           | (salted by email)          | One-shot, ten-minute expiry           |
-| Session JWTs                        | Signed (HS256), not encrypted | `MEANDER_JWT_SECRET`   | Rotation logs every user out          |
+| Data class                         | Encrypted?                    | Key                  | Rotation                             |
+| ---------------------------------- | ----------------------------- | -------------------- | ------------------------------------ |
+| Comment `body` + `author`          | Always (envelope)             | `MEANDER_DB_KEY_<n>` | Re-wrap DEKs, atomic generation flip |
+| Comment metadata (id, file, lines) | No (indexable plaintext)      | —                    | —                                    |
+| Walkthrough HTML in Val Town blobs | Opt-in (`encryptBlobs`)       | `MEANDER_BLOB_KEY`   | Re-publish under a fresh key         |
+| Walkthrough HTML on GitHub Pages   | No (Pages-gated access)       | —                    | —                                    |
+| `meander.css`, `manifest.json`     | No                            | —                    | —                                    |
+| Magic-code hashes                  | One-way SHA-256               | (salted by email)    | One-shot, ten-minute expiry          |
+| Session JWTs                       | Signed (HS256), not encrypted | `MEANDER_JWT_SECRET` | Rotation logs every user out         |
 
 ## Threat model
 
@@ -29,7 +29,7 @@ What the encryption defends against:
   with platform-level access reads stored data. Same defense:
   ciphertext only, until they also obtain the val's env.
 
-What it does *not* defend against:
+What it does _not_ defend against:
 
 - **Live val compromise**: an attacker with code execution inside
   the running val sees plaintext (the val must decrypt to serve).
@@ -51,7 +51,7 @@ Both encryption stories use the same construction:
 
 This is the standard NIST envelope pattern, also known as
 "key-encryption keys + data-encryption keys" (KEK/DEK in
-cryptographic literature; we call it *wrapping key* + *data key*
+cryptographic literature; we call it _wrapping key_ + _data key_
 because the term "KEK" carries unfortunate cultural baggage). The
 benefit is that rotating the wrapping key only requires re-wrapping
 the (small) DEKs — comment ciphertext is never decrypted in a
@@ -88,13 +88,13 @@ them has been re-wrapped (rotation) and the generation is retired.
 
 The lifecycle commands are under `meander db key`:
 
-| Command                 | Effect                                                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `meander db key init`   | First-time setup. Generates `MEANDER_DB_KEY_1`, plants `MEANDER_DB_KEY_CURRENT=1`, prints Shamir shares.         |
-| `meander db key rotate` | Reconstructs the current key from shares, mints `MEANDER_DB_KEY_<N+1>`, drives `/admin/rewrap` to re-wrap every row, atomically flips `MEANDER_DB_KEY_CURRENT`, prints new shares. |
-| `meander db key restore`| Reassembles a wrapping key from shares + plants it on the val. Used after env-var loss.                         |
-| `meander db key audit`  | Prints visible generations, the current pointer, and per-generation row counts.                                 |
-| `meander db key retire <N>` | Removes `MEANDER_DB_KEY_<N>` from env. Pre-flights audit; refuses if any rows still reference generation N. |
+| Command                     | Effect                                                                                                                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meander db key init`       | First-time setup. Generates `MEANDER_DB_KEY_1`, plants `MEANDER_DB_KEY_CURRENT=1`, prints Shamir shares.                                                                           |
+| `meander db key rotate`     | Reconstructs the current key from shares, mints `MEANDER_DB_KEY_<N+1>`, drives `/admin/rewrap` to re-wrap every row, atomically flips `MEANDER_DB_KEY_CURRENT`, prints new shares. |
+| `meander db key restore`    | Reassembles a wrapping key from shares + plants it on the val. Used after env-var loss.                                                                                            |
+| `meander db key audit`      | Prints visible generations, the current pointer, and per-generation row counts.                                                                                                    |
+| `meander db key retire <N>` | Removes `MEANDER_DB_KEY_<N>` from env. Pre-flights audit; refuses if any rows still reference generation N.                                                                        |
 
 The wrapping key never leaves the val after `init`. The operator's
 machine doesn't hold it; only the custodians' shares do.
@@ -129,12 +129,12 @@ the val needs it to serve, the publisher needs it to encrypt.
 
 The lifecycle commands are under `meander blob key`:
 
-| Command                  | Effect                                                                                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `meander blob key init`    | First-time setup. Generates `MEANDER_BLOB_KEY`, plants it on the val, prints Shamir shares + a shell snippet.       |
+| Command                    | Effect                                                                                                                                                                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meander blob key init`    | First-time setup. Generates `MEANDER_BLOB_KEY`, plants it on the val, prints Shamir shares + a shell snippet.                                                                                                                |
 | `meander blob key rotate`  | Reconstructs the current key from shares, mints a new key, plants it on the val, prints new shares + a shell snippet for the operator's local env. After rotation, re-publish (existing blobs become unreadable until then). |
-| `meander blob key restore` | Reassembles `MEANDER_BLOB_KEY` from shares + plants it on the val. Used after env-var loss.                         |
-| `meander blob key show`    | Prints the val's current `MEANDER_BLOB_KEY` in hex. Bare output (pipe to `pbcopy` / a password manager).             |
+| `meander blob key restore` | Reassembles `MEANDER_BLOB_KEY` from shares + plants it on the val. Used after env-var loss.                                                                                                                                  |
+| `meander blob key show`    | Prints the val's current `MEANDER_BLOB_KEY` in hex. Bare output (pipe to `pbcopy` / a password manager).                                                                                                                     |
 
 There's no rewrap dance for blobs because blobs are regenerable
 from source. Rotation = re-publish, which the CLI prompts
@@ -173,7 +173,7 @@ What share-loss tolerance buys you:
 - A `T-of-S` split tolerates losing `S - T` shares.
 
 What it costs: every share you add is one more place that can
-*leak*. Custodian count should match real custodian independence —
+_leak_. Custodian count should match real custodian independence —
 five entries in the same password manager is one custodian, not
 five.
 

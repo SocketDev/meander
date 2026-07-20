@@ -1,11 +1,11 @@
 ;(function () {
   'use strict'
 
-  let anchor = null // { table, row, lineNum }
+  let anchor = undefined // { table, row, lineNum }
   let currentSelection = [] // array of <tr> elements
 
   // Expose selection state and API for comment-client.js
-  window.walkthroughSelection = null
+  window.walkthroughSelection = undefined
   window.walkthroughSelectRange = function (table, fromLine, toLine) {
     selectRange(table, fromLine, toLine)
   }
@@ -27,7 +27,7 @@
       currentSelection[i].classList.remove('selected')
     }
     currentSelection = []
-    window.walkthroughSelection = null
+    window.walkthroughSelection = undefined
     document.dispatchEvent(new CustomEvent('walkthroughselectionchange'))
   }
 
@@ -40,7 +40,9 @@
 
     for (let i = 0; i < rows.length; i++) {
       const numCell = rows[i].querySelector('.line-num')
-      if (!numCell) {continue}
+      if (!numCell) {
+        continue
+      }
       const num = getLineNum(numCell)
       if (num >= lo && num <= hi) {
         rows[i].classList.add('selected')
@@ -63,23 +65,32 @@
     const lines = lo === hi ? 'L' + lo : 'L' + lo + '-L' + hi
     const hash = '#' + file + ':' + lines
     if (history.replaceState) {
-      history.replaceState(null, '', hash)
+      history.replaceState(undefined, '', hash)
     }
   }
 
   // Match #<encoded-filepath>:L28 or #<encoded-filepath>:L28-L35
   function parseHash() {
     const hash = window.location.hash
-    if (!hash) {return null}
+    if (!hash) {
+      return undefined
+    }
 
     const colonIdx = hash.lastIndexOf(':')
-    if (colonIdx < 1) {return null}
+    if (colonIdx < 1) {
+      return undefined
+    }
 
     const filePart = decodeURIComponent(hash.substring(1, colonIdx))
     const linesPart = hash.substring(colonIdx + 1)
 
+    // ^L anchors start with literal "L"; (\d+) captures the start line number;
+    // (?:-L(\d+))? optionally captures an end line number after "-L"; $ anchors end.
+    // Matches "L28" (single line) or "L28-L35" (range).
     const match = linesPart.match(/^L(\d+)(?:-L(\d+))?$/)
-    if (!match) {return null}
+    if (!match) {
+      return undefined
+    }
 
     const from = parseInt(match[1], 10)
     const to = match[2] ? parseInt(match[2], 10) : from
@@ -105,12 +116,14 @@
         }
       }
     }
-    return null
+    return undefined
   }
 
   document.addEventListener('click', function (e) {
     // Ignore clicks on comment indicators
-    if (e.target.closest('.comment-indicator')) {return}
+    if (e.target.closest('.comment-indicator')) {
+      return
+    }
 
     const td = e.target.closest('.line-num')
 
@@ -126,10 +139,10 @@
         !e.target.closest('.comment-card')
       ) {
         clearSelection()
-        anchor = null
+        anchor = undefined
         if (history.replaceState) {
           history.replaceState(
-            null,
+            undefined,
             '',
             window.location.pathname + window.location.search,
           )
@@ -140,10 +153,14 @@
 
     const tr = td.closest('tr')
     const table = td.closest('.code-table')
-    if (!tr || !table) {return}
+    if (!tr || !table) {
+      return
+    }
 
     const lineNum = getLineNum(td)
-    if (!lineNum) {return}
+    if (!lineNum) {
+      return
+    }
 
     if (e.shiftKey && anchor && anchor.table === table) {
       // Shift+click: extend range from anchor
@@ -169,10 +186,14 @@
   // On page load, apply selection from URL hash
   function applyHashSelection() {
     const range = parseHash()
-    if (!range) {return}
+    if (!range) {
+      return
+    }
 
     const table = findTableForFileAndLine(range.file, range.from)
-    if (!table) {return}
+    if (!table) {
+      return
+    }
 
     selectRange(table, range.from, range.to)
 
@@ -196,7 +217,7 @@
 
   window.addEventListener('hashchange', function () {
     clearSelection()
-    anchor = null
+    anchor = undefined
     applyHashSelection()
   })
 })()

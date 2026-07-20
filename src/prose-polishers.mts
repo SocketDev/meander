@@ -3,138 +3,24 @@
  * make rendered annotation + document HTML read better without
  * touching source content:
  *
- *   - highlightProseNumbers: wrap digit tokens in <span class="mdr-num">
- *   - italicizeParentheticals: wrap `(aside)` in <em>
- *   - anchorifyHeadings: give h2/h3/h4 an id + trailing `#` permalink
- *   - enhanceRepoTrees: mark ASCII directory-tree code blocks for
- *     CSS styling (dim the drawing glyphs, skip hljs)
- *   - stripFurtherReading: drop "<h2>Further reading</h2>" plus
- *     every sibling until the next h2
+ * - HighlightProseNumbers: wrap digit tokens in <span class="mdr-num">
+ * - ItalicizeParentheticals: wrap `(aside)` in <em>
+ * - AnchorifyHeadings: give h2/h3/h4 an id + trailing `#` permalink
+ * - EnhanceRepoTrees: mark ASCII directory-tree code blocks for CSS styling (dim
+ *   the drawing glyphs, skip hljs)
+ * - StripFurtherReading: drop "<h2>Further reading</h2>" plus every sibling until
+ *   the next h2
  *
  * All functions consume an HTML string and return an HTML string.
  * Safe to call multiple times; each is idempotent (second call is
  * a no-op on already-transformed content).
  */
-import { HTMLElement, parse as parseHtml } from 'node-html-parser'
-
-/**
- * Highlight numeric tokens in prose so counts + version numbers
- * pop in accent color. Touches text inside paragraphs, list items,
- * table cells, blockquotes, and h1-h4; skips code/pre/a/kbd/samp.
- *
- * Matches: version numbers (1.2.3, 11.0.0-rc.0), percentages (95%),
- * "23+", simple counts (42), optional ≥/≤/~ prefix. Skips digits
- * inside HTML numeric entities and bold list markers like `**1.**`.
- */
-export function highlightProseNumbers(html: string): string {
-  const root = parseHtml(html)
-  const allowed = new Set([
-    'P',
-    'LI',
-    'TD',
-    'TH',
-    'BLOCKQUOTE',
-    'DD',
-    'DT',
-    'H1',
-    'H2',
-    'H3',
-    'H4',
-  ])
-  const skip = new Set(['CODE', 'PRE', 'A', 'KBD', 'SAMP'])
-  const pattern =
-    /(?<!&#)(?<!&#x)(?<![\w.-])([≥≤~]?\s?\d+(?:\.\d+)+(?:-[a-z]+(?:\.\d+)*)?[+%]?|[≥≤~]?\s?\d+[+%]?)(?![\w-])(?!\.\s|\.\d)/gi
-  const walk = (node: HTMLElement): void => {
-    if (skip.has(node.tagName)) {
-      return
-    }
-    const tag = node.tagName
-    /* Inside <strong> at the start of an <li>, the number is a
-     * manually-bolded list marker ("**1.** Branch"). Don't
-     * re-colorize. */
-    const parent = node.parentNode as HTMLElement | null
-    const isLiStartMarker =
-      tag === 'STRONG' &&
-      parent?.tagName === 'LI' &&
-      parent.firstElementChild === node &&
-      /^\d+\./.test(node.text.trim())
-    if (isLiStartMarker) {
-      return
-    }
-    const children = [...node.childNodes]
-    for (const child of children) {
-      const any = child as unknown as { nodeType: number; rawText?: string }
-      if (any.nodeType === 3) {
-        if (!allowed.has(tag)) {
-          continue
-        }
-        const text: string = any.rawText ?? ''
-        if (!pattern.test(text)) {
-          continue
-        }
-        pattern.lastIndex = 0
-        any.rawText = text.replace(pattern, '<span class="mdr-num">$1</span>')
-      } else if (any.nodeType === 1) {
-        walk(child as HTMLElement)
-      }
-    }
-  }
-  walk(root as unknown as HTMLElement)
-  return root.toString()
-}
-
-/**
- * Wrap parenthetical asides in prose with <em> so "(extra info)"
- * reads as a quiet aside. Only touches text inside paragraphs,
- * list items, table cells, and blockquotes; leaves <code>, <pre>,
- * headings, and their descendants alone.
- *
- * Matches `(…)` with 2+ chars inside and no parens/tags/quotes,
- * so nested or complex expressions fall through untouched.
- */
-export function italicizeParentheticals(html: string): string {
-  const root = parseHtml(html)
-  const allowed = new Set(['P', 'LI', 'TD', 'TH', 'BLOCKQUOTE', 'DD', 'DT'])
-  const walk = (node: HTMLElement): void => {
-    const tag = node.tagName
-    if (
-      tag === 'CODE' ||
-      tag === 'PRE' ||
-      tag === 'KBD' ||
-      tag === 'SAMP' ||
-      tag === 'A'
-    ) {
-      return
-    }
-    for (const child of node.childNodes) {
-      const any = child as unknown as { nodeType: number; rawText?: string }
-      if (any.nodeType === 3) {
-        if (!allowed.has(tag)) {
-          continue
-        }
-        const text: string = any.rawText ?? ''
-        if (!/\([^()<>"'`]{2,}\)/.test(text)) {
-          continue
-        }
-        const rewritten = text.replace(
-          /\(([^()<>"'`]{2,})\)/g,
-          (_, inner) => `(<em>${inner}</em>)`,
-        )
-        if (rewritten !== text) {
-          any.rawText = rewritten
-        }
-      } else if (any.nodeType === 1) {
-        walk(child as HTMLElement)
-      }
-    }
-  }
-  walk(root as unknown as HTMLElement)
-  return root.toString()
-}
+import type { HTMLElement } from 'node-html-parser'
+import { parse as parseHtml } from 'node-html-parser'
 
 /**
  * Give every heading (h2-h4) in rendered doc HTML an id slug
- * + a trailing `<a class="mdr-heading-anchor">#</a>` so readers
+ * \+ a trailing `<a class="mdr-heading-anchor">#</a>` so readers
  * can copy a deep-link to the section. h1 is skipped — it's the
  * page title and the URL itself already anchors it.
  *
@@ -239,6 +125,142 @@ export function enhanceRepoTrees(html: string): string {
 }
 
 /**
+ * Highlight numeric tokens in prose so counts + version numbers
+ * pop in accent color. Touches text inside paragraphs, list items,
+ * table cells, blockquotes, and h1-h4; skips code/pre/a/kbd/samp.
+ *
+ * Matches: version numbers (1.2.3, 11.0.0-rc.0), percentages (95%),
+ * "23+", simple counts (42), optional ≥/≤/~ prefix. Skips digits
+ * inside HTML numeric entities and bold list markers like `**1.**`.
+ */
+export function highlightProseNumbers(html: string): string {
+  const root = parseHtml(html)
+  const allowed = new Set([
+    'BLOCKQUOTE',
+    'DD',
+    'DT',
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+    'LI',
+    'P',
+    'TD',
+    'TH',
+  ])
+  const skip = new Set(['A', 'CODE', 'KBD', 'PRE', 'SAMP'])
+  const pattern =
+    /(?<!&#)(?<!&#x)(?<![\w.-])([≥≤~]?\s?\d+(?:\.\d+)+(?:-[a-z]+(?:\.\d+)*)?[+%]?|[≥≤~]?\s?\d+[+%]?)(?![\w-])(?!\.\d|\.\s)/gi
+  const walk = (node: HTMLElement): void => {
+    if (skip.has(node.tagName)) {
+      return
+    }
+    const tag = node.tagName
+    /* Inside <strong> at the start of an <li>, the number is a
+     * manually-bolded list marker ("**1.** Branch"). Don't
+     * re-colorize. */
+    const parent = node.parentNode as HTMLElement | null
+    const isLiStartMarker =
+      tag === 'STRONG' &&
+      parent?.tagName === 'LI' &&
+      parent.firstElementChild === node &&
+      /^\d+\./.test(node.text.trim())
+    if (isLiStartMarker) {
+      return
+    }
+    const children = [...node.childNodes]
+    for (let i = 0, { length } = children; i < length; i += 1) {
+      const child = children[i]!
+      const any = child as unknown as {
+        nodeType: number
+        rawText?: string | undefined
+      }
+      if (any.nodeType === 3) {
+        if (!allowed.has(tag)) {
+          continue
+        }
+        const text: string = any.rawText ?? ''
+        if (!pattern.test(text)) {
+          continue
+        }
+        pattern.lastIndex = 0
+        any.rawText = text.replace(pattern, '<span class="mdr-num">$1</span>')
+      } else if (any.nodeType === 1) {
+        walk(child as HTMLElement)
+      }
+    }
+  }
+  walk(root as unknown as HTMLElement)
+  return root.toString()
+}
+
+/**
+ * Wrap parenthetical asides in prose with <em> so "(extra info)"
+ * reads as a quiet aside. Only touches text inside paragraphs,
+ * list items, table cells, and blockquotes; leaves <code>, <pre>,
+ * headings, and their descendants alone.
+ *
+ * Matches `(…)` with 2+ chars inside and no parens/tags/quotes,
+ * so nested or complex expressions fall through untouched.
+ */
+export function italicizeParentheticals(html: string): string {
+  const root = parseHtml(html)
+  const allowed = new Set(['BLOCKQUOTE', 'DD', 'DT', 'LI', 'P', 'TD', 'TH'])
+  const walk = (node: HTMLElement): void => {
+    const tag = node.tagName
+    if (
+      tag === 'A' ||
+      tag === 'CODE' ||
+      tag === 'KBD' ||
+      tag === 'PRE' ||
+      tag === 'SAMP'
+    ) {
+      return
+    }
+    for (const child of node.childNodes) {
+      const any = child as unknown as {
+        nodeType: number
+        rawText?: string | undefined
+      }
+      if (any.nodeType === 3) {
+        if (!allowed.has(tag)) {
+          continue
+        }
+        const text: string = any.rawText ?? ''
+        if (!/\([^()<>"'`]{2,}\)/.test(text)) {
+          continue
+        }
+        const rewritten = text.replace(
+          /\(([^()<>"'`]{2,})\)/g,
+          (_, inner) => `(<em>${inner}</em>)`,
+        )
+        if (rewritten !== text) {
+          any.rawText = rewritten
+        }
+      } else if (any.nodeType === 1) {
+        walk(child as HTMLElement)
+      }
+    }
+  }
+  walk(root as unknown as HTMLElement)
+  return root.toString()
+}
+
+/**
+ * Run the full default stack in the canonical order. Consumers
+ * who only want a subset should call the individual functions.
+ */
+export function polishProse(html: string): string {
+  let out = html
+  out = stripFurtherReading(out)
+  out = enhanceRepoTrees(out)
+  out = anchorifyHeadings(out)
+  out = highlightProseNumbers(out)
+  out = italicizeParentheticals(out)
+  return out
+}
+
+/**
  * Remove any `<h2>Further reading</h2>` section from a rendered
  * doc. README-style docs often close with a cross-reference list
  * that makes sense in a git repo but becomes dead links in a
@@ -275,23 +297,10 @@ export function stripFurtherReading(html: string): string {
       }
       toRemove.push(c)
     }
-    for (const n of toRemove) {
-      ;(n as { remove?: () => void }).remove?.()
+    for (let i = 0, { length } = toRemove; i < length; i += 1) {
+      const n = toRemove[i]!
+      ;(n as { remove?: (() => void) | undefined }).remove?.()
     }
   }
   return root.toString()
-}
-
-/**
- * Run the full default stack in the canonical order. Consumers
- * who only want a subset should call the individual functions.
- */
-export function polishProse(html: string): string {
-  let out = html
-  out = stripFurtherReading(out)
-  out = enhanceRepoTrees(out)
-  out = anchorifyHeadings(out)
-  out = highlightProseNumbers(out)
-  out = italicizeParentheticals(out)
-  return out
 }

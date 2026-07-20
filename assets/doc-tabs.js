@@ -3,7 +3,9 @@
 
   // Guard: only run on documents page
   const pageType = document.body.getAttribute('data-page-type')
-  if (pageType !== 'documents') {return}
+  if (pageType !== 'documents') {
+    return
+  }
 
   /* ------------------------------------------------------------------ */
   /*  Tab Switching                                                      */
@@ -26,7 +28,11 @@
       if (pane) {
         const filePath = pane.getAttribute('data-doc-file')
         if (filePath && history.replaceState) {
-          history.replaceState(null, '', '#' + encodeURIComponent(filePath))
+          history.replaceState(
+            undefined,
+            '',
+            '#' + encodeURIComponent(filePath),
+          )
         }
       }
     }
@@ -53,7 +59,9 @@
   // #<encoded-file-path>:B<n>-B<m>         - tab + block range selection
   function parseHash() {
     let hash = window.location.hash
-    if (!hash || hash.length < 2) {return null}
+    if (!hash || hash.length < 2) {
+      return undefined
+    }
 
     // Remove leading #
     hash = hash.substring(1)
@@ -76,8 +84,8 @@
     // Decode the file path
     try {
       filePath = decodeURIComponent(filePath)
-    } catch (e) {
-      return null
+    } catch (_e) {
+      return undefined
     }
 
     return { filePath: filePath, anchor: anchor }
@@ -109,7 +117,9 @@
   }
 
   function scrollToTarget(anchor) {
-    if (!anchor) {return}
+    if (!anchor) {
+      return
+    }
 
     // Check if it's a heading ID (not starting with B)
     if (!anchor.startsWith('B')) {
@@ -139,10 +149,14 @@
 
   function applyHash() {
     const parsed = parseHash()
-    if (!parsed) {return}
+    if (!parsed) {
+      return
+    }
 
     const index = findTabIndexByFilePath(parsed.filePath)
-    if (index < 0) {return}
+    if (index < 0) {
+      return
+    }
 
     // Switch to the tab without updating hash (we're reading from hash)
     switchToTab(index, false)
@@ -163,7 +177,9 @@
   // Tab button click handler
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.doc-tab-btn')
-    if (!btn) {return}
+    if (!btn) {
+      return
+    }
 
     const index = parseInt(btn.getAttribute('data-doc-index'), 10)
     if (!isNaN(index)) {
@@ -175,7 +191,9 @@
   // Cross-reference link click handler
   document.addEventListener('click', function (e) {
     const link = e.target.closest('[data-doc-ref]')
-    if (!link) {return}
+    if (!link) {
+      return
+    }
 
     const index = parseInt(link.getAttribute('data-doc-ref'), 10)
     const anchor = link.getAttribute('data-doc-anchor') || ''
@@ -194,7 +212,7 @@
             hash += ':' + anchor
           }
           if (history.pushState) {
-            history.pushState(null, '', hash)
+            history.pushState(undefined, '', hash)
           }
         }
       }

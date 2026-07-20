@@ -2,13 +2,15 @@
   'use strict'
 
   // Only activate on the documents page
-  if (document.body.getAttribute('data-page-type') !== 'documents') {return}
+  if (document.body.getAttribute('data-page-type') !== 'documents') {
+    return
+  }
 
-  let anchor = null // { pane, blockId }
+  let anchor = undefined // { pane, blockId }
   let currentSelection = [] // array of .doc-block elements
 
   // Expose selection state and API for comment-client.js
-  window.walkthroughSelection = null
+  window.walkthroughSelection = undefined
   window.walkthroughSelectRange = function (pane, fromBlock, toBlock) {
     selectBlockRange(
       pane,
@@ -23,7 +25,7 @@
       currentSelection[i].classList.remove('block-selected')
     }
     currentSelection = []
-    window.walkthroughSelection = null
+    window.walkthroughSelection = undefined
     document.dispatchEvent(new CustomEvent('walkthroughselectionchange'))
   }
 
@@ -53,25 +55,35 @@
 
   function updateHash(file, lo, hi) {
     let hash = '#' + encodeURIComponent(file) + ':B' + lo
-    if (lo !== hi) {hash += '-B' + hi}
+    if (lo !== hi) {
+      hash += '-B' + hi
+    }
     if (history.replaceState) {
-      history.replaceState(null, '', hash)
+      history.replaceState(undefined, '', hash)
     }
   }
 
   // Match #<encoded-filepath>:B28 or #<encoded-filepath>:B28-B35
   function parseHash() {
     const hash = window.location.hash
-    if (!hash) {return null}
+    if (!hash) {
+      return undefined
+    }
 
     const colonIdx = hash.lastIndexOf(':')
-    if (colonIdx < 1) {return null}
+    if (colonIdx < 1) {
+      return undefined
+    }
 
     const filePart = decodeURIComponent(hash.substring(1, colonIdx))
     const blocksPart = hash.substring(colonIdx + 1)
 
+    // ^B(\d+) — literal "B" then one or more digits (start block number)
+    // (?:-B(\d+))?$ — optionally a hyphen, "B", and more digits (end block number)
     const match = blocksPart.match(/^B(\d+)(?:-B(\d+))?$/)
-    if (!match) {return null}
+    if (!match) {
+      return undefined
+    }
 
     const from = parseInt(match[1], 10)
     const to = match[2] ? parseInt(match[2], 10) : from
@@ -82,7 +94,7 @@
     const panes = document.querySelectorAll(
       '.doc-tab-pane[data-doc-file="' + CSS.escape(filePath) + '"]',
     )
-    return panes.length > 0 ? panes[0] : null
+    return panes.length > 0 ? panes[0] : undefined
   }
 
   document.addEventListener('click', function (e) {
@@ -93,8 +105,9 @@
       e.target.closest('.comment-card') ||
       e.target.closest('.doc-comment-container') ||
       e.target.closest('.comment-indicator')
-    )
-      {return}
+    ) {
+      return
+    }
 
     let block = e.target.closest('.doc-block')
     const gutter = e.target.closest('.doc-block-gutter')
@@ -103,10 +116,10 @@
       // Click outside blocks — clear selection
       if (currentSelection.length > 0) {
         clearSelection()
-        anchor = null
+        anchor = undefined
         if (history.replaceState) {
           history.replaceState(
-            null,
+            undefined,
             '',
             window.location.pathname + window.location.search,
           )
@@ -118,10 +131,14 @@
     if (gutter) {
       block = gutter.closest('.doc-block')
     }
-    if (!block) {return}
+    if (!block) {
+      return
+    }
 
     const pane = block.closest('.doc-tab-pane')
-    if (!pane) {return}
+    if (!pane) {
+      return
+    }
 
     const blockId = parseInt(block.getAttribute('data-block-id'), 10)
     const file = pane.getAttribute('data-doc-file')
@@ -150,10 +167,14 @@
   // On page load, apply selection from URL hash
   function applyHashSelection() {
     const range = parseHash()
-    if (!range) {return}
+    if (!range) {
+      return
+    }
 
     const pane = findPaneForFile(range.file)
-    if (!pane) {return}
+    if (!pane) {
+      return
+    }
 
     // Ensure the pane is visible (switch tabs if necessary).
     // Use the public API from doc-tabs.js to avoid double scroll/hash handling.
@@ -189,7 +210,7 @@
 
   window.addEventListener('hashchange', function () {
     clearSelection()
-    anchor = null
+    anchor = undefined
     applyHashSelection()
   })
 })()

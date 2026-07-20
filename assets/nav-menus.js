@@ -109,7 +109,8 @@
     }
 
     const setActive = id => {
-      for (const panel of panels) {
+      for (let i = 0, { length } = panels; i < length; i += 1) {
+        const panel = panels[i]
         for (const link of panel.querySelectorAll('a.active')) {
           link.classList.remove('active')
         }
@@ -123,7 +124,7 @@
 
     const visible = new Set()
     const pickTopmost = () => {
-      let best = null
+      let best = undefined
       let bestTop = Infinity
       for (const block of visible) {
         const top = block.getBoundingClientRect().top
@@ -142,7 +143,7 @@
           }
         }
       }
-      setActive(best?.id ?? null)
+      setActive(best?.id ?? undefined)
     }
 
     const io = new IntersectionObserver(
@@ -159,7 +160,8 @@
       { rootMargin: '-20% 0px -70% 0px', threshold: 0 },
     )
 
-    for (const block of blocks) {
+    for (let i = 0, { length } = blocks; i < length; i += 1) {
+      const block = blocks[i]
       io.observe(block)
     }
   }
@@ -207,7 +209,7 @@
 
     const visibleCards = new Set()
     const pickCurrentFor = panel => {
-      let best = null
+      let best = undefined
       let bestTop = Infinity
       for (const card of visibleCards) {
         if (!panel.closest('.file-block')?.contains(card)) {
@@ -232,7 +234,7 @@
           }
         }
       }
-      setActive(panel, best?.id ?? null)
+      setActive(panel, best?.id ?? undefined)
     }
 
     const io = new IntersectionObserver(

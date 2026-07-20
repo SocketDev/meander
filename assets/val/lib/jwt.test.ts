@@ -1,5 +1,5 @@
 /**
- * @fileoverview Tests for assets/val/lib/jwt.ts.
+ * @file Tests for assets/val/lib/jwt.ts.
  */
 
 import { strict as assert } from 'node:assert'

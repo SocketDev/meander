@@ -1,20 +1,16 @@
 /**
- * @fileoverview In-memory fakes for the ceremony injection seam.
+ * @file In-memory fakes for the ceremony injection seam.
+ *   Each ceremony function takes a `CeremonyDeps` struct (see
+ *   src/ceremony-deps.mts). Production wires the struct to real
+ *   fetch / readline / crypto; tests build fakes:
  *
- * Each ceremony function takes a `CeremonyDeps` struct (see
- * src/ceremony-deps.mts). Production wires the struct to real
- * fetch / readline / crypto; tests build fakes:
- *
- *   - `FakeEnv` — Map-backed env-var store. Supports the same four
- *     verbs the production EnvClient does. Tests inspect the
- *     internal map between calls.
- *   - `FakeAdmin` — scripted responses for keyAudit + rewrap, plus
- *     hooks for tests that want to model row state evolving across
- *     calls.
- *   - `FakeIo` — pre-loaded share queue + captured stdout array.
- *
- * The factory `makeDeps()` returns all three plus a deterministic
- * randomWrappingKey, ready to pass to a ceremony function.
+ *   - `FakeEnv` — Map-backed env-var store. Supports the same four verbs the
+ *     production EnvClient does. Tests inspect the internal map between calls.
+ *   - `FakeAdmin` — scripted responses for keyAudit + rewrap, plus hooks for
+ *     tests that want to model row state evolving across calls.
+ *   - `FakeIo` — pre-loaded share queue + captured stdout array. The factory
+ *     `makeDeps()` returns all three plus a deterministic randomWrappingKey,
+ *     ready to pass to a ceremony function.
  */
 
 import type {
@@ -65,9 +61,9 @@ export class FakeEnv implements EnvClient {
 
 /**
  * Scripted admin client. Tests configure either:
- *   - a fixed `keyAudit` response, OR
- *   - a function that recomputes the response on each call (so
- *     simulated row-counts can change as rewrap progresses)
+ * - a fixed `keyAudit` response, OR
+ * - a function that recomputes the response on each call (so
+ * simulated row-counts can change as rewrap progresses)
  * Same for `rewrap` — fixed response or a closure.
  */
 export class FakeAdmin implements AdminClient {
@@ -77,16 +73,15 @@ export class FakeAdmin implements AdminClient {
   readonly rewrapCalls: RewrapRequest[] = []
 
   constructor(
-    audit:
-      | (() => KeyAuditResponse)
-      | KeyAuditResponse = {
+    audit: (() => KeyAuditResponse) | KeyAuditResponse = {
       visibleGenerations: [1],
       currentGeneration: 1,
       rowCounts: {},
     },
-    rewrapImpl:
-      | ((req: RewrapRequest) => RewrapResponse)
-      | RewrapResponse = { rewrapped: 0, remaining: 0 },
+    rewrapImpl: ((req: RewrapRequest) => RewrapResponse) | RewrapResponse = {
+      rewrapped: 0,
+      remaining: 0,
+    },
   ) {
     this.audit = audit
     this.rewrapImpl = rewrapImpl
@@ -128,7 +123,9 @@ export class FakeIo implements IoChannel {
     this.output.push(line)
   }
 
-  /** Convenience — returns the captured output as a single string. */
+  /**
+   * Convenience — returns the captured output as a single string.
+   */
   text(): string {
     return this.output.join('\n')
   }
@@ -156,8 +153,10 @@ export function deterministicRandom(seed = 1): () => Buffer {
   }
 }
 
-/** Return a fixed key — useful when a test wants the same Buffer
- *  on every randomWrappingKey() call. */
+/**
+ * Return a fixed key — useful when a test wants the same Buffer
+ * on every randomWrappingKey() call.
+ */
 export function fixedKey(byte: number): () => Buffer {
   return () => Buffer.alloc(32, byte)
 }
@@ -172,13 +171,18 @@ export type FakeBundle = CeremonyDeps & {
   io: FakeIo
 }
 
-export function makeDeps(opts: {
-  envInitial?: Record<string, string>
-  shares?: readonly string[]
-  audit?: (() => KeyAuditResponse) | KeyAuditResponse
-  rewrap?: ((req: RewrapRequest) => RewrapResponse) | RewrapResponse
-  randomWrappingKey?: () => Buffer
-} = {}): FakeBundle {
+export function makeDeps(
+  opts: {
+    envInitial?: Record<string, string> | undefined
+    shares?: readonly string[] | undefined
+    audit?: (() => KeyAuditResponse) | KeyAuditResponse | undefined
+    rewrap?:
+      | ((req: RewrapRequest) => RewrapResponse)
+      | RewrapResponse
+      | undefined
+    randomWrappingKey?: (() => Buffer) | undefined
+  } = {},
+): FakeBundle {
   const env = new FakeEnv(opts.envInitial)
   const admin = new FakeAdmin(opts.audit, opts.rewrap)
   const io = new FakeIo(opts.shares ?? [])

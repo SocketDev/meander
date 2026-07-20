@@ -14,7 +14,8 @@
  *
  * Idempotent — running the pass twice is a no-op.
  */
-import { HTMLElement, parse as parseHtml } from 'node-html-parser'
+import type { HTMLElement } from 'node-html-parser'
+import { parse as parseHtml } from 'node-html-parser'
 
 export function applyBasePathToHtml(html: string, basePath: string): string {
   if (!basePath) {

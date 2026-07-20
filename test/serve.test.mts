@@ -1,16 +1,20 @@
-/** @fileoverview Tests for serve.mts — routeToFile, escapeRegex, MIME, readWalkthroughMeta, serve(). */
+/**
+ * @file Tests for serve.mts — routeToFile, escapeRegex, MIME,
+ *   readWalkthroughMeta, serve().
+ */
 
 import type { Server } from 'node:http'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
-  MIME,
   escapeRegex,
+  MIME,
   readWalkthroughMeta,
   routeToFile,
   serve,
@@ -21,60 +25,74 @@ describe('routeToFile', () => {
   const partIds = new Set([1, 2, 5])
 
   it('maps / and /:slug to index.html', () => {
-    expect(routeToFile(slug, '/', partIds, false)).toBe('index.html')
-    expect(routeToFile(slug, '', partIds, false)).toBe('index.html')
-    expect(routeToFile(slug, `/${slug}`, partIds, false)).toBe('index.html')
+    expect(routeToFile(slug, '/', partIds, { hasDocuments: false })).toBe(
+      'index.html',
+    )
+    expect(routeToFile(slug, '', partIds, { hasDocuments: false })).toBe(
+      'index.html',
+    )
+    expect(
+      routeToFile(slug, `/${slug}`, partIds, { hasDocuments: false }),
+    ).toBe('index.html')
   })
 
   it('maps /:slug/part/:n → part-<n>.html when the part exists', () => {
-    expect(routeToFile(slug, `/${slug}/part/1`, partIds, false)).toBe(
-      'part-1.html',
-    )
-    expect(routeToFile(slug, `/${slug}/part/5`, partIds, false)).toBe(
-      'part-5.html',
-    )
+    expect(
+      routeToFile(slug, `/${slug}/part/1`, partIds, { hasDocuments: false }),
+    ).toBe('part-1.html')
+    expect(
+      routeToFile(slug, `/${slug}/part/5`, partIds, { hasDocuments: false }),
+    ).toBe('part-5.html')
   })
 
   it('returns undefined for an unknown part id', () => {
     expect(
-      routeToFile(slug, `/${slug}/part/999`, partIds, false),
+      routeToFile(slug, `/${slug}/part/999`, partIds, { hasDocuments: false }),
     ).toBeUndefined()
   })
 
   it('maps /:slug/documents → documents.html only when documents exist', () => {
-    expect(routeToFile(slug, `/${slug}/documents`, partIds, true)).toBe(
-      'documents.html',
-    )
+    expect(
+      routeToFile(slug, `/${slug}/documents`, partIds, { hasDocuments: true }),
+    ).toBe('documents.html')
     /* When documents are absent, the route-through treats it as
      * an asset path. Not an error — the asset handler then 404s. */
-    const fallback = routeToFile(slug, `/${slug}/documents`, partIds, false)
+    const fallback = routeToFile(slug, `/${slug}/documents`, partIds, {
+      hasDocuments: false,
+    })
     expect(fallback).toBe('documents')
   })
 
   it('strips :slug prefix from asset-shaped requests', () => {
-    expect(routeToFile(slug, `/${slug}/meander.css`, partIds, false)).toBe(
-      'meander.css',
-    )
-    expect(routeToFile(slug, '/meander.css', partIds, false)).toBe(
-      'meander.css',
-    )
+    expect(
+      routeToFile(slug, `/${slug}/meander.css`, partIds, {
+        hasDocuments: false,
+      }),
+    ).toBe('meander.css')
+    expect(
+      routeToFile(slug, '/meander.css', partIds, { hasDocuments: false }),
+    ).toBe('meander.css')
   })
 
   it('preserves nested asset subpaths', () => {
-    expect(routeToFile(slug, `/${slug}/assets/foo.js`, partIds, false)).toBe(
-      'assets/foo.js',
-    )
+    expect(
+      routeToFile(slug, `/${slug}/assets/foo.js`, partIds, {
+        hasDocuments: false,
+      }),
+    ).toBe('assets/foo.js')
   })
 
   it('strips trailing slashes before routing', () => {
-    expect(routeToFile(slug, `/${slug}/`, partIds, false)).toBe('index.html')
+    expect(
+      routeToFile(slug, `/${slug}/`, partIds, { hasDocuments: false }),
+    ).toBe('index.html')
   })
 
   it('handles slugs with regex-special characters via escapeRegex', () => {
     const slug2 = 'slug.v2+rc'
-    expect(routeToFile(slug2, `/${slug2}/part/1`, partIds, false)).toBe(
-      'part-1.html',
-    )
+    expect(
+      routeToFile(slug2, `/${slug2}/part/1`, partIds, { hasDocuments: false }),
+    ).toBe('part-1.html')
   })
 })
 
@@ -124,7 +142,7 @@ describe('readWalkthroughMeta', () => {
     )
     const meta = await readWalkthroughMeta(tmpDir)
     expect(meta.slug).toBe('demo')
-    expect([...meta.partIds].sort()).toEqual([1, 3])
+    expect([...meta.partIds].toSorted()).toEqual([1, 3])
     expect(meta.hasDocuments).toBe(true)
   })
 
@@ -134,7 +152,7 @@ describe('readWalkthroughMeta', () => {
     writeFileSync(path.join(tmpDir, 'unrelated.txt'), '', 'utf-8')
     const meta = await readWalkthroughMeta(tmpDir)
     expect(meta.slug).toBe('')
-    expect([...meta.partIds].sort()).toEqual([1, 7])
+    expect([...meta.partIds].toSorted()).toEqual([1, 7])
     expect(meta.hasDocuments).toBe(false)
   })
 
@@ -147,7 +165,7 @@ describe('readWalkthroughMeta', () => {
 
 describe('serve (HTTP handler)', () => {
   let tmpDir: string
-  let server: Server | null = null
+  let server: Server | undefined = undefined
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-serve-'))
@@ -200,12 +218,14 @@ describe('serve (HTTP handler)', () => {
   afterEach(async () => {
     if (server) {
       await new Promise<void>(resolve => server!.close(() => resolve()))
-      server = null
+      server = undefined
     }
     await safeDelete(tmpDir, { recursive: true, force: true })
   })
 
-  async function start(options: { basePath?: string } = {}): Promise<{
+  async function start(
+    options: { basePath?: string | undefined } = {},
+  ): Promise<{
     baseUrl: string
   }> {
     const configPath = path.join(tmpDir, 'meander.config.json')
@@ -222,48 +242,48 @@ describe('serve (HTTP handler)', () => {
 
   it('serves index.html at /', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/`)
+    const res = await httpRequest(`${baseUrl}/`)
     expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toMatch(/text\/html/)
+    expect(res.headers['content-type']).toMatch(/text\/html/)
     expect(await res.text()).toContain('<title>index</title>')
   })
 
   it('routes /:slug/part/:n to part-<n>.html', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/demo/part/1`)
+    const res = await httpRequest(`${baseUrl}/demo/part/1`)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('<title>p1</title>')
   })
 
   it('serves documents.html at /:slug/documents', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/demo/documents`)
+    const res = await httpRequest(`${baseUrl}/demo/documents`)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('<title>docs</title>')
   })
 
   it('returns 404 for an unknown part id', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/demo/part/99`)
+    const res = await httpRequest(`${baseUrl}/demo/part/99`)
     expect(res.status).toBe(404)
   })
 
   it('serves assets with the right content-type', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/meander.css`)
+    const res = await httpRequest(`${baseUrl}/meander.css`)
     expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toMatch(/text\/css/)
+    expect(res.headers['content-type']).toMatch(/text\/css/)
   })
 
   it('honors basePath prefix for /prefix/ and /prefix/<slug>/part/<n>', async () => {
     const { baseUrl } = await start({ basePath: '/prefix' })
     /* Trailing-slash form hits the `startsWith(basePath + '/')`
      * strip branch. */
-    const rootRes = await fetch(`${baseUrl}/`)
+    const rootRes = await httpRequest(`${baseUrl}/`)
     expect(rootRes.status).toBe(200)
     expect(await rootRes.text()).toContain('<title>index</title>')
     /* Real prefix stripping — request a part under the prefix. */
-    const partRes = await fetch(`${baseUrl}/demo/part/1`)
+    const partRes = await httpRequest(`${baseUrl}/demo/part/1`)
     expect(partRes.status).toBe(200)
     expect(await partRes.text()).toContain('<title>p1</title>')
   })
@@ -274,14 +294,14 @@ describe('serve (HTTP handler)', () => {
      * directly (no trailing slash). fetch() follows redirects
      * but we're not redirecting — the handler rewrites decoded
      * to `/` and serves index.html. */
-    const res = await fetch(baseUrl)
+    const res = await httpRequest(baseUrl)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('<title>index</title>')
   })
 
   it('returns 404 for missing files', async () => {
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/nonexistent.txt`)
+    const res = await httpRequest(`${baseUrl}/nonexistent.txt`)
     expect(res.status).toBe(404)
   })
 
@@ -289,14 +309,14 @@ describe('serve (HTTP handler)', () => {
     const { baseUrl } = await start()
     /* `%` without a valid hex pair makes decodeURIComponent
      * throw; serve() should catch it and return 400. */
-    const res = await fetch(`${baseUrl}/bad%`)
+    const res = await httpRequest(`${baseUrl}/bad%`)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 for path-traversal attempts', async () => {
     const { baseUrl } = await start()
     /* Using raw TCP request because fetch normalizes `..` */
-    const res = await fetch(`${baseUrl}/demo/%2e%2e/etc/passwd`)
+    const res = await httpRequest(`${baseUrl}/demo/%2e%2e/etc/passwd`)
     /* Either 400 (traversal guard rejected) or 404 (resolved
      * path wasn't found after normalization). Both are safe —
      * we must not 200 with arbitrary file content. */
@@ -310,9 +330,9 @@ describe('serve (HTTP handler)', () => {
       'utf-8',
     )
     const { baseUrl } = await start()
-    const res = await fetch(`${baseUrl}/data.bin`)
+    const res = await httpRequest(`${baseUrl}/data.bin`)
     expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toBe('application/octet-stream')
+    expect(res.headers['content-type']).toBe('application/octet-stream')
   })
 
   it('returns 404 when the target resolves to a directory', async () => {
@@ -322,14 +342,14 @@ describe('serve (HTTP handler)', () => {
      * To trigger the directory branch: request the pages dir
      * itself via `/pages` (routes through as an asset ref). */
     mkdirSync(path.join(tmpDir, 'pages', 'adir'), { recursive: true })
-    const res = await fetch(`${baseUrl}/adir`)
+    const res = await httpRequest(`${baseUrl}/adir`)
     expect(res.status).toBe(404)
   })
 })
 
 describe('serve (config + fallback resolution)', () => {
   let tmpDir: string
-  let server: Server | null = null
+  let server: Server | undefined = undefined
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-serve-resolve-'))
@@ -338,7 +358,7 @@ describe('serve (config + fallback resolution)', () => {
   afterEach(async () => {
     if (server) {
       await new Promise<void>(resolve => server!.close(() => resolve()))
-      server = null
+      server = undefined
     }
     await safeDelete(tmpDir, { recursive: true, force: true })
   })
@@ -376,7 +396,7 @@ describe('serve (config + fallback resolution)', () => {
       throw new Error('serve() returned undefined')
     }
     server = result.server
-    const res = await fetch(result.url)
+    const res = await httpRequest(result.url)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('custom')
   })
@@ -436,7 +456,7 @@ describe('serve (config + fallback resolution)', () => {
       throw new Error('serve() returned undefined')
     }
     server = result.server
-    const res = await fetch(result.url)
+    const res = await httpRequest(result.url)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('default')
   })

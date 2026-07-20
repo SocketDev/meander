@@ -1,11 +1,10 @@
 /**
  * Build-time minification passes.
  *
- *   - `minifyEmittedHtml(html, options)` — walk every inline
- *     <script> body through esbuild, every inline <svg> through
- *     SVGO. Returns the transformed HTML string.
- *   - `minifyAsset(bytes, kind)` — minify a standalone JS or
- *     CSS file's contents. Used for meander.css + sw.js.
+ * - `minifyEmittedHtml(html, options)` — walk every inline
+ *
+ *   <script> body through esbuild, every inline <svg> through
+ *   SVGO. Returns the transformed HTML string.
  *
  * All passes are best-effort: a single malformed asset (rare
  * SVGO parser choke, invalid JS in a consumer-provided snippet)
@@ -19,7 +18,11 @@
  * dep; `esbuild` is a meander devDep that consumers add to
  * their own project if they want JS/CSS minification.
  */
-import { HTMLElement, parse as parseHtml } from 'node-html-parser'
+import type { HTMLElement } from 'node-html-parser'
+import { parse as parseHtml } from 'node-html-parser'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+
+const logger = getDefaultLogger()
 
 export type MinifyHtmlOptions = {
   js?: boolean | undefined
@@ -28,11 +31,11 @@ export type MinifyHtmlOptions = {
 
 /**
  * SVGO config — preset-default with two overrides off:
- *   - cleanupIds: mermaid uses IDs for edge-to-node linking;
- *     collapsing them breaks arrows.
- *   - removeUnknownsAndDefaults: mermaid emits attributes the
- *     default list wants to strip (preserveAspectRatio variants)
- *     that browsers read.
+ * - cleanupIds: mermaid uses IDs for edge-to-node linking;
+ * collapsing them breaks arrows.
+ * - removeUnknownsAndDefaults: mermaid emits attributes the
+ * default list wants to strip (preserveAspectRatio variants)
+ * that browsers read.
  */
 const svgoConfig = {
   multipass: true,
@@ -47,6 +50,36 @@ const svgoConfig = {
       },
     },
   ],
+}
+
+export type MinifyAssetOptions = {
+  kind: 'js' | 'css'
+}
+
+/**
+ * Minify a standalone JS or CSS source string via esbuild.
+ * Used for the external meander.css and sw.js. Returns
+ * the original string on failure so callers don't ship an
+ * empty/broken asset.
+ */
+export async function minifyAsset(
+  code: string,
+  options: MinifyAssetOptions,
+): Promise<string> {
+  const { kind } = { __proto__: null, ...options } as MinifyAssetOptions
+  try {
+    const { transform } = await import('esbuild')
+    const out = await transform(code, {
+      loader: kind,
+      minify: true,
+      target: 'es2022',
+      legalComments: 'none',
+    })
+    return out.code
+  } catch (e) {
+    logger.fail(`[minify] ${kind} minify failed:`, (e as Error)?.message ?? e)
+    return code
+  }
 }
 
 export async function minifyEmittedHtml(
@@ -65,16 +98,13 @@ export async function minifyEmittedHtml(
   let changed = false
 
   if (js) {
-    let esbuildMod: typeof import('esbuild') | null = null
-    try {
-      esbuildMod = await import('esbuild')
-      /* v8 ignore start -- optional-dep absence; esbuild is a meander devDep so this branch never fires in tests. */
-    } catch {
-      /* esbuild isn't installed — skip the JS pass rather than
-       * erroring. Consumers enable minify.js by installing it
-       * alongside mermaid + puppeteer. */
-    }
-    /* v8 ignore stop */
+    /* esbuild isn't installed — skip the JS pass rather than
+     * erroring. Consumers enable minify.js by installing it
+     * alongside mermaid + puppeteer. */
+    const esbuildMod = await import('esbuild').catch(
+      /* v8 ignore next -- optional-dep absence; esbuild is a meander devDep so this branch never fires in tests. */
+      () => undefined,
+    )
     if (esbuildMod) {
       const { transform } = esbuildMod
       const scripts = root.querySelectorAll('script')
@@ -103,7 +133,7 @@ export async function minifyEmittedHtml(
       )
       for (const [i, r] of results.entries()) {
         if (r.status !== 'fulfilled') {
-          console.error(
+          logger.fail(
             '[minify] inline <script> failed:',
             (r.reason as Error)?.message ?? r.reason,
           )
@@ -120,15 +150,12 @@ export async function minifyEmittedHtml(
   }
 
   if (svg) {
-    let svgoMod: typeof import('svgo') | null = null
-    try {
-      svgoMod = await import('svgo')
-      /* v8 ignore start -- optional-dep absence; svgo is a direct dep here so this branch never fires in tests. */
-    } catch {
-      /* svgo isn't installed — skip the SVG pass rather than
-       * erroring. Consumers who want it install it as a peer. */
-    }
-    /* v8 ignore stop */
+    /* svgo isn't installed — skip the SVG pass rather than
+     * erroring. Consumers who want it install it as a peer. */
+    const svgoMod = await import('svgo').catch(
+      /* v8 ignore next -- optional-dep absence; svgo is a direct dep here so this branch never fires in tests. */
+      () => undefined,
+    )
     if (svgoMod) {
       const svgs = root.querySelectorAll('svg')
       for (const el of svgs) {
@@ -153,34 +180,4 @@ export async function minifyEmittedHtml(
   }
 
   return changed ? root.toString() : html
-}
-
-export type MinifyAssetOptions = {
-  kind: 'js' | 'css'
-}
-
-/**
- * Minify a standalone JS or CSS source string via esbuild.
- * Used for the external meander.css and sw.js. Returns
- * the original string on failure so callers don't ship an
- * empty/broken asset.
- */
-export async function minifyAsset(
-  code: string,
-  options: MinifyAssetOptions,
-): Promise<string> {
-  const { kind } = { __proto__: null, ...options } as MinifyAssetOptions
-  try {
-    const { transform } = await import('esbuild')
-    const out = await transform(code, {
-      loader: kind,
-      minify: true,
-      target: 'es2022',
-      legalComments: 'none',
-    })
-    return out.code
-  } catch (e) {
-    console.error(`[minify] ${kind} minify failed:`, (e as Error)?.message ?? e)
-    return code
-  }
 }

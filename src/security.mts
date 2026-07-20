@@ -1,24 +1,125 @@
 /**
  * Build-time security hardening utilities:
  *
- *   - computeIntegrity(bytes) → sha512 SRI hash string
- *   - sriForUrl(url, options) → hash for a CDN URL, disk-cached
- *   - injectSriIntegrity(html, options) → rewrite <script src> /
- *     <link rel=stylesheet|preload|modulepreload> with
- *     integrity="..." attributes
- *   - buildCspMeta(html, options) → <meta http-equiv="Content-
- *     Security-Policy"> tag with per-inline-script/style hashes
- *     plus allow-listed origins
+ * - ComputeIntegrity(bytes) → sha512 SRI hash string
+ * - SriForUrl(url, options) → hash for a CDN URL, disk-cached
+ * - InjectSriIntegrity(html, options) → rewrite <script src> /
+ *
+ *   <link rel=stylesheet|preload|modulepreload> with
+ *   integrity="..." attributes
+ * - BuildCspMeta(html, options) → <meta http-equiv="Content- Security-Policy">
+ *   tag with per-inline-script/style hashes plus allow-listed origins
  *
  * All functions are idempotent — tags that already carry
  * `integrity=` or pages that already have a CSP meta are left
  * alone.
  */
-import { hash as cryptoHash } from 'node:crypto'
+import crypto from 'node:crypto'
 import { existsSync, promises as fs } from 'node:fs'
 import path from 'node:path'
 
-import { HTMLElement, parse as parseHtml } from 'node-html-parser'
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
+import type { HTMLElement } from 'node-html-parser'
+import { parse as parseHtml } from 'node-html-parser'
+import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
+
+export type BuildCspOptions = {
+  /**
+   * Origins the page connects to via fetch/XHR beyond its own.
+   * Added to `connect-src`. Example: a comment-backend URL.
+   */
+  connectSrc?: readonly string[] | undefined
+  /**
+   * Origins that serve scripts/styles via CDN URLs. Added to
+   * both `script-src` and `style-src`. Default:
+   * `["https://unpkg.com"]`.
+   */
+  cdnHosts?: readonly string[] | undefined
+}
+
+/**
+ * Build a tight Content-Security-Policy meta tag for the HTML,
+ * by hashing every inline `<script>` and `<style>` body so no
+ * `'unsafe-inline'` is needed. Returns the CSP content string
+ * (not the full tag).
+ *
+ * Directives:
+ * default-src          'self'
+ * script-src           'self' + cdn + inline hashes
+ * style-src            'self' + cdn + inline style hashes
+ * connect-src          'self' + consumer's connectSrc
+ * img-src              'self' data:
+ * font-src             'self'
+ * worker-src           'self'
+ * base-uri, form-action 'self'
+ * frame-ancestors      'none' (clickjacking)
+ */
+export function buildCspContent(
+  html: string,
+  options: BuildCspOptions = { __proto__: null } as BuildCspOptions,
+): string {
+  const { connectSrc = [], cdnHosts = ['https://unpkg.com'] } = {
+    __proto__: null,
+    ...options,
+  } as BuildCspOptions
+
+  const root = parseHtml(html)
+
+  const inlineScriptHashes = new Set<string>()
+  for (const s of root.querySelectorAll('script')) {
+    if (s.getAttribute('src')) {
+      continue
+    }
+    const body = s.text ?? ''
+    if (!body) {
+      continue
+    }
+    inlineScriptHashes.add(`'sha256-${crypto.hash('sha256', body, 'base64')}'`)
+  }
+
+  const inlineStyleHashes = new Set<string>()
+  for (const s of root.querySelectorAll('style')) {
+    const body = s.text ?? ''
+    if (!body) {
+      continue
+    }
+    inlineStyleHashes.add(`'sha256-${crypto.hash('sha256', body, 'base64')}'`)
+  }
+  /* style="..." attributes each need their own sha256 hash. */
+  for (const el of root.querySelectorAll('[style]')) {
+    const style = el.getAttribute('style')
+    if (!style) {
+      continue
+    }
+    inlineStyleHashes.add(`'sha256-${crypto.hash('sha256', style, 'base64')}'`)
+  }
+
+  const scriptSrc = [
+    "'self'",
+    ...cdnHosts,
+    ...[...inlineScriptHashes].toSorted(),
+  ].join(' ')
+  const styleSrc = [
+    "'self'",
+    ...cdnHosts,
+    ...[...inlineStyleHashes].toSorted(),
+    "'unsafe-hashes'",
+  ].join(' ')
+  const connect = ["'self'", ...connectSrc].join(' ')
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    `style-src ${styleSrc}`,
+    `connect-src ${connect}`,
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "worker-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ')
+}
 
 /**
  * SRI-format sha512 hash string for raw bytes:
@@ -26,44 +127,33 @@ import { HTMLElement, parse as parseHtml } from 'node-html-parser'
  * `<link integrity>` attributes.
  */
 export function computeIntegrity(bytes: Uint8Array): string {
-  return `sha512-${cryptoHash('sha512', bytes, 'base64')}`
-}
-
-export type SriForUrlOptions = {
-  cacheDir?: string | undefined
+  return `sha512-${crypto.hash('sha512', bytes, 'base64')}`
 }
 
 /**
- * Fetch a remote resource and compute its SRI hash. Result is
- * cached to disk when `cacheDir` is provided so subsequent
- * builds don't re-fetch. Cache key is the URL (base64url
- * encoded).
+ * Inject a `<meta http-equiv="Content-Security-Policy">` tag
+ * into `<head>`. Idempotent — a page that already has a CSP
+ * meta is returned unchanged.
  */
-export async function sriForUrl(
-  url: string,
-  options: SriForUrlOptions = { __proto__: null } as SriForUrlOptions,
-): Promise<string> {
-  const { cacheDir } = { __proto__: null, ...options } as SriForUrlOptions
-  if (cacheDir) {
-    const key = Buffer.from(url).toString('base64url')
-    const cachePath = path.join(cacheDir, `${key}.txt`)
-    if (existsSync(cachePath)) {
-      return (await fs.readFile(cachePath, 'utf8')).trim()
-    }
-    const res = await fetch(url)
-    if (!res.ok) {
-      throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
-    }
-    const integrity = computeIntegrity(new Uint8Array(await res.arrayBuffer()))
-    await fs.mkdir(cacheDir, { recursive: true })
-    await fs.writeFile(cachePath, integrity + '\n')
-    return integrity
+export function injectCspMeta(
+  html: string,
+  options: BuildCspOptions = { __proto__: null } as BuildCspOptions,
+): string {
+  const root = parseHtml(html)
+  const head = root.querySelector('head')
+  if (!head) {
+    return html
   }
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
+  const existing = head.querySelector(
+    'meta[http-equiv="Content-Security-Policy"]',
+  )
+  if (existing) {
+    return html
   }
-  return computeIntegrity(new Uint8Array(await res.arrayBuffer()))
+  const content = buildCspContent(html, options)
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${content.replace(/"/g, '&quot;')}">`
+  head.insertAdjacentHTML('afterbegin', tag)
+  return root.toString()
 }
 
 export type InjectSriOptions = {
@@ -99,11 +189,11 @@ export type InjectSriOptions = {
  * `integrity="sha512-..."`. Returns the transformed HTML string.
  *
  * Sources it handles:
- *   - `https://<allowlisted-host>/...` → fetched + (optionally)
- *     disk-cached, tagged with `crossorigin="anonymous"`.
- *   - `/foo.js` (root-relative) → read from `localDir`.
- *   - `{basePath}/foo.js` → basePath stripped, then read from
- *     `localDir`.
+ *
+ * - `https://<allowlisted-host>/...` → fetched + (optionally) disk-cached, tagged
+ *   with `crossorigin="anonymous"`.
+ * - `/foo.js` (root-relative) → read from `localDir`.
+ * - `{basePath}/foo.js` → basePath stripped, then read from `localDir`.
  *
  * Tags that already carry `integrity=` are left alone.
  * `<link rel=icon>` / `<link rel=apple-touch-icon>` are skipped
@@ -136,11 +226,11 @@ export async function injectSriIntegrity(
     }
   }
 
-  const resolveIntegrity = async (ref: string): Promise<string | null> => {
+  const resolveIntegrity = async (ref: string): Promise<string | undefined> => {
     if (integrityByRef.has(ref)) {
-      return integrityByRef.get(ref) || null
+      return integrityByRef.get(ref) || undefined
     }
-    let integrity: string | null = null
+    let integrity: string | undefined = undefined
     if (isRemote(ref)) {
       integrity = await sriForUrl(ref, { cacheDir })
     } else if (ref.startsWith('/') && localDir) {
@@ -157,24 +247,26 @@ export async function injectSriIntegrity(
     return integrity
   }
 
-  const getRef = (el: HTMLElement): string | null => {
+  const getRef = (el: HTMLElement): string | undefined => {
     const tag = el.rawTagName.toLowerCase()
     if (tag === 'script') {
       const src = el.getAttribute('src')
       if (!src) {
-        return null
+        return undefined
       }
-      return isRemote(src) || src.startsWith('/') ? src : null
+      return isRemote(src) || normalizePath(src).startsWith('/')
+        ? src
+        : undefined
     }
     const rel = (el.getAttribute('rel') ?? '').toLowerCase()
-    if (!/\b(?:stylesheet|preload|modulepreload)\b/.test(rel)) {
-      return null
+    if (!/\b(?:modulepreload|preload|stylesheet)\b/.test(rel)) {
+      return undefined
     }
     const href = el.getAttribute('href')
     if (!href) {
-      return null
+      return undefined
     }
-    return isRemote(href) || href.startsWith('/') ? href : null
+    return isRemote(href) || href.startsWith('/') ? href : undefined
   }
 
   const candidates: HTMLElement[] = []
@@ -199,14 +291,15 @@ export async function injectSriIntegrity(
       const ref = getRef(el)
       /* v8 ignore start -- defensive re-lookup; candidates pre-filtered. */
       if (!ref) {
-        return Promise.resolve(null)
+        return Promise.resolve(undefined)
       }
       /* v8 ignore stop */
       return resolveIntegrity(ref)
     }),
   )
 
-  for (const el of candidates) {
+  for (let i = 0, { length } = candidates; i < length; i += 1) {
+    const el = candidates[i]!
     const ref = getRef(el)
     /* v8 ignore start -- same defensive re-lookup as above. */
     if (!ref) {
@@ -226,126 +319,39 @@ export async function injectSriIntegrity(
   return root.toString()
 }
 
-export type BuildCspOptions = {
-  /**
-   * Origins the page connects to via fetch/XHR beyond its own.
-   * Added to `connect-src`. Example: a comment-backend URL.
-   */
-  connectSrc?: readonly string[] | undefined
-  /**
-   * Origins that serve scripts/styles via CDN URLs. Added to
-   * both `script-src` and `style-src`. Default:
-   * `["https://unpkg.com"]`.
-   */
-  cdnHosts?: readonly string[] | undefined
+export type SriForUrlOptions = {
+  cacheDir?: string | undefined
 }
 
 /**
- * Build a tight Content-Security-Policy meta tag for the HTML,
- * by hashing every inline `<script>` and `<style>` body so no
- * `'unsafe-inline'` is needed. Returns the CSP content string
- * (not the full tag).
- *
- * Directives:
- *   default-src          'self'
- *   script-src           'self' + cdn + inline hashes
- *   style-src            'self' + cdn + inline style hashes
- *   connect-src          'self' + consumer's connectSrc
- *   img-src              'self' data:
- *   font-src             'self'
- *   worker-src           'self'
- *   base-uri, form-action 'self'
- *   frame-ancestors      'none' (clickjacking)
+ * Fetch a remote resource and compute its SRI hash. Result is
+ * cached to disk when `cacheDir` is provided so subsequent
+ * builds don't re-fetch. Cache key is the URL (base64url
+ * encoded).
  */
-export function buildCspContent(
-  html: string,
-  options: BuildCspOptions = { __proto__: null } as BuildCspOptions,
-): string {
-  const { connectSrc = [], cdnHosts = ['https://unpkg.com'] } = {
-    __proto__: null,
-    ...options,
-  } as BuildCspOptions
-
-  const root = parseHtml(html)
-
-  const inlineScriptHashes = new Set<string>()
-  for (const s of root.querySelectorAll('script')) {
-    if (s.getAttribute('src')) {
-      continue
+export async function sriForUrl(
+  url: string,
+  options: SriForUrlOptions = { __proto__: null } as SriForUrlOptions,
+): Promise<string> {
+  const { cacheDir } = { __proto__: null, ...options } as SriForUrlOptions
+  if (cacheDir) {
+    const key = Buffer.from(url).toString('base64url')
+    const cachePath = path.join(cacheDir, `${key}.txt`)
+    if (existsSync(cachePath)) {
+      return (await fs.readFile(cachePath, 'utf8')).trim()
     }
-    const body = s.text ?? ''
-    if (!body) {
-      continue
+    const res = await httpRequest(url)
+    if (!res.ok) {
+      throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
     }
-    inlineScriptHashes.add(`'sha256-${cryptoHash('sha256', body, 'base64')}'`)
+    const integrity = computeIntegrity(new Uint8Array(await res.arrayBuffer()))
+    await fs.mkdir(cacheDir, { recursive: true })
+    await fs.writeFile(cachePath, integrity + '\n')
+    return integrity
   }
-
-  const inlineStyleHashes = new Set<string>()
-  for (const s of root.querySelectorAll('style')) {
-    const body = s.text ?? ''
-    if (!body) {
-      continue
-    }
-    inlineStyleHashes.add(`'sha256-${cryptoHash('sha256', body, 'base64')}'`)
+  const res = await httpRequest(url)
+  if (!res.ok) {
+    throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
   }
-  /* style="..." attributes each need their own sha256 hash. */
-  for (const el of root.querySelectorAll('[style]')) {
-    const style = el.getAttribute('style')
-    if (!style) {
-      continue
-    }
-    inlineStyleHashes.add(`'sha256-${cryptoHash('sha256', style, 'base64')}'`)
-  }
-
-  const scriptSrc = [
-    "'self'",
-    ...cdnHosts,
-    ...[...inlineScriptHashes].sort(),
-  ].join(' ')
-  const styleSrc = [
-    "'self'",
-    ...cdnHosts,
-    ...[...inlineStyleHashes].sort(),
-    "'unsafe-hashes'",
-  ].join(' ')
-  const connect = ["'self'", ...connectSrc].join(' ')
-
-  return [
-    "default-src 'self'",
-    `script-src ${scriptSrc}`,
-    `style-src ${styleSrc}`,
-    `connect-src ${connect}`,
-    "img-src 'self' data:",
-    "font-src 'self'",
-    "worker-src 'self'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-  ].join('; ')
-}
-
-/**
- * Inject a `<meta http-equiv="Content-Security-Policy">` tag
- * into `<head>`. Idempotent — a page that already has a CSP
- * meta is returned unchanged.
- */
-export function injectCspMeta(
-  html: string,
-  options: BuildCspOptions = { __proto__: null } as BuildCspOptions,
-): string {
-  const root = parseHtml(html)
-  const head = root.querySelector('head')
-  if (!head) {
-    return html
-  }
-  const existing = head.querySelector(
-    'meta[http-equiv="Content-Security-Policy"]',
-  )
-  if (existing) {
-    return html
-  }
-  const content = buildCspContent(html, options)
-  const tag = `<meta http-equiv="Content-Security-Policy" content="${content.replace(/"/g, '&quot;')}">`
-  head.insertAdjacentHTML('afterbegin', tag)
-  return root.toString()
+  return computeIntegrity(new Uint8Array(await res.arrayBuffer()))
 }

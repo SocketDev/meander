@@ -39,7 +39,11 @@
       return
     }
     const pick = pool[Math.floor(Math.random() * pool.length)]
-    if (typeof pick === 'string' && pick.length > 0 && pick !== el.textContent) {
+    if (
+      typeof pick === 'string' &&
+      pick.length > 0 &&
+      pick !== el.textContent
+    ) {
       el.textContent = pick
     }
   })

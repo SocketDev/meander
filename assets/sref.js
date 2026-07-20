@@ -10,15 +10,21 @@
    * in several ecosystem-specific files) instead of silently
    * dropping them like the old singleton shape did. */
   const symbols = window[Symbol.for('meander:syms')]
-  if (!symbols || typeof symbols !== 'object') {return}
+  if (!symbols || typeof symbols !== 'object') {
+    return
+  }
 
   const slug = document.body.getAttribute('data-slug')
-  if (!slug) {return}
+  if (!slug) {
+    return
+  }
 
-  const names = Object.keys(symbols).sort(function (a, b) {
+  const names = Object.keys(symbols).toSorted(function (a, b) {
     return b.length - a.length // longest first to avoid partial matches
   })
-  if (names.length === 0) {return}
+  if (names.length === 0) {
+    return
+  }
 
   // Build a regex that matches any definition name as a whole word
   const escaped = names.map(function (n) {
@@ -49,19 +55,29 @@
    * line/file — we don't wrap those (a symbol shouldn't link
    * to itself). Checks against every location in `locs`. */
   function isSelfReference(textNode, locs) {
-    let table = textNode.closest ? textNode.closest('.code-table') : null
+    let table = textNode.closest ? textNode.closest('.code-table') : undefined
     if (!table) {
       let el = textNode.parentElement
-      while (el && !el.classList.contains('code-table')) {el = el.parentElement}
+      while (el && !el.classList.contains('code-table')) {
+        el = el.parentElement
+      }
       table = el
     }
-    if (!table) {return false}
+    if (!table) {
+      return false
+    }
     const currentFile = table.getAttribute('data-file')
     let row = textNode.parentElement
-    while (row && row.tagName !== 'TR') {row = row.parentElement}
-    if (!row) {return false}
+    while (row && row.tagName !== 'TR') {
+      row = row.parentElement
+    }
+    if (!row) {
+      return false
+    }
     const lineCell = row.querySelector('.line-num')
-    if (!lineCell) {return false}
+    if (!lineCell) {
+      return false
+    }
     const currentLine = parseInt(lineCell.textContent, 10)
     for (let i = 0; i < locs.length; i++) {
       if (
@@ -75,7 +91,11 @@
   }
 
   function processNode(node) {
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null)
+    const walker = document.createTreeWalker(
+      node,
+      NodeFilter.SHOW_TEXT,
+      undefined,
+    )
     const textNodes = []
     let current
     while ((current = walker.nextNode())) {
@@ -85,13 +105,16 @@
     for (let i = 0; i < textNodes.length; i++) {
       const textNode = textNodes[i]
       const text = textNode.textContent
-      if (!text) {continue}
+      if (!text) {
+        continue
+      }
 
       if (
         textNode.parentElement &&
         textNode.parentElement.classList.contains('def-ref')
-      )
-        {continue}
+      ) {
+        continue
+      }
 
       const parts = []
       let lastIndex = 0
@@ -101,8 +124,12 @@
       while ((match = pattern.exec(text)) !== null) {
         const name = match[1]
         const locs = symbols[name]
-        if (!locs || locs.length === 0) {continue}
-        if (isSelfReference(textNode, locs)) {continue}
+        if (!locs || locs.length === 0) {
+          continue
+        }
+        if (isSelfReference(textNode, locs)) {
+          continue
+        }
 
         if (match.index > lastIndex) {
           parts.push(
@@ -132,7 +159,9 @@
         lastIndex = match.index + match[0].length
       }
 
-      if (parts.length === 0) {continue}
+      if (parts.length === 0) {
+        continue
+      }
 
       if (lastIndex < text.length) {
         parts.push(document.createTextNode(text.slice(lastIndex)))
@@ -150,7 +179,7 @@
   /*  Tooltip                                                            */
   /* ------------------------------------------------------------------ */
 
-  let tooltip = null
+  let tooltip = undefined
 
   function createTooltip() {
     const el = document.createElement('div')
@@ -172,12 +201,16 @@
     const file = span.getAttribute('data-def-file')
     const line = span.getAttribute('data-def-line')
     const part = span.getAttribute('data-def-part')
-    if (!file) {return []}
+    if (!file) {
+      return []
+    }
     return [[file, parseInt(line, 10), parseInt(part, 10)]]
   }
 
   function showTooltip(span) {
-    if (!tooltip) {tooltip = createTooltip()}
+    if (!tooltip) {
+      tooltip = createTooltip()
+    }
     const name = span.getAttribute('data-def-name')
     const locs = locsFromSpan(span)
 
@@ -223,7 +256,9 @@
   }
 
   function hideTooltip() {
-    if (tooltip) {tooltip.style.display = 'none'}
+    if (tooltip) {
+      tooltip.style.display = 'none'
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -245,7 +280,9 @@
    * that want a fancier popup can override by listening to the
    * click earlier and calling preventDefault(). */
   function pickLocation(locs) {
-    if (locs.length === 1) {return locs[0]}
+    if (locs.length === 1) {
+      return locs[0]
+    }
     const lines = ['Choose a definition:']
     for (let i = 0; i < locs.length; i++) {
       lines.push(
@@ -261,14 +298,18 @@
       )
     }
     const answer = window.prompt(lines.join('\n'), '1')
-    if (!answer) {return null}
+    if (!answer) {
+      return undefined
+    }
     const n = parseInt(answer, 10)
-    if (!(n >= 1 && n <= locs.length)) {return null}
+    if (!(n >= 1 && n <= locs.length)) {
+      return undefined
+    }
     return locs[n - 1]
   }
 
   document.addEventListener('mouseover', function (e) {
-    const span = e.target.closest ? e.target.closest('.def-ref') : null
+    const span = e.target.closest ? e.target.closest('.def-ref') : undefined
     if (span) {
       showTooltip(span)
     } else {
@@ -277,13 +318,19 @@
   })
 
   document.addEventListener('click', function (e) {
-    const span = e.target.closest ? e.target.closest('.def-ref') : null
-    if (!span) {return}
+    const span = e.target.closest ? e.target.closest('.def-ref') : undefined
+    if (!span) {
+      return
+    }
 
     const locs = locsFromSpan(span)
-    if (locs.length === 0) {return}
+    if (locs.length === 0) {
+      return
+    }
     const loc = locs.length === 1 ? locs[0] : pickLocation(locs)
-    if (!loc) {return}
+    if (!loc) {
+      return
+    }
     navigateTo(loc)
   })
 

@@ -32,7 +32,7 @@
       }
       return node
     }
-    return null
+    return undefined
   }
 
   const absorbExampleBlock = (tagEl, block, body) => {
@@ -81,12 +81,14 @@
       return
     }
     const firstTextNode =
-      body.firstChild && body.firstChild.nodeType === 3 ? body.firstChild : null
+      body.firstChild && body.firstChild.nodeType === 3
+        ? body.firstChild
+        : undefined
     const nameMatch = firstTextNode
       ? (firstTextNode.nodeValue ?? '').match(
           /^\s*([A-Za-z_$][\w$]*)\s*[-—:]\s+/,
         )
-      : null
+      : undefined
     if (firstTextNode && nameMatch && nameMatch[1]) {
       const paramName = document.createElement('code')
       paramName.className = 'mdr-jsdoc-type-inline mdr-jsdoc-param-name'
@@ -126,7 +128,7 @@
       const nextTextNode =
         body.firstChild && body.firstChild.nodeType === 3
           ? body.firstChild
-          : null
+          : undefined
       if (nextTextNode) {
         nextTextNode.nodeValue = (nextTextNode.nodeValue ?? '').replace(
           /^\s*(?:[-—:]\s*)?/,
@@ -144,7 +146,8 @@
      * <span class="mdr-jsdoc-block">. Walk forward; reverse-walk
      * nests cards inside each other. */
     const tags = [...container.querySelectorAll('.mdr-jsdoc-tag')]
-    for (const tagEl of tags) {
+    for (let i = 0, { length } = tags; i < length; i += 1) {
+      const tagEl = tags[i]
       const parent = tagEl.parentElement
       if (!parent || parent.classList.contains('mdr-jsdoc-block')) {
         continue
@@ -197,7 +200,8 @@
       const body = b.querySelector(':scope > .mdr-jsdoc-body')
       return !body || (body.textContent ?? '').trim() === ''
     })
-    for (const b of emptyDescs) {
+    for (let i = 0, { length } = emptyDescs; i < length; i += 1) {
+      const b = emptyDescs[i]
       b.remove()
     }
     const liveBlocks = allBlocks.filter(b => !emptyDescs.includes(b))
@@ -210,14 +214,15 @@
     }
     /* Lift every tag block out of its markdown-wrapper parent
      * so the synthesis below only sees true leftover prose. */
-    for (const b of liveBlocks) {
+    for (let i = 0, { length } = liveBlocks; i < length; i += 1) {
+      const b = liveBlocks[i]
       if (b.parentElement !== container) {
         container.appendChild(b)
       }
     }
     /* Synthesize a @DESCRIPTION card from leftover prose when
      * no explicit one exists. */
-    let syntheticDesc = null
+    let syntheticDesc = undefined
     if (!explicitDesc) {
       const descBlock = document.createElement('span')
       descBlock.className = 'mdr-jsdoc-block mdr-jsdoc-block-desc'
@@ -229,7 +234,9 @@
       const descBody = document.createElement('span')
       descBody.className = 'mdr-jsdoc-body'
       descBlock.appendChild(descBody)
-      for (const node of Array.from(container.childNodes)) {
+      const childNodes = Array.from(container.childNodes)
+      for (let i = 0, { length } = childNodes; i < length; i += 1) {
+        const node = childNodes[i]
         if (node.nodeType === 1 && node.classList.contains('mdr-jsdoc-block')) {
           continue
         }

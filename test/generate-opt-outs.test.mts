@@ -1,9 +1,9 @@
 /**
- * @fileoverview Integration tests for generate() opt-out wiring:
- * `styles: false` must skip CSS emission AND strip the <link>;
- * `theme: false` must skip theme.js inlining. These exercise
- * generate.mts end-to-end against a throwaway fixture under
- * os.tmpdir() so the test doesn't leak output into the repo.
+ * @file Integration tests for generate() opt-out wiring:
+ *   `styles: false` must skip CSS emission AND strip the <link>;
+ *   `theme: false` must skip theme.js inlining. These exercise
+ *   generate.mts end-to-end against a throwaway fixture under
+ *   os.tmpdir() so the test doesn't leak output into the repo.
  */
 
 import {
@@ -16,7 +16,7 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { generate } from '../src/generate.mts'

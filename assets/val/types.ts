@@ -1,6 +1,6 @@
 /**
- * Type definitions for comment export functionality.
- * These types define the structure of exported comments for ticketing system integration.
+ * Type definitions for comment export functionality. These types define the
+ * structure of exported comments for ticketing system integration.
  */
 
 export interface BaseComment {

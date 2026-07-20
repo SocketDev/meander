@@ -3,13 +3,6 @@
  * (tests) identically via Web Crypto.
  */
 
-export function b64urlEncode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '')
-}
-
 export function b64urlDecode(s: string): Uint8Array {
   const padded = s.replaceAll('-', '+').replaceAll('_', '/')
   const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
@@ -20,7 +13,14 @@ export function b64urlDecode(s: string): Uint8Array {
   )
 }
 
-async function hmacKey(secret: string): Promise<CryptoKey> {
+export function b64urlEncode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+}
+
+export async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),

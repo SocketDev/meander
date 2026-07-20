@@ -98,7 +98,8 @@
      * span; `{Type}` becomes a separate inline <code>. Any
      * whitespace between is preserved as a text node. */
     const tagPattern = /@([A-Za-z]+)\b(\s*)(\{[^}]*\})?/g
-    for (const node of textNodes) {
+    for (let i = 0, { length } = textNodes; i < length; i += 1) {
+      const node = textNodes[i]
       const text = node.nodeValue ?? ''
       if (!text.includes('@')) {
         continue
@@ -147,7 +148,8 @@
         parts.push(document.createTextNode(text.slice(cursor)))
       }
       const frag = document.createDocumentFragment()
-      for (const p of parts) {
+      for (let j = 0, partsLen = parts.length; j < partsLen; j += 1) {
+        const p = parts[j]
         frag.appendChild(p)
       }
       node.parentNode?.replaceChild(frag, node)

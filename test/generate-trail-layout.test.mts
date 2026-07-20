@@ -1,16 +1,16 @@
 /**
- * @fileoverview Integration tests for the index page's trail
- * (row) layout. Covers `layout: 'auto' | 'cards' | 'rows'`,
- * `kind: 'code' | 'article'`, the auto-promote-at-12 threshold,
- * the search-filter-at-24 threshold, and backward compatibility
- * with configs that don't specify `layout` or `kind`.
+ * @file Integration tests for the index page's trail
+ *   (row) layout. Covers `layout: 'auto' | 'cards' | 'rows'`,
+ *   `kind: 'code' | 'article'`, the auto-promote-at-12 threshold,
+ *   the search-filter-at-24 threshold, and backward compatibility
+ *   with configs that don't specify `layout` or `kind`.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { safeDelete } from '@socketsecurity/lib/fs'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { generate } from '../src/generate.mts'
@@ -138,7 +138,7 @@ describe('generate index trail layout', () => {
   it('part with kind: article flips trail to mixed', async () => {
     const partList = Array.from({ length: 12 }, (_, i) => makePart(i + 1))
     /* Override the second part's kind. */
-    ;(partList[1] as { kind?: string }).kind = 'article'
+    ;(partList[1] as { kind?: string | undefined }).kind = 'article'
     const cfg = path.join(tmpDir, 'meander.config.json')
     writeFileSync(
       cfg,

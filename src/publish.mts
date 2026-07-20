@@ -3,38 +3,26 @@ import path from 'node:path'
 
 import { encrypt, packEnvelope, randomDataKey, wrapKey } from './crypto.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
+import { httpRequest } from '@socketsecurity/lib-stable/http-request'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+
+const logger = getDefaultLogger()
 
 const API_BASE = 'https://api.val.town'
 
-export type PublishOptions = {
-  /** Override the env var read for the bearer token. Default:
-   *  MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN. */
-  tokenEnv?: string | undefined
-  /** When true, missing token / blob key log a warning and
-   *  return 0 instead of throwing. Used by CI workflows that
-   *  shouldn't fail just because the publish secret isn't
-   *  provisioned (e.g. fork PRs). */
-  graceful?: boolean | undefined
-}
-
-async function uploadBlob(
-  token: string,
-  key: string,
-  content: string,
-): Promise<void> {
-  const res = await fetch(`${API_BASE}/v1/blob/${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: content,
-  })
-  if (!res.ok) {
-    throw new Error(
-      `Failed to upload blob ${key}: ${res.status} ${await res.text()}`,
-    )
-  }
-  console.log(`  Uploaded: ${key}`)
+/**
+ * Encrypt a single HTML payload using the envelope scheme:
+ *
+ * 1. Random per-blob DEK.
+ * 2. Body ciphertext = AES-256-GCM(DEK, html).
+ * 3. WrappedDEK = AES-256-GCM(MEANDER_BLOB_KEY, DEK).
+ * 4. Return `ENVELOPE:1:<wrappedDEK>:<body>`.
+ */
+export function encryptBlob(html: string, wrappingKey: Buffer): string {
+  const dek = randomDataKey()
+  const body = encrypt(html, dek)
+  const wrapped = wrapKey(dek, wrappingKey)
+  return packEnvelope(body, wrapped)
 }
 
 /**
@@ -44,7 +32,7 @@ async function uploadBlob(
  * caller supplies the wrong length, AES-256-GCM rejects later with
  * a clear error, which is fine for ops debugging.
  */
-function loadBlobWrappingKey(): Buffer | undefined {
+export function loadBlobWrappingKey(): Buffer | undefined {
   const hex = process.env['MEANDER_BLOB_KEY']
   if (!hex) {
     return undefined
@@ -55,20 +43,6 @@ function loadBlobWrappingKey(): Buffer | undefined {
     )
   }
   return Buffer.from(hex, 'hex')
-}
-
-/**
- * Encrypt a single HTML payload using the envelope scheme:
- *   1. Random per-blob DEK.
- *   2. Body ciphertext = AES-256-GCM(DEK, html).
- *   3. wrappedDEK = AES-256-GCM(MEANDER_BLOB_KEY, DEK).
- *   4. Return `ENVELOPE:1:<wrappedDEK>:<body>`.
- */
-function encryptBlob(html: string, wrappingKey: Buffer): string {
-  const dek = randomDataKey()
-  const body = encrypt(html, dek)
-  const wrapped = wrapKey(dek, wrappingKey)
-  return packEnvelope(body, wrapped)
 }
 
 export async function publish(
@@ -84,7 +58,7 @@ export async function publish(
   if (!token) {
     const msg = missingTokenMessage(envName)
     if (graceful) {
-      console.log(`[publish] skipped — ${msg}`)
+      logger.log(`[publish] skipped — ${msg}`)
       return
     }
     throw new Error(msg)
@@ -105,7 +79,7 @@ export async function publish(
       const msg =
         'encryptBlobs is true but MEANDER_BLOB_KEY is not set. Generate one with `meander blob key init` and place it in your env.'
       if (graceful) {
-        console.log(`[publish] skipped — ${msg}`)
+        logger.log(`[publish] skipped — ${msg}`)
         return
       }
       throw new Error(msg)
@@ -128,7 +102,7 @@ export async function publish(
   const parts: Array<{ id: number }> = config.parts
 
   const mode = encryptBlobsEnabled ? 'envelope-encrypted' : 'plaintext'
-  console.log(
+  logger.log(
     `Publishing walkthrough "${slug}" from ${localOutDir} → blob prefix "${outDirName}/" (${parts.length} parts, ${mode})...`,
   )
 
@@ -144,7 +118,8 @@ export async function publish(
   await uploadBlob(token, `${outDirName}/${slug}/index.html`, wrap(indexHtml))
 
   // Upload part HTML files
-  for (const part of parts) {
+  for (let i = 0, { length } = parts; i < length; i += 1) {
+    const part = parts[i]!
     const filename = `part-${part.id}.html`
     const html = readFileSync(path.join(localOutDir, filename), 'utf-8')
     await uploadBlob(token, `${outDirName}/${slug}/${filename}`, wrap(html))
@@ -171,5 +146,44 @@ export async function publish(
   await uploadBlob(token, `${outDirName}/${slug}/manifest.json`, manifest)
 
   const fileCount = parts.length + 2 + (hasDocuments ? 1 : 0)
-  console.log(`\nDone! Published ${fileCount} files for "${slug}".`)
+  logger.log('')
+  logger.log(`Done! Published ${fileCount} files for "${slug}".`)
+}
+
+export type PublishOptions = {
+  /**
+   * Override the env var read for the bearer token. Default:
+   * MEANDER_VALTOWN_TOKEN_ENV or VALTOWN_TOKEN.
+   */
+  tokenEnv?: string | undefined
+  /**
+   * When true, missing token / blob key log a warning and
+   * return 0 instead of throwing. Used by CI workflows that
+   * shouldn't fail just because the publish secret isn't
+   * provisioned (e.g. fork PRs).
+   */
+  graceful?: boolean | undefined
+}
+
+export async function uploadBlob(
+  token: string,
+  key: string,
+  content: string,
+): Promise<void> {
+  const res = await httpRequest(
+    `${API_BASE}/v1/blob/${encodeURIComponent(key)}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: content,
+    },
+  )
+  if (!res.ok) {
+    throw new Error(
+      `Failed to upload blob ${key}: ${res.status} ${await res.text()}`,
+    )
+  }
+  logger.log(`  Uploaded: ${key}`)
 }

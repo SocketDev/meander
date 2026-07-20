@@ -96,7 +96,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup and install
-        uses: ./.github/actions/setup-and-install
+        uses: ./.github/actions/fleet/setup-and-install
 
       - name: Build (emits dist/cli.mjs)
         run: pnpm run build

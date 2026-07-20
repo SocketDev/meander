@@ -1,3 +1,6 @@
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+const logger = getDefaultLogger()
+
 /* Walkthrough boot — shared namespace + runtime primitives.
  *
  * Namespace: window[Symbol.for('meander:pages')]. Boot is the
@@ -8,7 +11,6 @@
  *   - ns.storageGet(key)        guarded localStorage read
  *   - ns.storageSet(key, value) guarded write (null ⇒ remove)
  *   - ns.onReady(fn)            run after DOMContentLoaded */
-'use strict'
 ;(() => {
   const ns = (window[Symbol.for('meander:pages')] ??= {})
 
@@ -32,7 +34,7 @@
     try {
       return localStorage.getItem(key)
     } catch {
-      return null
+      return undefined
     }
   }
 
@@ -52,7 +54,7 @@
     try {
       fn()
     } catch (e) {
-      console.error(`[meander:pages] ${tag}:`, e)
+      logger.fail(`[meander:pages] ${tag}:`, e)
     }
   }
 

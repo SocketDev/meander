@@ -2,10 +2,12 @@
   'use strict'
 
   const slug = document.body.getAttribute('data-slug')
-  if (!slug) {return}
+  if (!slug) {
+    return
+  }
 
   const ns = window[Symbol.for('meander:pages')]
-  let dropdown = null
+  let dropdown = undefined
 
   /* ------------------------------------------------------------------ */
   /*  SVG Icon                                                           */
@@ -106,9 +108,13 @@
   }
 
   function positionDropdown() {
-    if (!dropdown) {return}
+    if (!dropdown) {
+      return
+    }
     const btn = document.querySelector('.export-btn')
-    if (!btn) {return}
+    if (!btn) {
+      return
+    }
 
     const btnRect = btn.getBoundingClientRect()
     const dropdownWidth = 200
@@ -128,7 +134,7 @@
     if (!dropdown) {
       dropdown = createDropdown()
     }
-    if (ns && ns.popovers) {
+    if (ns?.popovers) {
       ns.popovers.openExclusive(hideDropdown)
     }
     positionDropdown()
@@ -158,7 +164,9 @@
     }
   }
 
-  if (ns && ns.popovers) {ns.popovers.register(hideDropdown)}
+  if (ns?.popovers) {
+    ns.popovers.register(hideDropdown)
+  }
 
   /* ------------------------------------------------------------------ */
   /*  Init                                                               */
@@ -166,7 +174,9 @@
 
   function init() {
     const topbar = document.querySelector('.topbar')
-    if (!topbar) {return}
+    if (!topbar) {
+      return
+    }
 
     let actions = topbar.querySelector('.topbar-actions')
     if (!actions) {
@@ -187,7 +197,7 @@
     /* Bind keyboard once — pre-create the dropdown so the panel
      * exists for the keydown listener (binding to a null panel
      * would no-op the menu keys until first click). */
-    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+    if (ns?.popovers && ns.popovers.bindKeyboard) {
       if (!dropdown) {
         dropdown = createDropdown()
       }
@@ -203,7 +213,9 @@
   }
 
   document.addEventListener('click', function (e) {
-    if (!dropdown) {return}
+    if (!dropdown) {
+      return
+    }
     const btn = document.querySelector('.export-btn')
     const isClickInside = dropdown.contains(e.target) || btn.contains(e.target)
     if (!isClickInside) {

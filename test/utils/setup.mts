@@ -1,4 +1,6 @@
-/** @fileoverview Vitest setup: silence noisy env/debug channels. */
+/**
+ * @file Vitest setup: silence noisy env/debug channels.
+ */
 
 import process from 'node:process'
 

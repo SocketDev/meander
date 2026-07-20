@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import crypto from 'node:crypto'
 
 /**
  * Shamir's Secret Sharing over GF(2^8).
@@ -13,9 +13,10 @@ import { randomBytes } from 'node:crypto'
  * interpolation at x = 0.
  *
  * Constraints:
- *   - threshold >= 2 (threshold = 1 is plaintext)
- *   - threshold <= shares
- *   - shares <= 255 (x-coordinates are non-zero bytes)
+ *
+ * - Threshold >= 2 (threshold = 1 is plaintext)
+ * - Threshold <= shares
+ * - Shares <= 255 (x-coordinates are non-zero bytes)
  *
  * Share format: [0x01 version][1 byte threshold][1 byte x][N bytes y...]
  * The x-coordinate is also the share's "index" — combine() uses it
@@ -38,8 +39,8 @@ const LOG = new Uint8Array(256)
     /* Multiply by g = 0x03 in GF(2^8) under x^8 + x^4 + x^3 + x + 1.
      * 0x03 * x = (x << 1) ^ x; reduce mod 0x11b when bit 8 sets. */
     let next = (x << 1) ^ x
-    if (next & 0x100) {
-      next ^= 0x11b
+    if (next & 0x1_00) {
+      next ^= 0x1_1b
     }
     x = next & 0xff
   }
@@ -49,84 +50,13 @@ const LOG = new Uint8Array(256)
   LOG[0] = 0 // unused; multiply guards on a==0 || b==0
 }
 
-function gfMul(a: number, b: number): number {
-  if (a === 0 || b === 0) {
-    return 0
-  }
-  return EXP[LOG[a]! + LOG[b]!]!
-}
-
-function gfDiv(a: number, b: number): number {
-  if (b === 0) {
-    throw new Error('gfDiv: divide by zero')
-  }
-  if (a === 0) {
-    return 0
-  }
-  return EXP[(LOG[a]! - LOG[b]! + 255) % 255]!
-}
-
-/** Evaluate polynomial coeffs at x in GF(2^8). Horner's method. */
-function gfEval(coeffs: Uint8Array, x: number): number {
-  let result = 0
-  for (let i = coeffs.length - 1; i >= 0; i--) {
-    result = gfMul(result, x) ^ coeffs[i]!
-  }
-  return result
-}
-
 /**
- * Split `secret` into `shares` shares with reconstruction
- * threshold `threshold`. Returns one Uint8Array per share, each
- * carrying the version + threshold header so combine() can
- * validate without external metadata.
+ * Base58 (Bitcoin alphabet — no 0/O/I/l ambiguity) encoder.
+ * Inline because we only need it for share I/O and a dep would
+ * be 50× the size of this implementation.
  */
-export function split(
-  secret: Uint8Array,
-  threshold: number,
-  shares: number,
-): Uint8Array[] {
-  if (threshold < 2) {
-    throw new Error('shamir.split: threshold must be >= 2')
-  }
-  if (shares < threshold) {
-    throw new Error('shamir.split: shares must be >= threshold')
-  }
-  if (shares > 255) {
-    throw new Error('shamir.split: shares must be <= 255 (GF(2^8) limit)')
-  }
-  if (secret.length === 0) {
-    throw new Error('shamir.split: empty secret')
-  }
-
-  const out: Uint8Array[] = []
-  for (let s = 1; s <= shares; s++) {
-    /* 3-byte header: version, threshold, x. Body is `secret.length`
-     * y-bytes, one per byte of the secret. */
-    const buf = new Uint8Array(3 + secret.length)
-    buf[0] = VERSION
-    buf[1] = threshold
-    buf[2] = s
-    out.push(buf)
-  }
-
-  /* For each byte of the secret, build a fresh random polynomial
-   * with that byte as the constant term, then evaluate at every
-   * share's x-coordinate. Random coefficients come from the OS
-   * CSPRNG — this is the line that makes Shamir actually secure. */
-  for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
-    const coeffs = new Uint8Array(threshold)
-    coeffs[0] = secret[byteIdx]!
-    const random = randomBytes(threshold - 1)
-    for (let i = 1; i < threshold; i++) {
-      coeffs[i] = random[i - 1]!
-    }
-    for (let s = 1; s <= shares; s++) {
-      out[s - 1]![3 + byteIdx] = gfEval(coeffs, s)
-    }
-  }
-  return out
-}
+const B58_ALPHABET =
+  '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 /**
  * Reconstruct the secret from `>= threshold` distinct shares.
@@ -150,7 +80,8 @@ export function combine(shares: Uint8Array[]): Uint8Array {
   const threshold = first[1]!
   const bodyLen = first.length - 3
   const xs = new Set<number>()
-  for (const s of shares) {
+  for (let i = 0, { length } = shares; i < length; i += 1) {
+    const s = shares[i]!
     if (s.length !== first.length) {
       throw new Error('shamir.combine: share length mismatch')
     }
@@ -203,13 +134,33 @@ export function combine(shares: Uint8Array[]): Uint8Array {
   return out
 }
 
-/**
- * Base58 (Bitcoin alphabet — no 0/O/I/l ambiguity) encoder.
- * Inline because we only need it for share I/O and a dep would
- * be 50× the size of this implementation.
- */
-const B58_ALPHABET =
-  '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+export function decodeShare(encoded: string): Uint8Array {
+  if (encoded.length === 0) {
+    throw new Error('shamir.decodeShare: empty')
+  }
+  let n = 0n
+  for (const ch of encoded) {
+    const idx = B58_ALPHABET.indexOf(ch)
+    if (idx < 0) {
+      throw new Error(`shamir.decodeShare: invalid character '${ch}'`)
+    }
+    n = n * 58n + BigInt(idx)
+  }
+  const bytes: number[] = []
+  while (n > 0n) {
+    bytes.unshift(Number(n & 0xffn))
+    n >>= 8n
+  }
+  /* Restore leading zero bytes (mirror of encodeShare). */
+  for (const ch of encoded) {
+    if (ch === '1') {
+      bytes.unshift(0)
+    } else {
+      break
+    }
+  }
+  return new Uint8Array(bytes)
+}
 
 export function encodeShare(share: Uint8Array): string {
   let n = 0n
@@ -237,30 +188,83 @@ export function encodeShare(share: Uint8Array): string {
   return out
 }
 
-export function decodeShare(encoded: string): Uint8Array {
-  if (encoded.length === 0) {
-    throw new Error('shamir.decodeShare: empty')
+export function gfDiv(a: number, b: number): number {
+  if (b === 0) {
+    throw new Error('gfDiv: divide by zero')
   }
-  let n = 0n
-  for (const ch of encoded) {
-    const idx = B58_ALPHABET.indexOf(ch)
-    if (idx < 0) {
-      throw new Error(`shamir.decodeShare: invalid character '${ch}'`)
+  if (a === 0) {
+    return 0
+  }
+  return EXP[(LOG[a]! - LOG[b]! + 255) % 255]!
+}
+
+/**
+ * Evaluate polynomial coeffs at x in GF(2^8). Horner's method.
+ */
+export function gfEval(coeffs: Uint8Array, x: number): number {
+  let result = 0
+  for (let i = coeffs.length - 1; i >= 0; i--) {
+    result = gfMul(result, x) ^ coeffs[i]!
+  }
+  return result
+}
+
+export function gfMul(a: number, b: number): number {
+  if (a === 0 || b === 0) {
+    return 0
+  }
+  return EXP[LOG[a]! + LOG[b]!]!
+}
+
+/**
+ * Split `secret` into `shares` shares with reconstruction
+ * threshold `threshold`. Returns one Uint8Array per share, each
+ * carrying the version + threshold header so combine() can
+ * validate without external metadata.
+ */
+export function split(
+  secret: Uint8Array,
+  threshold: number,
+  shares: number,
+): Uint8Array[] {
+  if (threshold < 2) {
+    throw new Error('shamir.split: threshold must be >= 2')
+  }
+  if (shares < threshold) {
+    throw new Error('shamir.split: shares must be >= threshold')
+  }
+  if (shares > 255) {
+    throw new Error('shamir.split: shares must be <= 255 (GF(2^8) limit)')
+  }
+  if (secret.length === 0) {
+    throw new Error('shamir.split: empty secret')
+  }
+
+  const out: Uint8Array[] = []
+  for (let s = 1; s <= shares; s++) {
+    /* 3-byte header: version, threshold, x. Body is `secret.length`
+     * y-bytes, one per byte of the secret. */
+    const buf = new Uint8Array(3 + secret.length)
+    buf[0] = VERSION
+    buf[1] = threshold
+    buf[2] = s
+    out.push(buf)
+  }
+
+  /* For each byte of the secret, build a fresh random polynomial
+   * with that byte as the constant term, then evaluate at every
+   * share's x-coordinate. Random coefficients come from the OS
+   * CSPRNG — this is the line that makes Shamir actually secure. */
+  for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
+    const coeffs = new Uint8Array(threshold)
+    coeffs[0] = secret[byteIdx]!
+    const random = crypto.randomBytes(threshold - 1)
+    for (let i = 1; i < threshold; i++) {
+      coeffs[i] = random[i - 1]!
     }
-    n = n * 58n + BigInt(idx)
-  }
-  const bytes: number[] = []
-  while (n > 0n) {
-    bytes.unshift(Number(n & 0xffn))
-    n >>= 8n
-  }
-  /* Restore leading zero bytes (mirror of encodeShare). */
-  for (const ch of encoded) {
-    if (ch === '1') {
-      bytes.unshift(0)
-    } else {
-      break
+    for (let s = 1; s <= shares; s++) {
+      out[s - 1]![3 + byteIdx] = gfEval(coeffs, s)
     }
   }
-  return new Uint8Array(bytes)
+  return out
 }

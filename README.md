@@ -136,24 +136,24 @@ pages/
 
 ### Top-level fields
 
-| Field        | Type       | Required | Description                                                                 |
-| ------------ | ---------- | -------- | --------------------------------------------------------------------------- |
-| `slug`       | `string`   | Yes      | URL-safe identifier, `[a-z0-9][a-z0-9-]*`. Used in URLs and storage keys.   |
-| `title`      | `string`   | Yes      | Title shown on the index page.                                              |
-| `parts`      | `Part[]`   | Yes      | Ordered list of walkthrough parts (at least one).                           |
-| `documents`  | `string[]` | No       | Markdown files to render as a Documents tab, relative to the config file.   |
-| `outDir`     | `string`   | No       | Directory to emit into, default `pages`. Also the Val Town blob prefix.     |
+| Field       | Type       | Required | Description                                                               |
+| ----------- | ---------- | -------- | ------------------------------------------------------------------------- |
+| `slug`      | `string`   | Yes      | URL-safe identifier, `[a-z0-9][a-z0-9-]*`. Used in URLs and storage keys. |
+| `title`     | `string`   | Yes      | Title shown on the index page.                                            |
+| `parts`     | `Part[]`   | Yes      | Ordered list of walkthrough parts (at least one).                         |
+| `documents` | `string[]` | No       | Markdown files to render as a Documents tab, relative to the config file. |
+| `outDir`    | `string`   | No       | Directory to emit into, default `pages`. Also the Val Town blob prefix.   |
 
 ### Part fields
 
-| Field       | Type       | Required | Description                                                                  |
-| ----------- | ---------- | -------- | ---------------------------------------------------------------------------- |
-| `id`        | `integer`  | Yes      | Unique part number (starts at 1).                                            |
-| `title`     | `string`   | Yes      | Short title shown in the nav.                                                |
-| `objective` | `string`   | Yes      | One sentence describing what the reader will learn.                          |
-| `keywords`  | `string[]` | Yes      | Words used to resolve ownership when a file appears in multiple parts.      |
-| `files`     | `string[]` | Yes      | Source files in this part, relative to the config file.                     |
-| `filename`  | `string`   | No       | URL-friendly slug for clean part URLs (`/:slug/parts/<filename>.html`).     |
+| Field       | Type       | Required | Description                                                             |
+| ----------- | ---------- | -------- | ----------------------------------------------------------------------- |
+| `id`        | `integer`  | Yes      | Unique part number (starts at 1).                                       |
+| `title`     | `string`   | Yes      | Short title shown in the nav.                                           |
+| `objective` | `string`   | Yes      | One sentence describing what the reader will learn.                     |
+| `keywords`  | `string[]` | Yes      | Words used to resolve ownership when a file appears in multiple parts.  |
+| `files`     | `string[]` | Yes      | Source files in this part, relative to the config file.                 |
+| `filename`  | `string`   | No       | URL-friendly slug for clean part URLs (`/:slug/parts/<filename>.html`). |
 
 ### How `keywords` resolves overlap
 

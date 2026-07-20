@@ -1,3 +1,5 @@
+import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
+
 /* Cmd/Ctrl-click links inside code lines.
  *   - URLs: any http:// or https:// substring in code becomes
  *     an <a> that opens in a new tab when modifier-clicked.
@@ -13,7 +15,6 @@
  * Must run after hljs has tokenized — hljs splits text nodes
  * when it runs, so any <a> wraps made before hljs would get
  * blown away. Uses ns.onHljsReady to gate. */
-'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
   if (!ns) {
@@ -48,13 +49,14 @@
 
     const resolveRelPath = (fromPath, ref) => {
       if (!ref.startsWith('./') && !ref.startsWith('../')) {
-        return null
+        return undefined
       }
-      const fromDir = fromPath.split('/').slice(0, -1)
+      const fromDir = normalizePath(fromPath).split('/').slice(0, -1)
       const segs = ref.split('/')
       const out = [...fromDir]
-      for (const seg of segs) {
-        if (seg === '.' || seg === '') {
+      for (let i = 0, { length } = segs; i < length; i += 1) {
+        const seg = segs[i]
+        if (seg === '' || seg === '.') {
           continue
         }
         if (seg === '..') {
@@ -71,10 +73,13 @@
       if (anchorByStem.has(stem)) {
         return anchorByStem.get(stem)
       }
-      return null
+      return undefined
     }
 
     const urlRe = /https?:\/\/[^\s'"`<>)]+/g
+    // Opening quote (single or double) captured in group 1 for the closing
+    // backreference; `\.{1,2}\/` matches `./` or `../`; `[^'"\`]+` consumes
+    // the path stopping at any quote or backtick; `\1` matches the same closer.
     const quotedPathRe = /(['"])(\.{1,2}\/[^'"`]+)\1/g
 
     const wrapMatches = (textNode, filePath) => {
@@ -93,7 +98,7 @@
       }
       for (const m of text.matchAll(quotedPathRe)) {
         const pathRef = m[2]
-        const anchor = filePath ? resolveRelPath(filePath, pathRef) : null
+        const anchor = filePath ? resolveRelPath(filePath, pathRef) : undefined
         if (!anchor) {
           continue
         }
@@ -116,7 +121,8 @@
       }
       let cursor = 0
       const frag = document.createDocumentFragment()
-      for (const m of matches) {
+      for (let i = 0, { length } = matches; i < length; i += 1) {
+        const m = matches[i]
         if (m.start < cursor) {
           continue
         }
@@ -151,7 +157,8 @@
           textNodes.push(node)
           node = walker.nextNode()
         }
-        for (const t of textNodes) {
+        for (let i = 0, { length } = textNodes; i < length; i += 1) {
+          const t = textNodes[i]
           wrapMatches(t, filePath)
         }
       }
@@ -172,7 +179,7 @@
     addEventListener(
       'keydown',
       e => {
-        if (e.key === 'Meta' || e.key === 'Control') {
+        if (e.key === 'Control' || e.key === 'Meta') {
           setMod(true)
         }
       },
@@ -181,7 +188,7 @@
     addEventListener(
       'keyup',
       e => {
-        if (e.key === 'Meta' || e.key === 'Control') {
+        if (e.key === 'Control' || e.key === 'Meta') {
           setMod(false)
         }
       },

@@ -3,11 +3,13 @@
 
   // Guard: only run on documents page
   const pageType = document.body.getAttribute('data-page-type')
-  if (pageType !== 'documents') {return}
+  if (pageType !== 'documents') {
+    return
+  }
 
   const ns = window[Symbol.for('meander:pages')]
-  let btn = null
-  let dropdown = null
+  let btn = undefined
+  let dropdown = undefined
 
   /* ------------------------------------------------------------------ */
   /*  SVG Icon                                                           */
@@ -109,7 +111,7 @@
     if (!dropdown) {
       dropdown = createTocDropdown()
     }
-    if (ns && ns.popovers) {
+    if (ns?.popovers) {
       ns.popovers.openExclusive(closeTocDropdown)
     }
     populateToc()
@@ -138,7 +140,9 @@
     }
   }
 
-  if (ns && ns.popovers) {ns.popovers.register(closeTocDropdown)}
+  if (ns?.popovers) {
+    ns.popovers.register(closeTocDropdown)
+  }
 
   /* ------------------------------------------------------------------ */
   /*  TOC Population                                                     */
@@ -146,15 +150,21 @@
 
   function populateToc() {
     const activePane = document.querySelector('.doc-tab-pane.active')
-    if (!activePane) {return}
+    if (!activePane) {
+      return
+    }
 
     const docFile = activePane.getAttribute('data-doc-file')
-    if (!docFile || !window[Symbol.for('meander:toc')]) {return}
+    if (!docFile || !window[Symbol.for('meander:toc')]) {
+      return
+    }
 
     const docData = window[Symbol.for('meander:toc')].find(function (d) {
       return d.file === docFile
     })
-    if (!docData) {return}
+    if (!docData) {
+      return
+    }
 
     const list = dropdown.querySelector('.doc-toc-list')
     list.innerHTML = ''
@@ -177,7 +187,8 @@
             const offset = topbar
               ? topbar.getBoundingClientRect().height + 16
               : 16
-            const y = target.getBoundingClientRect().top + window.scrollY - offset
+            const y =
+              target.getBoundingClientRect().top + window.scrollY - offset
             const reduce =
               window.matchMedia &&
               window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -199,22 +210,28 @@
   /* ------------------------------------------------------------------ */
 
   function updateScrollSpy() {
-    if (!dropdown || dropdown.style.display === 'none') {return}
+    if (!dropdown || dropdown.style.display === 'none') {
+      return
+    }
 
     const activePane = document.querySelector('.doc-tab-pane.active')
-    if (!activePane) {return}
+    if (!activePane) {
+      return
+    }
 
     // Get all headings with IDs within the active pane
     const headings = activePane.querySelectorAll(
       'h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]',
     )
-    if (headings.length === 0) {return}
+    if (headings.length === 0) {
+      return
+    }
 
     const topbar = document.querySelector('.topbar')
     const offset = topbar ? topbar.getBoundingClientRect().height + 20 : 20
 
     // Find the current heading (last one above the offset line)
-    let current = null
+    let current = undefined
     for (let i = 0; i < headings.length; i++) {
       const rect = headings[i].getBoundingClientRect()
       if (rect.top <= offset) {
@@ -238,7 +255,9 @@
 
   function activeDocHasHeadings() {
     const activePane = document.querySelector('.doc-tab-pane.active')
-    if (!activePane || !window[Symbol.for('meander:toc')]) {return false}
+    if (!activePane || !window[Symbol.for('meander:toc')]) {
+      return false
+    }
     const docFile = activePane.getAttribute('data-doc-file')
     const docData = window[Symbol.for('meander:toc')].find(function (d) {
       return d.file === docFile
@@ -247,7 +266,9 @@
   }
 
   function updateButtonVisibility() {
-    if (!btn) {return}
+    if (!btn) {
+      return
+    }
     btn.style.display = activeDocHasHeadings() ? '' : 'none'
   }
 
@@ -259,7 +280,7 @@
      * attach to before the user's first click. populateToc()
      * still runs lazily on each open so heading lists stay
      * fresh across tab changes. */
-    if (ns && ns.popovers && ns.popovers.bindKeyboard) {
+    if (ns?.popovers && ns.popovers.bindKeyboard) {
       if (!dropdown) {
         dropdown = createTocDropdown()
       }
@@ -286,8 +307,11 @@
 
     // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
-      if (!dropdown) {return}
-      const isClickInside = dropdown.contains(e.target) || btn.contains(e.target)
+      if (!dropdown) {
+        return
+      }
+      const isClickInside =
+        dropdown.contains(e.target) || btn.contains(e.target)
       if (!isClickInside) {
         closeTocDropdown()
       }

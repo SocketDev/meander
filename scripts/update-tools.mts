@@ -3,9 +3,10 @@
  *
  * For each tool entry, look up the latest published version on
  * GitHub Releases. When there's a newer version:
- *   1. Download every per-platform asset.
- *   2. Compute sha256 for each.
- *   3. Patch the JSON in place with the new version + checksums.
+ *
+ * 1. Download every per-platform asset.
+ * 2. Compute sha256 for each.
+ * 3. Patch the JSON in place with the new version + checksums.
  *
  * Invoked by the weekly-update workflow. Safe to run locally too:
  * `node scripts/update-tools.mts` produces a dirty tree that
@@ -17,12 +18,18 @@
  *
  * Requires: `gh` CLI on PATH, logged in or a GH_TOKEN env var.
  */
-import { hash as cryptoHash } from 'node:crypto'
+import crypto from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { validateExternalTools, type ExternalTools } from './validate-tools.mts'
+import { validateExternalTools } from './validate-tools.mts'
+import type { ExternalTools } from './validate-tools.mts'
+import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { errorMessage } from '@socketsecurity/lib-stable/errors/message'
+import { httpJson, httpRequest } from '@socketsecurity/lib-stable/http-request'
+
+const logger = getDefaultLogger()
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(scriptDir, '..')
@@ -45,25 +52,18 @@ async function fetchLatestRelease(repoGithub: string): Promise<Release> {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
-  const res = await fetch(
+  return httpJson<Release>(
     `https://api.github.com/repos/${owner}/releases/latest`,
     { headers },
   )
-  if (!res.ok) {
-    throw new Error(
-      `GET releases/latest for ${owner}: ${res.status} ${res.statusText}`,
-    )
-  }
-  return (await res.json()) as Release
 }
 
 async function sha256OfUrl(url: string): Promise<string> {
-  const res = await fetch(url)
+  const res = await httpRequest(url)
   if (!res.ok) {
     throw new Error(`GET ${url}: ${res.status}`)
   }
-  const bytes = new Uint8Array(await res.arrayBuffer())
-  return cryptoHash('sha256', bytes, 'hex')
+  return crypto.hash('sha256', res.body, 'hex')
 }
 
 function normalizeVersion(tagName: string): string {
@@ -84,10 +84,12 @@ function normalizeVersion(tagName: string): string {
  * understand, fall back to string comparison.
  */
 function compareVersions(a: string, b: string): number {
-  const parse = (v: string): { main: number[]; pre: string | null } => {
+  const parse = (v: string): { main: number[]; pre: string | undefined } => {
     const [mainPart, prePart] = v.split('-', 2)
-    const main = (mainPart ?? '').split('.').map(n => Number.parseInt(n, 10))
-    return { main, pre: prePart ?? null }
+    const mainNums = (mainPart ?? '')
+      .split('.')
+      .map(n => Number.parseInt(n, 10))
+    return { main: mainNums, pre: prePart ?? undefined }
   }
   const pa = parse(a)
   const pb = parse(b)
@@ -103,13 +105,13 @@ function compareVersions(a: string, b: string): number {
     }
   }
   /* Main parts equal. Prerelease semantics: no-pre > any-pre. */
-  if (pa.pre === null && pb.pre === null) {
+  if (pa.pre === undefined && pb.pre === undefined) {
     return 0
   }
-  if (pa.pre === null) {
+  if (pa.pre === undefined) {
     return 1
   }
-  if (pb.pre === null) {
+  if (pb.pre === undefined) {
     return -1
   }
   return pa.pre < pb.pre ? -1 : pa.pre > pb.pre ? 1 : 0
@@ -130,12 +132,12 @@ async function refreshOne(
    * an older tag to "latest"). Semver-compare and no-op on
    * equal-or-lower. */
   if (compareVersions(latest, entry.version) <= 0) {
-    console.log(
+    logger.log(
       `  ${name}: upstream "latest" is ${latest}, pinned is ${entry.version} — keeping pin`,
     )
     return { changed: false, from: entry.version, to: entry.version }
   }
-  console.log(`  ${name}: ${entry.version} → ${latest}`)
+  logger.log(`  ${name}: ${entry.version} → ${latest}`)
 
   /* For every platform we track, find the matching asset in the
    * new release, download it, and compute its sha256. If an
@@ -152,7 +154,7 @@ async function refreshOne(
     const assetName = slot.asset
     const asset = release.assets.find(a => a.name === assetName)
     if (!asset) {
-      console.warn(
+      logger.warn(
         `    ${platform}: asset "${assetName}" not found in ${latest}; keeping old checksum`,
       )
       nextChecksums[platform as keyof typeof nextChecksums] = slot
@@ -180,9 +182,7 @@ async function main(): Promise<void> {
         anyChanged = true
       }
     } catch (e) {
-      console.error(
-        `  ${name}: failed to refresh — ${e instanceof Error ? e.message : String(e)}`,
-      )
+      logger.fail(`  ${name}: failed to refresh — ${errorMessage(e)}`)
       /* Keep going — a single failed lookup shouldn't block the
        * other tools. Exit code reflects whether the process as a
        * whole succeeded; per-tool failures are logged and the
@@ -194,10 +194,13 @@ async function main(): Promise<void> {
     /* Re-validate — catches any weird shape that slipped through
      * a partially-refreshed entry. Throws on schema violation. */
     validateExternalTools(toolsPath)
-    console.log('✓ external-tools.json updated')
+    logger.log('✓ external-tools.json updated')
   } else {
-    console.log('✓ external-tools.json already up to date')
+    logger.log('✓ external-tools.json already up to date')
   }
 }
 
-await main()
+void main().catch((e: unknown) => {
+  logger.fail(String(e))
+  process.exitCode = 1
+})

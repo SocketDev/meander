@@ -1,4 +1,4 @@
-import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
+import crypto from 'node:crypto'
 
 /**
  * AES-256-GCM with envelope-key wrapping for the comment store.
@@ -6,12 +6,11 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
  * Two layers, with separate version bytes so the format is
  * self-describing:
  *
- *   - Body encryption (encrypt/decrypt): a random per-row data key
- *     (DEK) encrypts the comment body + author. Version 0x10.
- *
- *   - Key wrapping (wrapKey/unwrapKey): the database wrapping key
- *     for some generation N encrypts the DEK. Version 0x20. The
- *     wrapped DEK is stored alongside the body ciphertext.
+ * - Body encryption (encrypt/decrypt): a random per-row data key (DEK) encrypts
+ *   the comment body + author. Version 0x10.
+ * - Key wrapping (wrapKey/unwrapKey): the database wrapping key for some
+ *   generation N encrypts the DEK. Version 0x20. The wrapped DEK is stored
+ *   alongside the body ciphertext.
  *
  * This split is the standard envelope pattern: rotating the
  * wrapping key means re-wrapping each row's small DEK, not
@@ -31,41 +30,6 @@ const WRAP_VERSION = 0x20
 const KEY_BYTES = 32 // AES-256
 const IV_BYTES = 12 // GCM standard
 const TAG_BYTES = 16 // GCM standard
-
-/** A fresh 32-byte data key suitable for use as a per-row DEK. */
-export function randomDataKey(): Buffer {
-  return randomBytes(KEY_BYTES)
-}
-
-/** A fresh 32-byte wrapping key suitable for use as a database-level KEK. */
-export function randomWrappingKey(): Buffer {
-  return randomBytes(KEY_BYTES)
-}
-
-/**
- * Encrypt plaintext with a 32-byte data key. Returns base64 of
- * [1 byte version 0x10][12 byte IV][ciphertext + 16 byte tag].
- */
-export function encrypt(plaintext: string, dataKey: Buffer): string {
-  if (dataKey.length !== KEY_BYTES) {
-    throw new Error(
-      `encrypt: dataKey must be ${KEY_BYTES} bytes, got ${dataKey.length}`,
-    )
-  }
-  const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv('aes-256-gcm', dataKey, iv)
-  const ciphertext = Buffer.concat([
-    cipher.update(plaintext, 'utf-8'),
-    cipher.final(),
-  ])
-  const tag = cipher.getAuthTag()
-  return Buffer.concat([
-    Buffer.from([BODY_VERSION]),
-    iv,
-    ciphertext,
-    tag,
-  ]).toString('base64')
-}
 
 /**
  * Decrypt base64 ciphertext produced by encrypt(). Throws if the
@@ -89,7 +53,7 @@ export function decrypt(ciphertext: string, dataKey: Buffer): string {
   const iv = combined.subarray(1, 1 + IV_BYTES)
   const tag = combined.subarray(combined.length - TAG_BYTES)
   const ct = combined.subarray(1 + IV_BYTES, combined.length - TAG_BYTES)
-  const decipher = createDecipheriv('aes-256-gcm', dataKey, iv)
+  const decipher = crypto.createDecipheriv('aes-256-gcm', dataKey, iv)
   decipher.setAuthTag(tag)
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString(
     'utf-8',
@@ -97,30 +61,28 @@ export function decrypt(ciphertext: string, dataKey: Buffer): string {
 }
 
 /**
- * Wrap a 32-byte data key under a wrapping key. Returns base64 of
- * [1 byte version 0x20][12 byte IV][32 byte wrapped key + 16 byte tag].
- *
- * The wrapped form is exactly 61 bytes raw / 84 chars base64, so it
- * fits in any TEXT column without size concern.
+ * Encrypt plaintext with a 32-byte data key. Returns base64 of
+ * [1 byte version 0x10][12 byte IV][ciphertext + 16 byte tag].
  */
-export function wrapKey(dataKey: Buffer, wrappingKey: Buffer): string {
+export function encrypt(plaintext: string, dataKey: Buffer): string {
   if (dataKey.length !== KEY_BYTES) {
     throw new Error(
-      `wrapKey: dataKey must be ${KEY_BYTES} bytes, got ${dataKey.length}`,
+      `encrypt: dataKey must be ${KEY_BYTES} bytes, got ${dataKey.length}`,
     )
   }
-  if (wrappingKey.length !== KEY_BYTES) {
-    throw new Error(
-      `wrapKey: wrappingKey must be ${KEY_BYTES} bytes, got ${wrappingKey.length}`,
-    )
-  }
-  const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv('aes-256-gcm', wrappingKey, iv)
-  const ct = Buffer.concat([cipher.update(dataKey), cipher.final()])
+  const iv = crypto.randomBytes(IV_BYTES)
+  const cipher = crypto.createCipheriv('aes-256-gcm', dataKey, iv)
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, 'utf-8'),
+    cipher.final(),
+  ])
   const tag = cipher.getAuthTag()
-  return Buffer.concat([Buffer.from([WRAP_VERSION]), iv, ct, tag]).toString(
-    'base64',
-  )
+  return Buffer.concat([
+    Buffer.from([BODY_VERSION]),
+    iv,
+    ciphertext,
+    tag,
+  ]).toString('base64')
 }
 
 /**
@@ -135,6 +97,20 @@ export function wrapKey(dataKey: Buffer, wrappingKey: Buffer): string {
  */
 export function packEnvelope(ciphertext: string, wrappedDek: string): string {
   return `ENVELOPE:1:${wrappedDek}:${ciphertext}`
+}
+
+/**
+ * A fresh 32-byte data key suitable for use as a per-row DEK.
+ */
+export function randomDataKey(): Buffer {
+  return crypto.randomBytes(KEY_BYTES)
+}
+
+/**
+ * A fresh 32-byte wrapping key suitable for use as a database-level KEK.
+ */
+export function randomWrappingKey(): Buffer {
+  return crypto.randomBytes(KEY_BYTES)
 }
 
 /**
@@ -179,7 +155,34 @@ export function unwrapKey(wrapped: string, wrappingKey: Buffer): Buffer {
   const iv = combined.subarray(1, 1 + IV_BYTES)
   const ct = combined.subarray(1 + IV_BYTES, 1 + IV_BYTES + KEY_BYTES)
   const tag = combined.subarray(1 + IV_BYTES + KEY_BYTES)
-  const decipher = createDecipheriv('aes-256-gcm', wrappingKey, iv)
+  const decipher = crypto.createDecipheriv('aes-256-gcm', wrappingKey, iv)
   decipher.setAuthTag(tag)
   return Buffer.concat([decipher.update(ct), decipher.final()])
+}
+
+/**
+ * Wrap a 32-byte data key under a wrapping key. Returns base64 of
+ * [1 byte version 0x20][12 byte IV][32 byte wrapped key + 16 byte tag].
+ *
+ * The wrapped form is exactly 61 bytes raw / 84 chars base64, so it
+ * fits in any TEXT column without size concern.
+ */
+export function wrapKey(dataKey: Buffer, wrappingKey: Buffer): string {
+  if (dataKey.length !== KEY_BYTES) {
+    throw new Error(
+      `wrapKey: dataKey must be ${KEY_BYTES} bytes, got ${dataKey.length}`,
+    )
+  }
+  if (wrappingKey.length !== KEY_BYTES) {
+    throw new Error(
+      `wrapKey: wrappingKey must be ${KEY_BYTES} bytes, got ${wrappingKey.length}`,
+    )
+  }
+  const iv = crypto.randomBytes(IV_BYTES)
+  const cipher = crypto.createCipheriv('aes-256-gcm', wrappingKey, iv)
+  const ct = Buffer.concat([cipher.update(dataKey), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([Buffer.from([WRAP_VERSION]), iv, ct, tag]).toString(
+    'base64',
+  )
 }

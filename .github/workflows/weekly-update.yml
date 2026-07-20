@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup and install
-        uses: ./.github/actions/setup-and-install
+        uses: ./.github/actions/fleet/setup-and-install
         with:
           frozen-lockfile: 'false'
 
@@ -85,7 +85,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup and install
-        uses: ./.github/actions/setup-and-install
+        uses: ./.github/actions/fleet/setup-and-install
         with:
           frozen-lockfile: 'false'
 
