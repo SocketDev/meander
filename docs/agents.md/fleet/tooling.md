@@ -97,6 +97,8 @@ Every new dep added to `package.json` runs a Socket-score check at edit time. Lo
 
 Every per-package soak-bypass entry (the `'pkg@1.2.3'` exact-pin form) MUST carry a `# published: YYYY-MM-DD | removable: YYYY-MM-DD` annotation as the LAST comment line above the bullet. `published` is the version's npm publish date; `removable` is `published + 7d` so a periodic cleanup can drop entries that no longer need the bypass (enforced by `.claude/hooks/fleet/soak-exclude-date-guard/` at edit time + `scripts/fleet/check/soak-excludes-have-dates.mts` at commit time).
 
+**Add a soak-bypass ONLY with the writer, never by hand:** `node scripts/fleet/soak-bypass.mts <pkg>@<version>`. It fetches the authoritative npm publish date, writes the dated `'name@version'` pin to `pnpm-workspace.yaml` (canonical — pnpm reads it directly), AND regenerates the name-only mirror block in `.npmrc` (for npm >= v12, which matches soak-excludes by NAME or glob only, no `@version` — [npm/cli#9532](https://github.com/npm/cli/pull/9532)), keeping both package managers in lockstep from one command. Hand-editing either the pnpm pin or the `.npmrc` mirror reddens `scripts/fleet/check/npmrc-versioned-soak-mirror-is-derived.mts` — that check is the code-as-law contract that the two files agree.
+
 Vitest `include` globs must not match `node:test` files. Mismatched runners produce confusing "no test suite found" errors (enforced by `.claude/hooks/fleet/vitest-vs-node-test-guard/`).
 
 ## Bundler
@@ -155,7 +157,7 @@ Every executable script (skill runner, hook handler, fleet automation) is TypeSc
 
 ## Soak time
 
-(pnpm-workspace.yaml `minimumReleaseAge`, default 7 days). Never add packages to `minimumReleaseAgeExclude` in CI. Locally, ASK before adding (security control).
+(pnpm-workspace.yaml `minimumReleaseAge`, default 7 days). Never add packages to `minimumReleaseAgeExclude` in CI. Locally, ASK before adding (security control), then add it with `node scripts/fleet/soak-bypass.mts <pkg>@<version>` (never by hand — see "New dependencies + soak" above for why: it keeps `pnpm-workspace.yaml` and `.npmrc` in lockstep).
 
 ## External repo clones
 

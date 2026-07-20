@@ -211,6 +211,15 @@ export function buildPathsAndSupplyChainSteps(): CheckStep[] {
       run('node', [
         'scripts/fleet/check/npmrc-socket-soak-excludes-are-derived.mts',
       ]),
+    // .npmrc's versioned-soak-MIRROR block is DERIVED from pnpm-workspace.yaml's
+    // `minimumReleaseAgeExclude` version-pins (bare name only — npm can't pin a
+    // version, npm/cli#9532), so npm + pnpm share the ONE canonical list. Fails
+    // on drift; `scripts/fleet/soak-bypass.mts` + the cascade --fix it. This is
+    // what MANDATES the writer: hand-editing one file (pin OR mirror) reddens.
+    () =>
+      run('node', [
+        'scripts/fleet/check/npmrc-versioned-soak-mirror-is-derived.mts',
+      ]),
     // Fleet soak-exclude parity. Wheelhouse-only at runtime — the script
     // no-ops when `scripts/sync-scaffolding/manifest.mts` is absent (i.e.
     // in every cascaded fleet repo). Enforces that every versioned soak
