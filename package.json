@@ -67,7 +67,7 @@
   "dependencies": {
     "@sinclair/typebox": "catalog:",
     "@valtown/sdk": "1.0.0",
-    "marked": "18.0.0",
+    "marked": "18.0.6",
     "node-html-parser": "7.1.0",
     "svgo": "4.0.1"
   },
@@ -94,7 +94,7 @@
     "magic-string": "catalog:",
     "markdownlint-cli2": "catalog:",
     "mdast-util-from-markdown": "catalog:",
-    "mermaid": "11.14.0",
+    "mermaid": "11.16.0",
     "micromark": "catalog:",
     "neosanitize": "catalog:",
     "nock": "catalog:",

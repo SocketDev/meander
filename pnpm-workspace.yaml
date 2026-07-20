@@ -21,7 +21,7 @@ catalog:
   'compromise': 14.15.1
   'dtu-github-actions': 0.17.1
   'magic-string': 1.0.0
-  'markdownlint-cli2': 0.23.0
+  'markdownlint-cli2': 0.23.1
   'mdast-util-from-markdown': 2.0.3
   'micromark': 4.0.2
   'neosanitize': 0.3.0
@@ -118,6 +118,10 @@ minimumReleaseAgeExclude:
   - 'magic-string@1.0.0'
   # published: 2026-07-16 | removable: 2026-07-23
   - 'portless@0.15.4'
+  # Dependabot security bump: 0.23.1 ships js-yaml 5.2.1 (patches a
+  # moderate advisory in the 5.2.0 it pinned).
+  # published: 2026-07-17 | removable: 2026-07-24
+  - 'markdownlint-cli2@0.23.1'
 blockExoticSubdeps: true
 confirmModulesPurge: false
 managePackageManagerVersions: false
