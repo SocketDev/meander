@@ -153,3 +153,10 @@ pnpm-debug.log
 # fleet-canonical globs would otherwise ignore (untrack-ignored-files fix) ───
 !/test/fixtures/
 !/.node-version
+
+# ─── vitiate coverage-guided fuzz lane (`pnpm run test:fuzz`) caches ───
+# `.swc/` is the SWC instrument plugin's WASM cache; `.vitiate/` holds the
+# regenerable corpus + run results. Both are rebuilt on every fuzz run — never
+# commit them.
+/.swc/
+/.vitiate/
