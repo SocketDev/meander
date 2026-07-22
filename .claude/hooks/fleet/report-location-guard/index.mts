@@ -126,6 +126,9 @@ export const check = makeDocLocationCheck({
 })
 
 export const hook = defineHook({
+  bypass: ['report-location'],
+  bypassMode: 'manual',
+  bypassOptional: true,
   check,
   event: 'PreToolUse',
   matcher: ['Edit', 'Write', 'MultiEdit'],

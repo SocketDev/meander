@@ -125,12 +125,13 @@ export const check = editGuard((filePath, content): GuardResult => {
       '  const copy = structuredClone(value)\n' +
       '\n' +
       'One-off override: append `// socket-lint: allow structured-clone`\n' +
-      'to the line. Whole-session bypass requires the user to type\n' +
-      '`Allow no-structured-clone-prefer-json bypass` verbatim.\n',
+      'to the line.\n',
   )
 })
 
 export const hook = defineHook({
+  bypass: ['no-structured-clone-prefer-json'],
+  bypassOptional: true,
   check,
   event: 'PreToolUse',
   matcher: ['Edit', 'Write', 'MultiEdit'],

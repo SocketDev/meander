@@ -120,6 +120,12 @@ export function buildReleaseAndDocsSteps(): CheckStep[] {
     // push-run count per member via gh; report-mode for now (skips cleanly when
     // gh is unauthenticated / no fleet-repos.json in a member checkout).
     releaseStep(['scripts/fleet/check/member-ci-fires-on-push.mts']),
+    // Every repo in fleet-repos.json must EXIST in its org — a roster entry with
+    // no repo is a half-onboarded member (socket-gemini-nano: roster entry, no
+    // SocketDev/ repo → stranded cascades + 404'd environments). Onboarding must
+    // create the repo AND update the roster together. Report-mode + network-gated
+    // (a 404 can mean private + no token access), skips cleanly in offline lanes.
+    releaseStep(['scripts/fleet/check/member-repos-resolve.mts']),
     // The dep-0 fetcher (bootstrap/fleet.mjs) is a rolldown-inlined build artifact;
     // fail loud if it drifts from its bootstrap/src/* source (rebuild: node
     // scripts/repo/build-bootstrap-fetcher.mts). Wheelhouse-only — the build script
@@ -158,6 +164,21 @@ export function buildReleaseAndDocsSteps(): CheckStep[] {
     // Catches the failure mode that shipped a CHANGELOG entry describing work that
     // landed after its tag. Published versions are historical and not re-checked.
     () => run('node', ['scripts/fleet/check/changelog-is-commit-derived.mts']),
+    // A PENDING release's package.json version must be at most ONE bump ahead of
+    // the registry's latest-published version. A manifest pre-bumped further
+    // skips the versions between (package.json pre-bumped to 1.4.3, then the
+    // workflow bumped 1.4.3 → 1.4.4, so 1.4.3 was never published). Network read
+    // → release-tier; fail-open when no published version / registry unreachable.
+    releaseStep(['scripts/fleet/check/version-is-not-ahead-of-published.mts']),
+    // A multi-crate cargo workspace keeps every publishable crate BARE — a
+    // `-prerelease` breaks inter-crate `^X.Y.Z` resolution. The hint is OPTIONAL
+    // for a single crate (the release bumps from the published version by
+    // heuristic; anti-skip is version-is-not-ahead-of-published). No-ops without
+    // a Cargo.toml / cargo. Release-tier.
+    releaseStep([
+      'scripts/fleet/check/multi-crate-cargo-versions-are-bare.mts',
+      '--quiet',
+    ]),
     // No tracked symlink is self-referential or points at an absolute path
     // inside the repo (a `node_modules → /abs/<repo>/node_modules` self-loop
     // bricked fresh clones fleet-wide with ELOOP; git kept it tracked despite
@@ -211,6 +232,14 @@ export function buildReleaseAndDocsSteps(): CheckStep[] {
       'scripts/fleet/check/release-and-cascade-are-paired.mts',
       '--quiet',
     ]),
+    // Persisted release pins store ONLY exact canonical values — the belt twin of
+    // the write-time bundle-pin validators (bootstrap/src/lockstep.mts +
+    // sync-scaffolding/socket-wheelhouse-config.mts). Asserts the committed
+    // bundle.ref is an exact fleet-<hex> tag (no latest/main/head/stable/newest
+    // alias), bundle.cascadeSha / a manifest templateSha is a bare 40-hex SHA, and
+    // no alias is stored beside a canonical value. Pure local reads → always on;
+    // vacuous pass where nothing is pinned (the producer / a non-thin member).
+    () => run('node', ['scripts/fleet/check/release-pins-are-canonical.mts']),
     // llms.txt structural freshness: compares H1 + section titles + ordered link
     // pairs of the committed file against deterministic extraction. Prose is never
     // diffed — the check is credential-free and member-safe fail-open (no file or

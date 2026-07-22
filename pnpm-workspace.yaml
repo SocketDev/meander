@@ -1,7 +1,7 @@
 catalog:
   '@redwoodjs/agent-ci': 0.17.1
   '@sinclair/typebox': 0.34.52
-  '@socketregistry/packageurl-js': 1.4.2
+  '@socketregistry/packageurl-js': 1.4.4
   '@socketregistry/packageurl-js-stable': npm:@socketregistry/packageurl-js@1.4.2
   '@socketsecurity/lib': 6.1.0
   '@socketsecurity/lib-stable': npm:@socketsecurity/lib@6.1.0
@@ -17,9 +17,9 @@ catalog:
   '@vitiate/core': 0.3.1
   '@vitest/coverage-v8': 4.1.10
   '@vitest/ui': 4.1.10
-  'c8': 11.0.0
-  'chrome-devtools-mcp': 1.5.0
-  'compromise': 14.15.1
+  'c8': 12.0.0
+  'chrome-devtools-mcp': 1.6.0
+  'compromise': 14.16.0
   'dtu-github-actions': 0.17.1
   'fast-check': 4.9.0
   'magic-string': 1.0.0
@@ -28,8 +28,8 @@ catalog:
   'micromark': 4.0.2
   'neosanitize': 0.3.0
   'nock': 15.0.0
-  'oxfmt': 0.58.0
-  'oxlint': 1.73.0
+  'oxfmt': 0.59.0
+  'oxlint': 1.74.0
   'playwright-core': 1.61.1
   'portless': 0.15.4
   'regjsparser': 0.13.2
@@ -79,6 +79,8 @@ overrides:
 # them alongside the root manifest. Keeps hook deps in lockstep.
 packages:
   - '.claude/hooks/fleet/*'
+  - '.config/fleet/oxlint-plugin'
+  - '.config/fleet/oxlint-plugin/fleet/*'
 trustPolicy: no-downgrade
 allowBuilds:
   # @swc/core ships a native binary + a WASM plugin cache used by the
@@ -118,10 +120,6 @@ minimumReleaseAgeExclude:
   - 'sfw'
   - 'socket'
   - 'stuie'
-  # published: 2026-07-14 | removable: 2026-07-21
-  - '@redwoodjs/agent-ci@0.17.1'
-  # published: 2026-07-14 | removable: 2026-07-21
-  - 'dtu-github-actions@0.17.1'
   # published: 2026-07-16 | removable: 2026-07-23
   - 'magic-string@1.0.0'
   # published: 2026-07-16 | removable: 2026-07-23

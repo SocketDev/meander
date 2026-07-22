@@ -183,6 +183,9 @@ export function buildBlockMessage(
 }
 
 export const hook = defineHook({
+  bypass: ['pip-install'],
+  bypassMode: 'manual',
+  bypassOptional: true,
   check(payload) {
     const tool = payload?.tool_name
     if (tool !== 'Bash' && tool !== 'Edit' && tool !== 'Write') {
