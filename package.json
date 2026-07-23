@@ -85,9 +85,9 @@
     "@types/semver": "catalog:",
     "@types/shell-quote": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260415.1",
-    "@vitiate/core": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
+    "@vitiate/core": "catalog:",
     "c8": "catalog:",
     "chrome-devtools-mcp": "catalog:",
     "ecc-agentshield": "1.4.0",
@@ -103,6 +103,7 @@
     "nock": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
     "playwright-core": "catalog:",
     "portless": "catalog:",
     "puppeteer": "24.42.0",
@@ -112,8 +113,8 @@
     "taze": "catalog:",
     "type-coverage": "2.29.7",
     "typescript": "catalog:",
-    "vitiate": "catalog:",
     "vitest": "catalog:",
+    "vitiate": "catalog:",
     "yoctocolors-cjs": "2.1.3"
   },
   "typeCoverage": {
