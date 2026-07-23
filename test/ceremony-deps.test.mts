@@ -9,7 +9,7 @@
  *   gatherShares + printShares against the FakeIo channel.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -29,6 +29,7 @@ import {
 } from '../src/ceremony-deps.mts'
 import { encodeShare, split } from '../src/shamir.mts'
 import { FakeIo } from './utils/fake-deps.mts'
+import { safeDelete } from '@socketsecurity/lib-stable/fs/safe'
 
 const VAL_API = 'https://api.val.town'
 
@@ -284,8 +285,8 @@ describe('createIoChannel', () => {
   beforeEach(() => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'meander-iochannel-'))
   })
-  afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true })
+  afterEach(async () => {
+    await safeDelete(tmp)
   })
 
   it('reads queued shares from --share-file paths in order', async () => {
