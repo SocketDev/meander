@@ -23,18 +23,18 @@ import type { Row } from './admin-test-doubles.ts'
 /*  constantTimeEqual                                                   */
 /* ------------------------------------------------------------------ */
 
-test('constantTimeEqual: identical strings match', () => {
+void test('constantTimeEqual: identical strings match', () => {
   assert.equal(constantTimeEqual('abc', 'abc'), true)
   assert.equal(constantTimeEqual('', ''), true)
 })
 
-test('constantTimeEqual: different strings reject', () => {
+void test('constantTimeEqual: different strings reject', () => {
   assert.equal(constantTimeEqual('abc', 'abd'), false)
   assert.equal(constantTimeEqual('abc', 'abcd'), false)
   assert.equal(constantTimeEqual('abcd', 'abc'), false)
 })
 
-test('constantTimeEqual: empty vs non-empty reject', () => {
+void test('constantTimeEqual: empty vs non-empty reject', () => {
   assert.equal(constantTimeEqual('', 'a'), false)
   assert.equal(constantTimeEqual('a', ''), false)
 })
@@ -43,7 +43,7 @@ test('constantTimeEqual: empty vs non-empty reject', () => {
 /*  /admin/key-audit auth                                              */
 /* ------------------------------------------------------------------ */
 
-test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
+void test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
   const sqlite = makeSqlite([])
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
@@ -63,7 +63,7 @@ test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
   assert.match(body.error, /MEANDER_ADMIN_TOKEN/)
 })
 
-test('admin: returns 401 when Authorization header is missing', async () => {
+void test('admin: returns 401 when Authorization header is missing', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -76,7 +76,7 @@ test('admin: returns 401 when Authorization header is missing', async () => {
   assert.equal(res.status, 401)
 })
 
-test('admin: returns 401 on wrong bearer token', async () => {
+void test('admin: returns 401 on wrong bearer token', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -93,7 +93,7 @@ test('admin: returns 401 on wrong bearer token', async () => {
   assert.equal(res.status, 401)
 })
 
-test('admin: returns 500 with the keyContextError when key context is missing', async () => {
+void test('admin: returns 500 with the keyContextError when key context is missing', async () => {
   const app = setupApp({
     sqlite: makeSqlite([]),
     ensureDb: async () => {},
@@ -115,7 +115,7 @@ test('admin: returns 500 with the keyContextError when key context is missing', 
 /*  /admin/key-audit happy path                                        */
 /* ------------------------------------------------------------------ */
 
-test('admin: key-audit reports per-generation row counts', async () => {
+void test('admin: key-audit reports per-generation row counts', async () => {
   const ctx = await makeKeyContext([1, 2], 2)
   const sqlite = makeSqlite([
     { id: 'a', dek_wrapped: 'old1', key_generation: 1 },
@@ -145,7 +145,7 @@ test('admin: key-audit reports per-generation row counts', async () => {
   assert.deepEqual(body.rowCounts, { '1': 2, '2': 1 })
 })
 
-test('admin: key-audit returns empty rowCounts when no rows', async () => {
+void test('admin: key-audit returns empty rowCounts when no rows', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -167,7 +167,7 @@ test('admin: key-audit returns empty rowCounts when no rows', async () => {
 /*  /admin/rewrap input validation                                     */
 /* ------------------------------------------------------------------ */
 
-test('admin: rewrap rejects same fromGeneration / toGeneration', async () => {
+void test('admin: rewrap rejects same fromGeneration / toGeneration', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -191,7 +191,7 @@ test('admin: rewrap rejects same fromGeneration / toGeneration', async () => {
   assert.match(body.error, /distinct/)
 })
 
-test('admin: rewrap rejects negative generations', async () => {
+void test('admin: rewrap rejects negative generations', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -213,7 +213,7 @@ test('admin: rewrap rejects negative generations', async () => {
   assert.equal(res.status, 400)
 })
 
-test('admin: rewrap rejects out-of-range batchSize', async () => {
+void test('admin: rewrap rejects out-of-range batchSize', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -258,7 +258,7 @@ test('admin: rewrap rejects out-of-range batchSize', async () => {
 /*  /admin/rewrap happy path — the headline case                       */
 /* ------------------------------------------------------------------ */
 
-test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching ciphertext', async () => {
+void test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching ciphertext', async () => {
   /* Build realistic seed data: 5 rows under generation 1, each
    * with a real wrapped DEK we can validate after rewrap. */
   const ctx = await makeKeyContext([1, 2], 1)
@@ -339,7 +339,7 @@ test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching cipherte
   }
 })
 
-test('admin: rewrap is idempotent — calling with no rows in the from generation reports 0/0', async () => {
+void test('admin: rewrap is idempotent — calling with no rows in the from generation reports 0/0', async () => {
   const ctx = await makeKeyContext([1, 2], 2)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -363,7 +363,7 @@ test('admin: rewrap is idempotent — calling with no rows in the from generatio
   assert.equal(body.remaining, 0)
 })
 
-test('admin: rewrap propagates getKey failure when generation key is missing', async () => {
+void test('admin: rewrap propagates getKey failure when generation key is missing', async () => {
   /* Seeded with rows at gen 1, but the key context only has gen 2 +
    * gen 3. Calling rewrap from 1 → 2 should fail (gen 1 key absent). */
   const ctx = await makeKeyContext([2, 3], 2)

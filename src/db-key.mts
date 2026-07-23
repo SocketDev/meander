@@ -65,12 +65,12 @@ export async function dbKeyAudit(deps: CeremonyDeps): Promise<void> {
 }
 
 export async function dbKeyInit(
-  options: DbKeyOptions,
+  config: DbKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
-  const sharesCount = opts.shares ?? 3
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
+  const sharesCount = cfg.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const snapshot = await snapshotEnv(deps)
@@ -95,11 +95,11 @@ export async function dbKeyInit(
 }
 
 export async function dbKeyRestore(
-  options: DbKeyOptions,
+  config: DbKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
   validateShamirParams(threshold, threshold)
 
   const snapshot = await snapshotEnv(deps)
@@ -142,11 +142,11 @@ export async function dbKeyRestore(
 }
 
 export async function dbKeyRetire(
-  options: DbKeyOptions,
+  config: DbKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const target = opts.generation
+  const cfg = { __proto__: null, ...config } as typeof config
+  const target = cfg.generation
   if (target === undefined || !Number.isInteger(target) || target <= 0) {
     throw new Error('--generation <n> required (positive integer)')
   }
@@ -182,12 +182,12 @@ export async function dbKeyRetire(
 }
 
 export async function dbKeyRotate(
-  options: DbKeyOptions,
+  config: DbKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
-  const sharesCount = opts.shares ?? 3
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
+  const sharesCount = cfg.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const snapshot = await snapshotEnv(deps)

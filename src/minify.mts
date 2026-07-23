@@ -64,9 +64,9 @@ export type MinifyAssetOptions = {
  */
 export async function minifyAsset(
   code: string,
-  options: MinifyAssetOptions,
+  config: MinifyAssetOptions,
 ): Promise<string> {
-  const { kind } = { __proto__: null, ...options } as MinifyAssetOptions
+  const { kind } = { __proto__: null, ...config } as MinifyAssetOptions
   try {
     const { transform } = await import('esbuild')
     const out = await transform(code, {

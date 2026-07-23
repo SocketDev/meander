@@ -38,9 +38,7 @@ export async function deleteEnvVar(
     return false
   }
   if (!res.ok) {
-    throw new Error(
-      `deleteEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
-    )
+    throw new Error(`deleteEnvVar(${key}) failed: ${res.status} ${res.text()}`)
   }
   return true
 }
@@ -80,11 +78,9 @@ export async function getEnvVar(
     return undefined
   }
   if (!res.ok) {
-    throw new Error(
-      `getEnvVar(${key}) failed: ${res.status} ${await res.text()}`,
-    )
+    throw new Error(`getEnvVar(${key}) failed: ${res.status} ${res.text()}`)
   }
-  const body = (await res.json()) as { value?: string | undefined }
+  const body = res.json<{ value?: string | undefined }>()
   return typeof body.value === 'string' ? body.value : undefined
 }
 
@@ -104,11 +100,11 @@ export async function listEnvVarNames(
     { headers: { Authorization: `Bearer ${token}` } },
   )
   if (!res.ok) {
-    throw new Error(`listEnvVarNames failed: ${res.status} ${await res.text()}`)
+    throw new Error(`listEnvVarNames failed: ${res.status} ${res.text()}`)
   }
-  const body = (await res.json()) as {
+  const body = res.json<{
     data?: Array<{ key?: string | undefined }> | undefined
-  }
+  }>()
   const out: string[] = []
   for (const entry of body.data ?? []) {
     if (typeof entry.key === 'string') {
@@ -198,7 +194,7 @@ export async function setEnvVar(
   )
   if (!createRes.ok) {
     throw new Error(
-      `setEnvVar(${key}) failed: ${createRes.status} ${await createRes.text()}`,
+      `setEnvVar(${key}) failed: ${createRes.status} ${createRes.text()}`,
     )
   }
 }

@@ -179,7 +179,7 @@ export async function serve(
         `Run \`meander generate ${configPath}\` first, or use \`pnpm run dev\`.`,
     )
     process.exitCode = 1
-    return
+    return undefined
   }
 
   const { slug, partIds, hasDocuments } = await readWalkthroughMeta(outDir)

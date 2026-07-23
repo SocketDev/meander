@@ -41,7 +41,7 @@ export function adminAuth(
   if (!m) {
     return c.json({ error: 'admin auth required' }, 401)
   }
-  if (!constantTimeEqual(m[1]!, adminToken)) {
+  if (!constantTimeEqual(m[1], adminToken)) {
     return c.json({ error: 'admin auth failed' }, 401)
   }
   return undefined
@@ -133,7 +133,7 @@ export function registerAdminRoutes(app: Hono, deps: AdminDeps): Hono {
       key_generation: number
       n: number
     }>) {
-      counts[String(row.key_generation)] = Number(row.n)
+      counts[String(row.key_generation)] = row.n
     }
     return c.json({
       visibleGenerations: deps.keyContext.visibleGenerations(),
@@ -198,9 +198,7 @@ export function registerAdminRoutes(app: Hono, deps: AdminDeps): Hono {
       sql: 'SELECT COUNT(*) AS n FROM comments WHERE key_generation = :gen',
       args: { gen: fromGen },
     })
-    const remaining = Number(
-      (remainingResult.rows as Array<{ n: number }>)[0]?.n ?? 0,
-    )
+    const remaining = (remainingResult.rows as Array<{ n: number }>)[0]?.n ?? 0
 
     return c.json({ rewrapped, remaining })
   })

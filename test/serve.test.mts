@@ -142,7 +142,7 @@ describe('readWalkthroughMeta', () => {
     )
     const meta = await readWalkthroughMeta(tmpDir)
     expect(meta.slug).toBe('demo')
-    expect([...meta.partIds].toSorted()).toEqual([1, 3])
+    expect([...meta.partIds].toSorted((a, b) => a - b)).toEqual([1, 3])
     expect(meta.hasDocuments).toBe(true)
   })
 
@@ -152,7 +152,7 @@ describe('readWalkthroughMeta', () => {
     writeFileSync(path.join(tmpDir, 'unrelated.txt'), '', 'utf-8')
     const meta = await readWalkthroughMeta(tmpDir)
     expect(meta.slug).toBe('')
-    expect([...meta.partIds].toSorted()).toEqual([1, 7])
+    expect([...meta.partIds].toSorted((a, b) => a - b)).toEqual([1, 7])
     expect(meta.hasDocuments).toBe(false)
   })
 
@@ -245,21 +245,21 @@ describe('serve (HTTP handler)', () => {
     const res = await httpRequest(`${baseUrl}/`)
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toMatch(/text\/html/)
-    expect(await res.text()).toContain('<title>index</title>')
+    expect(res.text()).toContain('<title>index</title>')
   })
 
   it('routes /:slug/part/:n to part-<n>.html', async () => {
     const { baseUrl } = await start()
     const res = await httpRequest(`${baseUrl}/demo/part/1`)
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('<title>p1</title>')
+    expect(res.text()).toContain('<title>p1</title>')
   })
 
   it('serves documents.html at /:slug/documents', async () => {
     const { baseUrl } = await start()
     const res = await httpRequest(`${baseUrl}/demo/documents`)
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('<title>docs</title>')
+    expect(res.text()).toContain('<title>docs</title>')
   })
 
   it('returns 404 for an unknown part id', async () => {
@@ -281,11 +281,11 @@ describe('serve (HTTP handler)', () => {
      * strip branch. */
     const rootRes = await httpRequest(`${baseUrl}/`)
     expect(rootRes.status).toBe(200)
-    expect(await rootRes.text()).toContain('<title>index</title>')
+    expect(rootRes.text()).toContain('<title>index</title>')
     /* Real prefix stripping — request a part under the prefix. */
     const partRes = await httpRequest(`${baseUrl}/demo/part/1`)
     expect(partRes.status).toBe(200)
-    expect(await partRes.text()).toContain('<title>p1</title>')
+    expect(partRes.text()).toContain('<title>p1</title>')
   })
 
   it('rewrites exact-match basePath hit (no trailing slash) to /', async () => {
@@ -296,7 +296,7 @@ describe('serve (HTTP handler)', () => {
      * to `/` and serves index.html. */
     const res = await httpRequest(baseUrl)
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('<title>index</title>')
+    expect(res.text()).toContain('<title>index</title>')
   })
 
   it('returns 404 for missing files', async () => {
@@ -398,7 +398,7 @@ describe('serve (config + fallback resolution)', () => {
     server = result.server
     const res = await httpRequest(result.url)
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('custom')
+    expect(res.text()).toContain('custom')
   })
 
   it('returns undefined when no emit dir exists', async () => {
@@ -458,6 +458,6 @@ describe('serve (config + fallback resolution)', () => {
     server = result.server
     const res = await httpRequest(result.url)
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('default')
+    expect(res.text()).toContain('default')
   })
 })

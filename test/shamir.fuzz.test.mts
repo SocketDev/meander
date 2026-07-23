@@ -67,7 +67,7 @@ describe('shamir — fuzz', () => {
         shareScenario,
         ({ secret, sharesCount, subset, threshold }) => {
           const shares = split(secret, threshold, sharesCount)
-          const picked = subset.map(i => shares[i]!)
+          const picked = subset.map(i => shares[i])
           const recovered = combine(picked)
           expect([...recovered]).toEqual([...secret])
         },
@@ -90,12 +90,12 @@ describe('shamir — fuzz', () => {
           expect(shares.length).toBe(sharesCount)
           const seenX = new Set<number>()
           for (let i = 0; i < shares.length; i += 1) {
-            const s = shares[i]!
+            const s = shares[i]
             expect(s.length).toBe(3 + secret.length)
             expect(s[0]).toBe(0x01)
             expect(s[1]).toBe(threshold)
             expect(s[2]).toBe(i + 1)
-            seenX.add(s[2]!)
+            seenX.add(s[2])
           }
           expect(seenX.size).toBe(sharesCount)
         },
@@ -118,7 +118,10 @@ describe('shamir — fuzz', () => {
   // returns a Uint8Array rather than crashing.
   test('decodeShare never throws on base58-alphabet input', () => {
     const b58String = fc
-      .array(fc.constantFrom(...B58_ALPHABET), { minLength: 1, maxLength: 40 })
+      .array(fc.constantFrom(...B58_ALPHABET.split('')), {
+        minLength: 1,
+        maxLength: 40,
+      })
       .map(chars => chars.join(''))
     fc.assert(
       fc.property(b58String, s => {

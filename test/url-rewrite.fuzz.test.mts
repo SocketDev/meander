@@ -22,7 +22,7 @@ const LOWER = 'abcdefghijklmnopqrstuvwxyz'
 
 function fromChars(alphabet: string, minLength: number, maxLength: number) {
   return fc
-    .array(fc.constantFrom(...alphabet), { minLength, maxLength })
+    .array(fc.constantFrom(...alphabet.split('')), { minLength, maxLength })
     .map(chars => chars.join(''))
 }
 

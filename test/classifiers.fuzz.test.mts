@@ -25,16 +25,16 @@ const PKG_TAIL = 'abcdefghijklmnopqrstuvwxyz0123456789._-'
 
 function fromChars(alphabet: string, minLength: number, maxLength: number) {
   return fc
-    .array(fc.constantFrom(...alphabet), { minLength, maxLength })
+    .array(fc.constantFrom(...alphabet.split('')), { minLength, maxLength })
     .map(chars => chars.join(''))
 }
 
 // `@scope/name` — each segment starts alnum then allows [a-z0-9._-].
 const scopedPackage = fc
   .tuple(
-    fc.constantFrom(...ALNUM),
+    fc.constantFrom(...ALNUM.split('')),
     fromChars(PKG_TAIL, 0, 12),
-    fc.constantFrom(...ALNUM),
+    fc.constantFrom(...ALNUM.split('')),
     fromChars(PKG_TAIL, 0, 12),
   )
   .map(([s0, sRest, n0, nRest]) => `@${s0}${sRest}/${n0}${nRest}`)
@@ -43,7 +43,7 @@ const scopedPackage = fc
 const purl = fc
   .record({
     type: fc
-      .tuple(fc.constantFrom(...LOWER), fromChars(ALNUM, 0, 8))
+      .tuple(fc.constantFrom(...LOWER.split('')), fromChars(ALNUM, 0, 8))
       .map(([h, t]) => `${h}${t}`),
     segments: fc.array(fromChars(ALNUM, 1, 10), { minLength: 1, maxLength: 3 }),
     version: fc.option(fromChars(ALNUM, 1, 8), { nil: undefined }),
@@ -67,7 +67,10 @@ const email = fc
 const url = fc
   .tuple(
     fc
-      .tuple(fc.constantFrom(...LOWER), fromChars(`${ALNUM}+.-`, 0, 6))
+      .tuple(
+        fc.constantFrom(...LOWER.split('')),
+        fromChars(`${ALNUM}+.-`, 0, 6),
+      )
       .map(([h, t]) => `${h}${t}`),
     fromChars(`${ALNUM}/.-`, 1, 20),
   )

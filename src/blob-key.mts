@@ -45,12 +45,12 @@ export type BlobKeyOptions = {
 /* ------------------------------------------------------------------ */
 
 export async function blobKeyInit(
-  options: BlobKeyOptions,
+  config: BlobKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
-  const sharesCount = opts.shares ?? 3
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
+  const sharesCount = cfg.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const existing = await deps.env.getEnvVar(BLOB_KEY)
@@ -83,11 +83,11 @@ export async function blobKeyInit(
 }
 
 export async function blobKeyRestore(
-  options: BlobKeyOptions,
+  config: BlobKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
   validateShamirParams(threshold, threshold)
 
   const existing = await deps.env.getEnvVar(BLOB_KEY)
@@ -119,12 +119,12 @@ export async function blobKeyRestore(
 }
 
 export async function blobKeyRotate(
-  options: BlobKeyOptions,
+  config: BlobKeyOptions,
   deps: CeremonyDeps,
 ): Promise<void> {
-  const opts = { __proto__: null, ...options } as typeof options
-  const threshold = opts.threshold ?? 2
-  const sharesCount = opts.shares ?? 3
+  const cfg = { __proto__: null, ...config } as typeof config
+  const threshold = cfg.threshold ?? 2
+  const sharesCount = cfg.shares ?? 3
   validateShamirParams(threshold, sharesCount)
 
   const existing = await deps.env.getEnvVar(BLOB_KEY)

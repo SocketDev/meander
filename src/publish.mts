@@ -181,9 +181,7 @@ export async function uploadBlob(
     },
   )
   if (!res.ok) {
-    throw new Error(
-      `Failed to upload blob ${key}: ${res.status} ${await res.text()}`,
-    )
+    throw new Error(`Failed to upload blob ${key}: ${res.status} ${res.text()}`)
   }
   logger.log(`  Uploaded: ${key}`)
 }

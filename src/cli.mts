@@ -286,14 +286,11 @@ export function parseValTownFlags(args: readonly string[]): {
 
 export function usage(cmd: 'generate' | 'publish' | 'serve'): string {
   const form = '<meander.config.json>'
-  switch (cmd) {
-    case 'generate':
-      return `Usage: meander generate ${form} [--base-path <path>] [--asset-dir <dir>]`
-    case 'publish':
-      return `Usage: meander publish ${form} [--token-env <name>] [--graceful]`
-    case 'serve':
-      return `Usage: meander serve ${form} [--port N] [--base-path <path>]`
-  }
+  return {
+    generate: `Usage: meander generate ${form} [--base-path <path>] [--asset-dir <dir>]`,
+    publish: `Usage: meander publish ${form} [--token-env <name>] [--graceful]`,
+    serve: `Usage: meander serve ${form} [--port N] [--base-path <path>]`,
+  }[cmd]
 }
 
 async function main() {

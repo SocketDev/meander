@@ -9,7 +9,7 @@ import { b64urlDecode, b64urlEncode, signJwt, verifyJwt } from './jwt.ts'
 
 const SECRET = 'x'.repeat(32)
 
-test('b64url: round-trip arbitrary bytes', () => {
+void test('b64url: round-trip arbitrary bytes', () => {
   const input = new Uint8Array([0, 1, 2, 3, 250, 251, 252, 253, 254, 255])
   assert.deepEqual(
     Array.from(b64urlDecode(b64urlEncode(input))),
@@ -17,14 +17,14 @@ test('b64url: round-trip arbitrary bytes', () => {
   )
 })
 
-test('b64url: no +, /, or = in output', () => {
+void test('b64url: no +, /, or = in output', () => {
   const encoded = b64urlEncode(new Uint8Array([255, 255, 255]))
   assert.ok(!encoded.includes('+'))
   assert.ok(!encoded.includes('/'))
   assert.ok(!encoded.includes('='))
 })
 
-test('signJwt/verifyJwt: round-trip a simple payload', async () => {
+void test('signJwt/verifyJwt: round-trip a simple payload', async () => {
   const now = Math.floor(Date.now() / 1000)
   const token = await signJwt(
     { email: 'alice@example.com', exp: now + 60 },
@@ -35,7 +35,7 @@ test('signJwt/verifyJwt: round-trip a simple payload', async () => {
   assert.equal(payload['email'], 'alice@example.com')
 })
 
-test('verifyJwt: rejects bad signature', async () => {
+void test('verifyJwt: rejects bad signature', async () => {
   const now = Math.floor(Date.now() / 1000)
   const token = await signJwt(
     { email: 'alice@example.com', exp: now + 60 },
@@ -49,7 +49,7 @@ test('verifyJwt: rejects bad signature', async () => {
   assert.equal(payload, undefined)
 })
 
-test('verifyJwt: rejects expired token (exp < now)', async () => {
+void test('verifyJwt: rejects expired token (exp < now)', async () => {
   const now = Math.floor(Date.now() / 1000)
   const token = await signJwt(
     { email: 'alice@example.com', exp: now - 1 },
@@ -58,19 +58,19 @@ test('verifyJwt: rejects expired token (exp < now)', async () => {
   assert.equal(await verifyJwt(token, SECRET, now), undefined)
 })
 
-test('verifyJwt: accepts token with no exp claim (non-expiring)', async () => {
+void test('verifyJwt: accepts token with no exp claim (non-expiring)', async () => {
   const token = await signJwt({ email: 'svc-account' }, SECRET)
   const payload = await verifyJwt(token, SECRET)
   assert.ok(payload)
   assert.equal(payload['email'], 'svc-account')
 })
 
-test('verifyJwt: rejects malformed token (wrong segment count)', async () => {
+void test('verifyJwt: rejects malformed token (wrong segment count)', async () => {
   assert.equal(await verifyJwt('not.enough', SECRET), undefined)
   assert.equal(await verifyJwt('way.too.many.parts.here', SECRET), undefined)
 })
 
-test('verifyJwt: rejects non-JSON body', async () => {
+void test('verifyJwt: rejects non-JSON body', async () => {
   /* Craft header.body.sig where body isn't valid JSON but the
    * signature matches — tests the JSON.parse catch. */
   const head = b64urlEncode(

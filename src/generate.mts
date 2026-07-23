@@ -813,7 +813,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     sectionsByPart.get(section.partId)?.push(section)
   }
 
-  const hasDocuments = !!(documents && documents.length > 0)
+  const hasDocuments = documents !== undefined && documents.length > 0
   const counts = new Map<number, number>()
   const lineCounts = new Map<number, number>()
 
@@ -867,7 +867,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
      * (resolved relative to meander.config.json's dir), falling
      * back to the bundled default if the override isn't
      * provided or doesn't exist. */
-    const resolveOverride = (p?: string): string | undefined => {
+    const resolveOverride = (p?: string | undefined): string | undefined => {
       if (!p) {
         return undefined
       }
@@ -1774,7 +1774,7 @@ export async function renderMarkdownDocument(
   filePath: string,
   docIndex: number,
   allDocPaths: readonly string[],
-  mermaidRenderer?: MermaidRenderer,
+  mermaidRenderer?: MermaidRenderer | undefined,
   mermaidTheme: MermaidTheme = 'default',
 ): Promise<RenderedDocument> {
   let markdown = readFileSync(filePath, 'utf-8')

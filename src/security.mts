@@ -344,7 +344,7 @@ export async function sriForUrl(
     if (!res.ok) {
       throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
     }
-    const integrity = computeIntegrity(new Uint8Array(await res.arrayBuffer()))
+    const integrity = computeIntegrity(new Uint8Array(res.arrayBuffer()))
     await fs.mkdir(cacheDir, { recursive: true })
     await fs.writeFile(cachePath, integrity + '\n')
     return integrity
@@ -353,5 +353,5 @@ export async function sriForUrl(
   if (!res.ok) {
     throw new Error(`SRI fetch ${url} → HTTP ${res.status}`)
   }
-  return computeIntegrity(new Uint8Array(await res.arrayBuffer()))
+  return computeIntegrity(new Uint8Array(res.arrayBuffer()))
 }

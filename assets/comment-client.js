@@ -157,7 +157,7 @@ const logger = getDefaultLogger()
           'Check your email for a 6-digit code. Enter it here:',
         )
         if (!code || !code.trim()) {
-          return
+          return undefined
         }
         return verifyMagicCode(email, code.trim()).then(function (data) {
           setSession(data.token, data.email)

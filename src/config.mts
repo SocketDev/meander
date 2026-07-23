@@ -184,7 +184,7 @@ export function resolveOptOuts(config: MeanderConfig): ResolvedOptOuts {
 
 export function resolveStyles(
   input: MeanderConfig['styles'],
-  options: { commentsEnabled: boolean },
+  config: { commentsEnabled: boolean },
 ): ResolvedOptOuts['styles'] {
   if (input === false) {
     return {
@@ -195,7 +195,7 @@ export function resolveStyles(
       prose: false,
     }
   }
-  const { commentsEnabled } = { __proto__: null, ...options } as typeof options
+  const { commentsEnabled } = { __proto__: null, ...config } as typeof config
   const obj = typeof input === 'object' && input !== null ? input : {}
   return {
     base: obj.base ?? true,
