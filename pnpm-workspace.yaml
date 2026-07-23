@@ -38,6 +38,9 @@ catalog:
   'playwright-core': 1.61.1
   'portless': 0.15.4
   'regjsparser': 0.13.2
+  # Fleet bundler. Single-sourced to match the wheelhouse catalog pin;
+  # the hook-bundle build (scripts/fleet/build-hook-bundle.mts) runs it.
+  'rolldown': 1.1.4
   'semver': 7.8.5
   'shell-quote': 1.10.0
   'taze': 19.14.1
@@ -51,7 +54,16 @@ overrides:
   '@socketsecurity/lib': 'catalog:'
   '@socketsecurity/registry': 'catalog:'
   '@socketsecurity/sdk': 'catalog:'
+  # Dedup: @types/node 18 rides in via @anthropic-ai/sdk + @valtown/sdk and
+  # drags undici-types 5 beside the 26/8 pair the tree already carries.
+  # Types-only package — collapse to the catalog pin.
+  '@types/node': 'catalog:'
   'chalk@>=5': '5.6.2'
+  # Dedup: css-tree 2.2.1 via csso, pinned ~2.2.0, vs 3.2.1 direct from svgo.
+  # css-tree 3's AST-shape breaks don't touch the surface csso exercises —
+  # functionally verified at the wheelhouse: csso.minify() and a full
+  # svgo.optimize() pass both produce correct output on 3.2.1.
+  'css-tree': '3.2.1'
   'es-define-property': 'npm:@socketregistry/es-define-property@1.0.7'
   'es-set-tostringtag': 'npm:@socketregistry/es-set-tostringtag@1.0.10'
   'function-bind': 'npm:@socketregistry/function-bind@1.0.7'
@@ -113,6 +125,10 @@ allowBuilds:
 # compromised uploads.
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  # `@rolldown/pluginutils` versions independently of the catalog-pinned
+  # rolldown release; the per-platform bindings share its pin.
+  # Listed explicitly per the fleet "no scope globs in soak excludes" rule.
+  - '@rolldown/pluginutils'
   - '@sdxgen/*'
   - '@socketoverride/*'
   - '@socketregistry/*'
