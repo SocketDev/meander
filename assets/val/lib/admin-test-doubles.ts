@@ -37,8 +37,8 @@ export type TestContext = {
     param: (name: string) => string | undefined
     query: (name: string) => string | undefined
   }
-  json: (body: unknown, status?: number) => Response
-  text: (body: string, status?: number) => Response
+  json: (body: unknown, status?: number | undefined) => Response
+  text: (body: string, status?: number | undefined) => Response
   html: (body: string) => Response
 }
 
@@ -97,7 +97,7 @@ export async function makeKeyContext(
   const rawKeys = new Map<number, Uint8Array>()
   const importedKeys = new Map<number, CryptoKey>()
   for (let i = 0, { length } = generations; i < length; i += 1) {
-    const gen = generations[i]!
+    const gen = generations[i]
     const raw = randomDataKeyBytes()
     rawKeys.set(gen, raw)
     importedKeys.set(gen, await importKey(raw))
@@ -146,7 +146,7 @@ export function makeSqlite(initial: Row[]) {
       ) {
         const counts = new Map<number, number>()
         for (let i = 0, { length } = rows; i < length; i += 1) {
-          const r = rows[i]!
+          const r = rows[i]
           counts.set(r.key_generation, (counts.get(r.key_generation) ?? 0) + 1)
         }
         const out = [...counts.entries()]
@@ -178,8 +178,8 @@ export function makeSqlite(initial: Row[]) {
         const gen = Number(args['gen'])
         const idx = rows.findIndex(r => r.id === id)
         if (idx >= 0) {
-          rows[idx]!.dek_wrapped = wrapped
-          rows[idx]!.key_generation = gen
+          rows[idx].dek_wrapped = wrapped
+          rows[idx].key_generation = gen
         }
         return { rows: [] }
       }
@@ -204,9 +204,6 @@ export function makeSqlite(initial: Row[]) {
 
 export function setupApp(deps: AdminDeps) {
   const app = makeApp()
-  registerAdminRoutes(
-    app as unknown as Parameters<typeof registerAdminRoutes>[0],
-    deps,
-  )
+  registerAdminRoutes(app, deps)
   return app
 }

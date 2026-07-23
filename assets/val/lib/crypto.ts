@@ -46,7 +46,7 @@ export function base64Decode(s: string): Uint8Array {
 export function base64Encode(bytes: Uint8Array): string {
   let s = ''
   for (let i = 0; i < bytes.length; i++) {
-    s += String.fromCharCode(bytes[i]!)
+    s += String.fromCharCode(bytes[i])
   }
   return btoa(s)
 }
@@ -81,7 +81,7 @@ export async function decrypt(
   }
   if (combined[0] !== BODY_VERSION) {
     throw new Error(
-      `decrypt: unsupported body version 0x${combined[0]!.toString(16)}`,
+      `decrypt: unsupported body version 0x${combined[0].toString(16)}`,
     )
   }
   const iv = combined.slice(1, 1 + IV_BYTES)
@@ -170,7 +170,7 @@ export function unpackEnvelope(
   if (parts.length !== 4 || parts[1] !== '1') {
     throw new Error('unpackEnvelope: malformed envelope header')
   }
-  return { wrappedDek: parts[2]!, ciphertext: parts[3]! }
+  return { wrappedDek: parts[2], ciphertext: parts[3] }
 }
 
 /**
@@ -189,7 +189,7 @@ export async function unwrapKey(
   }
   if (combined[0] !== WRAP_VERSION) {
     throw new Error(
-      `unwrapKey: unsupported wrap version 0x${combined[0]!.toString(16)}`,
+      `unwrapKey: unsupported wrap version 0x${combined[0].toString(16)}`,
     )
   }
   const iv = combined.slice(1, 1 + IV_BYTES)

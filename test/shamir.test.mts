@@ -20,9 +20,9 @@ describe('shamir split/combine', () => {
     const shares = split(secret, 2, 3)
     expect(shares).toHaveLength(3)
     /* Any 2 of 3 should reconstruct exactly. */
-    expect(eq(combine([shares[0]!, shares[1]!]), secret)).toBe(true)
-    expect(eq(combine([shares[0]!, shares[2]!]), secret)).toBe(true)
-    expect(eq(combine([shares[1]!, shares[2]!]), secret)).toBe(true)
+    expect(eq(combine([shares[0], shares[1]]), secret)).toBe(true)
+    expect(eq(combine([shares[0], shares[2]]), secret)).toBe(true)
+    expect(eq(combine([shares[1], shares[2]]), secret)).toBe(true)
     /* All three also work — extras are tolerated. */
     expect(eq(combine(shares), secret)).toBe(true)
   })
@@ -32,15 +32,15 @@ describe('shamir split/combine', () => {
     const shares = split(secret, 3, 5)
     expect(shares).toHaveLength(5)
     /* Spot-check several 3-subsets. */
-    expect(eq(combine([shares[0]!, shares[2]!, shares[4]!]), secret)).toBe(true)
-    expect(eq(combine([shares[1]!, shares[3]!, shares[4]!]), secret)).toBe(true)
+    expect(eq(combine([shares[0], shares[2], shares[4]]), secret)).toBe(true)
+    expect(eq(combine([shares[1], shares[3], shares[4]]), secret)).toBe(true)
   })
 
   it('round-trips secrets of varied lengths', () => {
     for (const len of [1, 7, 16, 32, 64, 200]) {
       const secret = crypto.randomBytes(len)
       const shares = split(secret, 2, 3)
-      expect(eq(combine([shares[0]!, shares[1]!]), secret)).toBe(true)
+      expect(eq(combine([shares[0], shares[1]]), secret)).toBe(true)
     }
   })
 
@@ -53,7 +53,7 @@ describe('shamir split/combine', () => {
      * correctness around this is what GF(2^8) buys us. */
     const secret = crypto.randomBytes(32)
     const shares = split(secret, 3, 5)
-    expect(() => combine([shares[0]!, shares[1]!])).toThrow(/need >= 3/)
+    expect(() => combine([shares[0], shares[1]])).toThrow(/need >= 3/)
   })
 
   it('rejects threshold < 2', () => {
@@ -76,21 +76,21 @@ describe('shamir split/combine', () => {
   it('rejects duplicate share x-coordinates', () => {
     const secret = crypto.randomBytes(8)
     const shares = split(secret, 2, 3)
-    expect(() => combine([shares[0]!, shares[0]!])).toThrow(/duplicate/)
+    expect(() => combine([shares[0], shares[0]])).toThrow(/duplicate/)
   })
 
   it('rejects mismatched share lengths', () => {
     const secret = crypto.randomBytes(8)
     const shares = split(secret, 2, 3)
-    const truncated = shares[1]!.slice(0, -1)
-    expect(() => combine([shares[0]!, truncated])).toThrow(/length mismatch/)
+    const truncated = shares[1].slice(0, -1)
+    expect(() => combine([shares[0], truncated])).toThrow(/length mismatch/)
   })
 
   it('rejects mismatched thresholds', () => {
     const secret = crypto.randomBytes(8)
     const shares2 = split(secret, 2, 3)
     const shares3 = split(secret, 3, 5)
-    expect(() => combine([shares2[0]!, shares3[0]!])).toThrow(
+    expect(() => combine([shares2[0], shares3[0]])).toThrow(
       /length mismatch|threshold mismatch/,
     )
   })
@@ -98,9 +98,9 @@ describe('shamir split/combine', () => {
   it('rejects unknown version', () => {
     const secret = crypto.randomBytes(8)
     const shares = split(secret, 2, 3)
-    const tampered = new Uint8Array(shares[0]!)
+    const tampered = new Uint8Array(shares[0])
     tampered[0] = 0x99
-    expect(() => combine([tampered, shares[1]!])).toThrow(/version/)
+    expect(() => combine([tampered, shares[1]])).toThrow(/version/)
   })
 })
 
@@ -137,7 +137,7 @@ describe('shamir encodeShare/decodeShare', () => {
     const shares = split(secret, 2, 3)
     const encoded = shares.map(encodeShare)
     const decoded = encoded.map(decodeShare)
-    expect(eq(combine([decoded[0]!, decoded[1]!]), secret)).toBe(true)
+    expect(eq(combine([decoded[0], decoded[1]]), secret)).toBe(true)
   })
 })
 
@@ -150,7 +150,7 @@ describe('shamir GF(2^8) sanity', () => {
     for (let i = 0; i < 100; i++) {
       const secret = crypto.randomBytes(32)
       const shares = split(secret, 2, 3)
-      expect(eq(combine([shares[0]!, shares[2]!]), secret)).toBe(true)
+      expect(eq(combine([shares[0], shares[2]]), secret)).toBe(true)
     }
   })
 })

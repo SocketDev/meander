@@ -110,9 +110,7 @@ export async function createMermaidRenderer(
    * actually try to render a diagram. */
   let puppeteerMod: { launch: typeof puppeteer.launch }
   try {
-    puppeteerMod = (await import('puppeteer')) as unknown as {
-      launch: typeof puppeteer.launch
-    }
+    puppeteerMod = await import('puppeteer')
   } catch {
     throw new Error(
       'puppeteer not installed. Install with: pnpm add -D puppeteer',
@@ -226,10 +224,7 @@ export async function createMermaidRenderer(
         source,
         theme,
       )
-      const rawSvg = (await page.$eval(
-        '#out svg',
-        el => el.outerHTML,
-      )) as string
+      const rawSvg = await page.$eval('#out svg', el => el.outerHTML)
       /* SVGO pass — mermaid occasionally emits constructs SVGO's
        * parser dislikes; raw SVG on failure is visually correct. */
       let finalSvg: string

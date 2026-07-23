@@ -190,7 +190,7 @@ export function highlightProseNumbers(html: string): string {
       }
     }
   }
-  walk(root as unknown as HTMLElement)
+  walk(root)
   return root.toString()
 }
 
@@ -242,7 +242,7 @@ export function italicizeParentheticals(html: string): string {
       }
     }
   }
-  walk(root as unknown as HTMLElement)
+  walk(root)
   return root.toString()
 }
 

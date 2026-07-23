@@ -62,7 +62,7 @@ describe('generate opt-outs', () => {
   }
 
   it('default config emits meander.css and links it from pages', async () => {
-    await generate(writeConfig({}), { __proto__: null } as { __proto__: null })
+    await generate(writeConfig({}), { __proto__: null })
     const pages = path.join(tmpDir, 'pages')
     expect(existsSync(path.join(pages, 'meander.css'))).toBe(true)
     const index = readFileSync(path.join(pages, 'index.html'), 'utf-8')
@@ -71,9 +71,7 @@ describe('generate opt-outs', () => {
   })
 
   it('`styles: false` skips meander.css emit AND drops the <link>', async () => {
-    await generate(writeConfig({ styles: false }), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig({ styles: false }), { __proto__: null })
     const pages = path.join(tmpDir, 'pages')
     expect(existsSync(path.join(pages, 'meander.css'))).toBe(false)
     const index = readFileSync(path.join(pages, 'index.html'), 'utf-8')
@@ -83,9 +81,7 @@ describe('generate opt-outs', () => {
   })
 
   it('`theme: false` skips theme.js inlining', async () => {
-    await generate(writeConfig({ theme: false }), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig({ theme: false }), { __proto__: null })
     const index = readFileSync(
       path.join(tmpDir, 'pages', 'index.html'),
       'utf-8',
@@ -97,7 +93,7 @@ describe('generate opt-outs', () => {
   })
 
   it('defaults inline theme.js', async () => {
-    await generate(writeConfig({}), { __proto__: null } as { __proto__: null })
+    await generate(writeConfig({}), { __proto__: null })
     const index = readFileSync(
       path.join(tmpDir, 'pages', 'index.html'),
       'utf-8',
@@ -106,9 +102,7 @@ describe('generate opt-outs', () => {
   })
 
   it('`demoMode: true` stamps data-demo-mode on body', async () => {
-    await generate(writeConfig({ demoMode: true }), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig({ demoMode: true }), { __proto__: null })
     const index = readFileSync(
       path.join(tmpDir, 'pages', 'index.html'),
       'utf-8',
@@ -117,7 +111,7 @@ describe('generate opt-outs', () => {
   })
 
   it('omits data-demo-mode by default', async () => {
-    await generate(writeConfig({}), { __proto__: null } as { __proto__: null })
+    await generate(writeConfig({}), { __proto__: null })
     const index = readFileSync(
       path.join(tmpDir, 'pages', 'index.html'),
       'utf-8',

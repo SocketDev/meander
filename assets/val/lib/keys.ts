@@ -60,7 +60,7 @@ export function listGenerations(): number[] {
   const env = Deno.env.toObject()
   const names = Object.keys(env)
   for (let i = 0, { length } = names; i < length; i += 1) {
-    const name = names[i]!
+    const name = names[i]
     if (!name.startsWith(DB_KEY_PREFIX)) {
       continue
     }

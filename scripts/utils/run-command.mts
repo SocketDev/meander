@@ -129,8 +129,8 @@ export async function runCommandQuiet(
 
     return {
       exitCode: result.code,
-      stderr: result.stderr as string,
-      stdout: result.stdout as string,
+      stderr: result.stderr,
+      stdout: result.stdout,
     }
   } catch (e) {
     if (

@@ -126,8 +126,8 @@ describe('gatherShares', () => {
     const out = await gatherShares(io, 2)
     expect(out).toHaveLength(2)
     /* Each returned Uint8Array equals the original share's bytes. */
-    expect(Array.from(out[0]!)).toEqual(Array.from(fixture[0]!))
-    expect(Array.from(out[1]!)).toEqual(Array.from(fixture[1]!))
+    expect(Array.from(out[0])).toEqual(Array.from(fixture[0]))
+    expect(Array.from(out[1])).toEqual(Array.from(fixture[1]))
   })
 
   it('propagates an exhausted IoChannel as a clear error', async () => {

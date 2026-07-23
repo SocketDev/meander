@@ -42,5 +42,5 @@ export function parseAllowedDomains(raw: string | undefined): string[] {
 export function sixDigitCode(): string {
   const buf = new Uint32Array(1)
   crypto.getRandomValues(buf)
-  return (buf[0]! % 1_000_000).toString().padStart(6, '0')
+  return (buf[0] % 1_000_000).toString().padStart(6, '0')
 }

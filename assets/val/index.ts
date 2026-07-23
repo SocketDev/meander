@@ -147,7 +147,7 @@ export async function currentUser(c: Context): Promise<string | undefined> {
   if (!m) {
     return undefined
   }
-  return readSession(m[1]!)
+  return readSession(m[1])
 }
 
 export async function ensureDb() {
@@ -411,7 +411,7 @@ app.get('/', async c => {
        * only two segments, so the slug branch skips it. */
       const parts = b.key.split('/')
       if (parts.length >= 3 && parts[0] === OUT_DIR) {
-        slugs.add(parts[1]!)
+        slugs.add(parts[1])
       }
     }
     const links = [...slugs]

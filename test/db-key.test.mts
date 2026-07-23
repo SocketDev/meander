@@ -79,19 +79,15 @@ describe('dbKeyInit', () => {
     const lines = deps.io.output
     const shareBase58: string[] = []
     for (let i = 0; i < lines.length; i++) {
-      if (
-        lines[i] &&
-        lines[i]!.startsWith('Share ') &&
-        lines[i]!.endsWith(':')
-      ) {
-        shareBase58.push(lines[i + 1]!)
+      if (lines[i]?.startsWith('Share ') && lines[i].endsWith(':')) {
+        shareBase58.push(lines[i + 1])
       }
     }
     expect(shareBase58).toHaveLength(3)
     /* (We don't combine here — that's tested exhaustively in
      *  test/shamir.test.mts. Just sanity-check the wire format.) */
     for (let i = 0, { length } = shareBase58; i < length; i += 1) {
-      const s = shareBase58[i]!
+      const s = shareBase58[i]
       expect(s).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/)
     }
   })
@@ -169,8 +165,8 @@ describe('dbKeyRotate', () => {
     expect(deps.env.store.get('MEANDER_DB_KEY_1')).toBe(HEX_OF_BYTE(0x33))
     /* Both rewrap batches were called. */
     expect(deps.admin.rewrapCalls).toHaveLength(2)
-    expect(deps.admin.rewrapCalls[0]!.fromGeneration).toBe(1)
-    expect(deps.admin.rewrapCalls[0]!.toGeneration).toBe(2)
+    expect(deps.admin.rewrapCalls[0].fromGeneration).toBe(1)
+    expect(deps.admin.rewrapCalls[0].toGeneration).toBe(2)
     /* Status output mentions both batches. */
     expect(deps.io.text()).toContain('rewrapped 100 this batch, 50 remaining')
     expect(deps.io.text()).toContain('rewrapped 50 this batch, 0 remaining')

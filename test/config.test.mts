@@ -26,7 +26,7 @@ function minimalConfig(extra: Partial<MeanderConfig> = {}): MeanderConfig {
       },
     ],
     ...extra,
-  } as MeanderConfig
+  }
 }
 
 describe('resolveOptOuts', () => {
@@ -176,7 +176,7 @@ describe('loadMeanderConfig', () => {
   })
 
   it('throws on empty parts array', () => {
-    const p = writeConfig(minimalConfig({ parts: [] } as never))
+    const p = writeConfig(minimalConfig({ parts: [] }))
     expect(() => loadMeanderConfig(p)).toThrow(/invalid meander config/i)
   })
 

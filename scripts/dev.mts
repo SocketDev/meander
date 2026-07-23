@@ -36,7 +36,7 @@ const port = portArg ? Number(portArg.slice('--port='.length)) : 8080
 const watchMode = process.argv.includes('--watch')
 
 async function main(): Promise<void> {
-  await generate(configPath, { __proto__: null } as { __proto__: null })
+  await generate(configPath, { __proto__: null })
 
   if (watchMode) {
     /* Fire-and-forget watcher — the serve() call below blocks
@@ -47,10 +47,7 @@ async function main(): Promise<void> {
     void startWatcher()
   }
 
-  await serve(configPath, { port, __proto__: null } as {
-    port: number
-    __proto__: null
-  })
+  await serve(configPath, { port, __proto__: null })
 }
 
 async function startWatcher(): Promise<void> {
@@ -72,7 +69,7 @@ async function startWatcher(): Promise<void> {
       pending = false
       timer = undefined
       const started = Date.now()
-      generate(configPath, { __proto__: null } as { __proto__: null })
+      generate(configPath, { __proto__: null })
         .then(() => {
           logger.log(`✓ regen (${reason}) in ${Date.now() - started}ms`)
         })

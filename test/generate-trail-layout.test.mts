@@ -65,9 +65,7 @@ describe('generate index trail layout', () => {
   /* ---------- layout: auto resolves by count ---------- */
 
   it('auto layout below 12 markers picks cards', async () => {
-    await generate(writeConfig(3, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(3, {}), { __proto__: null })
     const index = readIndex()
     expect(index).toContain('mdr-toc-grid')
     expect(index).toContain('mdr-toc-card')
@@ -75,9 +73,7 @@ describe('generate index trail layout', () => {
   })
 
   it('auto layout at 12 markers promotes to rows', async () => {
-    await generate(writeConfig(12, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(12, {}), { __proto__: null })
     const index = readIndex()
     expect(index).toContain('mdr-trail-list')
     expect(index).not.toContain('mdr-toc-grid')
@@ -88,16 +84,14 @@ describe('generate index trail layout', () => {
   it('explicit cards keeps grid at high count', async () => {
     await generate(writeConfig(20, { layout: 'cards' }), {
       __proto__: null,
-    } as { __proto__: null })
+    })
     const index = readIndex()
     expect(index).toContain('mdr-toc-grid')
     expect(index).not.toContain('mdr-trail-list')
   })
 
   it('explicit rows uses trail list at low count', async () => {
-    await generate(writeConfig(3, { layout: 'rows' }), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(3, { layout: 'rows' }), { __proto__: null })
     const index = readIndex()
     expect(index).toContain('mdr-trail-list')
     expect(index).not.toContain('mdr-toc-grid')
@@ -108,7 +102,7 @@ describe('generate index trail layout', () => {
   it('filter input is absent below 24 rows', async () => {
     await generate(writeConfig(20, { layout: 'rows' }), {
       __proto__: null,
-    } as { __proto__: null })
+    })
     const index = readIndex()
     expect(index).not.toContain('mdr-trail-filter')
   })
@@ -116,7 +110,7 @@ describe('generate index trail layout', () => {
   it('filter input appears at 24 rows', async () => {
     await generate(writeConfig(24, { layout: 'rows' }), {
       __proto__: null,
-    } as { __proto__: null })
+    })
     const index = readIndex()
     expect(index).toContain('mdr-trail-filter')
     expect(index).toContain('mdr-trail-count')
@@ -127,9 +121,7 @@ describe('generate index trail layout', () => {
   /* ---------- kind glyph + mixed-kind detection ---------- */
 
   it('all-code trail uses single-kind class (suppresses glyph)', async () => {
-    await generate(writeConfig(12, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(12, {}), { __proto__: null })
     const index = readIndex()
     expect(index).toContain('mdr-trail-single')
     expect(index).not.toContain('mdr-trail-mixed')
@@ -149,7 +141,7 @@ describe('generate index trail layout', () => {
       }),
       'utf-8',
     )
-    await generate(cfg, { __proto__: null } as { __proto__: null })
+    await generate(cfg, { __proto__: null })
     const index = readIndex()
     expect(index).toContain('mdr-trail-mixed')
     expect(index).toContain('data-kind="article"')
@@ -159,18 +151,14 @@ describe('generate index trail layout', () => {
   /* ---------- backward compatibility ---------- */
 
   it('config without layout key still validates and renders', async () => {
-    await generate(writeConfig(3, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(3, {}), { __proto__: null })
     const index = readIndex()
     /* Renders something — the cards path. */
     expect(index).toContain('mdr-toc-grid')
   })
 
   it('config without kind on parts defaults to code', async () => {
-    await generate(writeConfig(12, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(12, {}), { __proto__: null })
     const index = readIndex()
     /* Every row stamps data-kind, defaulted to "code". */
     expect(index).toMatch(/data-kind="code"/)
@@ -180,9 +168,7 @@ describe('generate index trail layout', () => {
   /* ---------- numbering + size pill ---------- */
 
   it('rows render zero-padded tabular nums', async () => {
-    await generate(writeConfig(12, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(12, {}), { __proto__: null })
     const index = readIndex()
     /* First row is "01", twelfth is "12". */
     expect(index).toContain('>01<')
@@ -192,7 +178,7 @@ describe('generate index trail layout', () => {
   it('sizeTiers true stamps trail size pill class', async () => {
     await generate(writeConfig(12, { sizeTiers: true }), {
       __proto__: null,
-    } as { __proto__: null })
+    })
     const index = readIndex()
     /* At minimum the smallest tier — 1-line `src/app.ts` content
      * lands in x-small. */
@@ -200,9 +186,7 @@ describe('generate index trail layout', () => {
   })
 
   it('sizeTiers omitted suppresses trail size pill', async () => {
-    await generate(writeConfig(12, {}), { __proto__: null } as {
-      __proto__: null
-    })
+    await generate(writeConfig(12, {}), { __proto__: null })
     const index = readIndex()
     expect(index).not.toContain('mdr-trail-size-')
   })
