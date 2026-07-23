@@ -109,8 +109,6 @@ allowBuilds:
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@sdxgen/*'
-  - '@socketaddon/*'
-  - '@socketbin/*'
   - '@socketoverride/*'
   - '@socketregistry/*'
   - '@socketsecurity/*'
