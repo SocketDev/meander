@@ -7,8 +7,8 @@ catalog:
   '@socketsecurity/lib-stable': npm:@socketsecurity/lib@6.2.2
   '@socketsecurity/registry': 2.0.2
   '@socketsecurity/registry-stable': npm:@socketsecurity/registry@2.0.2
-  '@socketsecurity/sdk': 4.0.1
-  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.0.1
+  '@socketsecurity/sdk': 4.0.2
+  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.0.2
   '@types/mdast': 4.0.4
   '@types/node': 26.1.1
   '@types/semver': 7.7.1
@@ -104,6 +104,7 @@ allowBuilds:
   # vitiate coverage-guided fuzz lane's instrument transform (see the
   # root vitest.config.mts). Its postinstall must run so `pnpm run
   # test:fuzz` can SWC-instrument src/.
+  '@socketsecurity/sdk': false
   '@swc/core': true
   # esbuild ships platform-specific binaries via a postinstall;
   # it's a devDep of meander and a peer dep consumers use for
