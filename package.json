@@ -48,6 +48,7 @@
     "format": "node scripts/fleet/format.mts",
     "format:check": "node scripts/fleet/format.mts --check",
     "lockstep": "node scripts/fleet/lockstep.mts",
+    "lockstep:emit-mirror-globs": "node scripts/fleet/lockstep-emit-mirror-globs.mts",
     "lockstep:emit-schema": "node scripts/fleet/lockstep-emit-schema.mts",
     "prepare": "node scripts/fleet/install-git-hooks.mts && node scripts/fleet/prepare.mts",
     "security": "node scripts/fleet/security.mts",

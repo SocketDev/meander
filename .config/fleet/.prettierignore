@@ -31,9 +31,9 @@
 # git-ls-files template gate), not this walk.
 **/fleet/**
 
-# The rolldown-inlined dep-0 fetcher — a build artifact (from bootstrap/src/* via
-# scripts/repo/build-bootstrap-fetcher.mts), not hand-written source; oxfmt would
-# fight the bundler output. The bootstrap/src/* modules ARE formatted.
+# The rolldown-inlined dep-0 fetcher — a build artifact (from template/bootstrap/
+# src/* via scripts/repo/gen/bootstrap.mts), not hand-written source; oxfmt would
+# fight the bundler output. The template/bootstrap/src/* modules ARE formatted.
 **/bootstrap/fleet.mjs
 
 # Generated build/test output — machine-written trees whose generators own the
@@ -59,3 +59,11 @@
 # into a hardened `<name>.lock.yml`; that artifact is tool-owned and must stay
 # byte-identical to the compiler output (the .md is the source of truth).
 **/.github/workflows/*.lock.yml
+
+# Lockstep verbatim upstream mirrors — files kept byte-identical with the
+# upstream source they mirror, declared `mirror: true` in the lockstep
+# manifest and carrying the `// @lockstep-mirror` header marker. DERIVED by
+# scripts/fleet/lockstep/emit-mirror-globs.mts and asserted by
+# scripts/fleet/check/lockstep-mirror-markers-are-declared.mts — never hand-edit.
+# BEGIN lockstep-mirrors (generated)
+# END lockstep-mirrors (generated)
