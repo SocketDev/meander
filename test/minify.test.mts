@@ -63,21 +63,21 @@ describe('minifyEmittedHtml', () => {
 describe('minifyAsset', () => {
   it('minifies JS source', async () => {
     const code = 'const longName = 42;\n// a comment\nconsole.log(longName);'
-    const out = await minifyAsset(code, { kind: 'js' })
+    const out = await minifyAsset(code, 'js')
     expect(out).not.toContain('// a comment')
     expect(out.length).toBeLessThan(code.length)
   })
 
   it('minifies CSS source', async () => {
     const code = 'body {\n  color: red;\n  /* note */\n  background: white;\n}'
-    const out = await minifyAsset(code, { kind: 'css' })
+    const out = await minifyAsset(code, 'css')
     expect(out).not.toContain('/* note */')
     expect(out.length).toBeLessThan(code.length)
   })
 
   it('returns original source on failure (no throw)', async () => {
     const bad = 'const broken = ;'
-    const out = await minifyAsset(bad, { kind: 'js' })
+    const out = await minifyAsset(bad, 'js')
     expect(out).toBe(bad)
   })
 })

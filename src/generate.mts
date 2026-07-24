@@ -745,7 +745,7 @@ export async function generate(
       (typeof config.minify === 'object' ? config.minify.js !== false : true)
     if (minifyJsHere) {
       const m = await import('./minify.mts')
-      swOut = await m.minifyAsset(swOut, { kind: 'js' })
+      swOut = await m.minifyAsset(swOut, 'js')
     }
     /* sw.js must land at origin root (or basePath root) so its
      * scope covers the whole site. */
@@ -835,7 +835,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
       (typeof config.minify === 'object' ? config.minify.css !== false : true)
     if (minifyCssHere) {
       const m = await import('./minify.mts')
-      css = await m.minifyAsset(css, { kind: 'css' })
+      css = await m.minifyAsset(css, 'css')
     }
     const cssOutDir = assetDir ? path.join(outDir, assetDir) : outDir
     mkdirSync(cssOutDir, { recursive: true })

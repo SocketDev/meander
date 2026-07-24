@@ -52,10 +52,6 @@ const svgoConfig = {
   ],
 }
 
-export type MinifyAssetOptions = {
-  kind: 'js' | 'css'
-}
-
 /**
  * Minify a standalone JS or CSS source string via esbuild.
  * Used for the external meander.css and sw.js. Returns
@@ -64,9 +60,8 @@ export type MinifyAssetOptions = {
  */
 export async function minifyAsset(
   code: string,
-  config: MinifyAssetOptions,
+  kind: 'js' | 'css',
 ): Promise<string> {
-  const { kind } = { __proto__: null, ...config } as MinifyAssetOptions
   try {
     const { transform } = await import('esbuild')
     const out = await transform(code, {
