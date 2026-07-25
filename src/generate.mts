@@ -16,13 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { marked, Marked, Renderer } from 'marked'
 import type { Tokens } from 'marked'
 
-import {
-  isEmail,
-  isPurl,
-  isScopedPackage,
-  isUrl,
-  PURL_RE,
-} from './classifiers.mts'
+import { isEmail, isScopedPackage, isUrl, PURL_RE } from './classifiers.mts'
 import { loadMeanderConfig } from './config.mts'
 import type { DocEntry, WalkthroughPart } from './config.mts'
 import { polishProse } from './prose-polishers.mts'
@@ -183,15 +177,16 @@ const annotationMarked = new Marked({
    * (`alice@example.com`) keep their mailto. The email
    * classifier's shape check does the distinguishing. */
   walkTokens(token: Tokens.Generic) {
+    const href = token['href']
     if (
       token.type === 'link' &&
-      typeof token.href === 'string' &&
-      token.href.startsWith('mailto:')
+      typeof href === 'string' &&
+      href.startsWith('mailto:')
     ) {
-      const addr = token.href.slice('mailto:'.length)
+      const addr = href.slice('mailto:'.length)
       if (!isEmail(addr)) {
         token.type = 'text'
-        token.text = token.raw
+        token['text'] = token.raw
       }
     }
   },
@@ -986,7 +981,6 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   const minifyOpts = typeof minifyCfg === 'object' ? minifyCfg : undefined
   const minifyJs = minifyOpts?.js ?? minifyEnabled
   const minifySvg = minifyOpts?.svg ?? minifyEnabled
-  const minifyCssEnabled = minifyOpts?.css ?? minifyEnabled
   const cspEnabled = !!config.csp
   const sriEnabled = !!config.sri
   const cspOpts = typeof config.csp === 'object' ? config.csp : undefined
@@ -1144,7 +1138,6 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     const documentsHtml = renderDocumentsHtml(
       slug,
       parts,
-      documents,
       renderedDocs,
       documentsInlineJs,
       basePath,
@@ -1531,7 +1524,6 @@ export function renderCardGrid(
 export function renderDocumentsHtml(
   slug: string,
   parts: readonly WalkthroughPart[],
-  documents: readonly NormalizedDocEntry[],
   renderedDocs: RenderedDocData[],
   inlineJs: string,
   basePath: string,

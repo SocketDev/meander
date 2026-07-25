@@ -19,7 +19,7 @@
  * Requires: `gh` CLI on PATH, logged in or a GH_TOKEN env var.
  */
 import crypto from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 

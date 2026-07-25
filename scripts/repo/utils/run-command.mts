@@ -5,16 +5,16 @@
 import { WIN32 } from '@socketsecurity/lib-stable/constants/platform'
 import type { Logger } from '@socketsecurity/lib-stable/logger/logger'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import {
+  spawn,
+  spawnSync,
+} from '@socketsecurity/lib-stable/process/spawn/child'
 import type {
   SpawnErrorWithOutputString,
   SpawnOptions,
   SpawnSyncOptions,
   SpawnSyncReturns,
-} from '@socketsecurity/lib-stable/process/spawn/child'
-import {
-  spawn,
-  spawnSync,
-} from '@socketsecurity/lib-stable/process/spawn/child'
+} from '@socketsecurity/lib-stable/process/spawn/types'
 
 const logger: Logger = getDefaultLogger()
 
@@ -140,7 +140,10 @@ export async function runCommandQuiet(
       'stdout' in e &&
       'stderr' in e
     ) {
-      const spawnError: SpawnErrorWithOutputString = e
+      /* The three `in` checks above only narrow `e` to a Record
+       * intersection; the cast names the concrete spawn-error shape
+       * (spawn with stdioString: true rejects with string output). */
+      const spawnError = e as SpawnErrorWithOutputString
       return {
         exitCode: spawnError.code,
         stderr: spawnError.stderr,

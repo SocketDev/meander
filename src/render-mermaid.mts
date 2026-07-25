@@ -1,3 +1,7 @@
+/// <reference lib="dom" />
+/* The dom lib reference exists for the page.evaluate() callbacks
+ * below — they execute inside the puppeteer-controlled browser
+ * page, where window/document/Element/FontFace are real globals. */
 /**
  * Build-time Mermaid → SVG renderer.
  *

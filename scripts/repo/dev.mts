@@ -20,7 +20,11 @@ import { fileURLToPath } from 'node:url'
 // oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
 import { generate } from '../../src/generate.mts'
 // oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+import type { GenerateOptions } from '../../src/generate.mts'
+// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
 import { serve } from '../../src/serve.mts'
+// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+import type { ServeOptions } from '../../src/serve.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
 const logger = getDefaultLogger()
@@ -36,7 +40,7 @@ const port = portArg ? Number(portArg.slice('--port='.length)) : 8080
 const watchMode = process.argv.includes('--watch')
 
 async function main(): Promise<void> {
-  await generate(configPath, { __proto__: null })
+  await generate(configPath, { __proto__: null } as GenerateOptions)
 
   if (watchMode) {
     /* Fire-and-forget watcher — the serve() call below blocks
@@ -47,7 +51,7 @@ async function main(): Promise<void> {
     void startWatcher()
   }
 
-  await serve(configPath, { port, __proto__: null })
+  await serve(configPath, { __proto__: null, port } as ServeOptions)
 }
 
 async function startWatcher(): Promise<void> {
@@ -69,7 +73,7 @@ async function startWatcher(): Promise<void> {
       pending = false
       timer = undefined
       const started = Date.now()
-      generate(configPath, { __proto__: null })
+      generate(configPath, { __proto__: null } as GenerateOptions)
         .then(() => {
           logger.log(`✓ regen (${reason}) in ${Date.now() - started}ms`)
         })
