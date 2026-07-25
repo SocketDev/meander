@@ -133,11 +133,18 @@
     "is": 99,
     "strict": true
   },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": ">=11.0.0 <12.0.0",
+      "onFail": "error"
+    }
+  },
   "engines": {
     "node": ">=24",
+    "npm": ">=12.0.1",
     "pnpm": ">=11.0.5"
   },
-  "packageManager": "pnpm@>=11.0.5",
   "allowScripts": {
     "cpu-features": false,
     "esbuild": true,
