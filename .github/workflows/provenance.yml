@@ -52,7 +52,7 @@ jobs:
         run: pnpm run build
 
       - name: Run checks
-        run: pnpm run check
+        run: pnpm run check --all
 
       - name: Publish with provenance
         env:

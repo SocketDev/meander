@@ -92,7 +92,7 @@ jobs:
       - name: Apply taze updates + verify
         run: |
           pnpm run update
-          pnpm run check
+          pnpm run check --all
           pnpm run build
 
       # Refresh external-tools.json checksums so a new pnpm /
@@ -105,7 +105,7 @@ jobs:
           node scripts/repo/update-tools.mts
           # Re-run the full check so the refreshed checksums are
           # schema-valid before we commit.
-          pnpm run check
+          pnpm run check --all
 
       - name: Create PR
         env:

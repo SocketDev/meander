@@ -53,7 +53,7 @@ jobs:
         uses: ./.github/actions/fleet/setup-and-install
 
       - name: Run checks
-        run: pnpm run check
+        run: pnpm run check --all
 
       - name: AgentShield audit (.claude configs)
         # Audits this repo's .claude/ settings + hooks for known
@@ -92,7 +92,7 @@ jobs:
         uses: ./.github/actions/fleet/setup-and-install
 
       - name: Run tests (meander CLI)
-        run: pnpm run test
+        run: pnpm run test --all
 
       - name: Run tests (val helpers)
         run: pnpm run test:val
