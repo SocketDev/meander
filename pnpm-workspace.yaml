@@ -7,9 +7,9 @@ catalog:
   '@socketsecurity/lib': 6.2.3
   '@socketsecurity/lib-stable': npm:@socketsecurity/lib@6.2.3
   '@socketsecurity/registry': 2.0.4
-  '@socketsecurity/registry-stable': npm:@socketsecurity/registry@2.0.2
+  '@socketsecurity/registry-stable': npm:@socketsecurity/registry@2.0.4
   '@socketsecurity/sdk': 4.0.4
-  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.0.3
+  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.0.4
   '@types/mdast': 4.0.4
   '@types/node': 26.1.1
   '@types/semver': 7.7.1
@@ -46,6 +46,9 @@ catalog:
   'shell-quote': 1.10.0
   'taze': 19.16.0
   'typescript': 7.0.2
+  # vite 8.x is rolldown-native (no esbuild transitive); the override
+  # below pins every transitive vite (vitest, @vitest/*) to it.
+  'vite': 8.1.0
   'vitiate': 0.3.1
   'vitest': 4.1.10
 
@@ -93,6 +96,10 @@ overrides:
   # functionally verified at the wheelhouse: csso.minify() and a full
   # svgo.optimize() pass both produce correct output on 3.2.1.
   'css-tree': '3.2.1'
+  # Force every transitive vite resolution (vitest, @vitest/*) to the
+  # catalog'd rolldown-native 8.x — vite 6/7 hard-depend on esbuild.
+  'rolldown': 'catalog:'
+  'vite': 'catalog:'
 
 # Register .claude/hooks/* as workspace packages so `pnpm install`
 # resolves each hook's deps + taze (via `pnpm run update`) bumps
