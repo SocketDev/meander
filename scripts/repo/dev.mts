@@ -18,15 +18,15 @@ import { watch as fsWatch } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 // oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
-import { generate } from '../src/generate.mts'
+import { generate } from '../../src/generate.mts'
 // oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
-import { serve } from '../src/serve.mts'
+import { serve } from '../../src/serve.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
 const logger = getDefaultLogger()
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const repoRoot = path.resolve(here, '..')
+const repoRoot = path.resolve(here, '..', '..')
 const fixtureDir = path.join(repoRoot, 'test', 'fixtures', 'test-docs')
 const assetsDir = path.join(repoRoot, 'assets')
 const configPath = path.join(fixtureDir, 'meander.config.json')

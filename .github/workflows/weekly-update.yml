@@ -57,7 +57,7 @@ jobs:
           # whether package.json, pnpm-lock.yaml, or
           # external-tools.json changed after a full refresh pass.
           pnpm run update || true
-          node scripts/update-tools.mts || true
+          node scripts/repo/update-tools.mts || true
           if git diff --quiet -- package.json pnpm-lock.yaml external-tools.json; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
@@ -102,7 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node scripts/update-tools.mts
+          node scripts/repo/update-tools.mts
           # Re-run the full check so the refreshed checksums are
           # schema-valid before we commit.
           pnpm run check

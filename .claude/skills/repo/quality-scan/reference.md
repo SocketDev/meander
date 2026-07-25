@@ -471,7 +471,7 @@ Pattern: [Problematic code/config]
 Fix: [Specific change]
 
 Example:
-File: scripts/build.mts:23
+File: scripts/repo/build.mts:23
 Issue: Default-imports `path` cherry-pick style instead of CLAUDE.md convention
 Severity: Low
 Impact: Inconsistent style; reviewers must mentally normalize across scripts

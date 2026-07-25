@@ -45,7 +45,11 @@ const ToolEntrySchema = Type.Object({
   description: Type.String({ minLength: 1 }),
   repository: Type.String({ pattern: '^github:[^/]+/[^/]+$' }),
   version: Type.String({ minLength: 1 }),
-  release: Type.Union([Type.Literal('asset'), Type.Literal('binary')]),
+  release: Type.Union([
+    Type.Literal('archive'),
+    Type.Literal('asset'),
+    Type.Literal('uv-project'),
+  ]),
   checksums: ChecksumMapSchema,
 })
 
@@ -54,13 +58,24 @@ const ExternalToolsSchema = Type.Record(
   ToolEntrySchema,
 )
 
-export type ExternalTools = Static<typeof ExternalToolsSchema>
+/* The fleet container shape (scripts/fleet/lib/external-tools-schema.mts):
+ * `{ $schema?, description?, tools: { <name>: ToolEntry } }`. This repo
+ * schema narrows the fleet ToolEntry to the fields meander's entries
+ * require at runtime. */
+const ExternalToolsFileSchema = Type.Object({
+  $schema: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  tools: ExternalToolsSchema,
+})
 
-export function validateExternalTools(filePath: string): ExternalTools {
+export type ExternalTools = Static<typeof ExternalToolsSchema>
+export type ExternalToolsFile = Static<typeof ExternalToolsFileSchema>
+
+export function validateExternalToolsFile(filePath: string): ExternalToolsFile {
   const resolved = path.resolve(filePath)
   const raw: unknown = JSON.parse(readFileSync(resolved, 'utf-8'))
-  if (!Value.Check(ExternalToolsSchema, raw)) {
-    const errors = [...Value.Errors(ExternalToolsSchema, raw)]
+  if (!Value.Check(ExternalToolsFileSchema, raw)) {
+    const errors = [...Value.Errors(ExternalToolsFileSchema, raw)]
     const messages = errors
       .map(e => `  ${e.path || '(root)'}: ${e.message}`)
       .join('\n')
@@ -69,13 +84,17 @@ export function validateExternalTools(filePath: string): ExternalTools {
   return raw
 }
 
+export function validateExternalTools(filePath: string): ExternalTools {
+  return validateExternalToolsFile(filePath).tools
+}
+
 /* Allow running as a standalone script: `node --experimental-
  * strip-types validate-tools.mts`. Prints a ✓ on success,
  * exits non-zero on validation failure. */
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url))
-  const repoRoot = path.resolve(scriptDir, '..')
+  const repoRoot = path.resolve(scriptDir, '..', '..')
   const toolsPath = path.join(repoRoot, 'external-tools.json')
   try {
     const tools = validateExternalTools(toolsPath)

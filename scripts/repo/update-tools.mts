@@ -9,7 +9,7 @@
  * 3. Patch the JSON in place with the new version + checksums.
  *
  * Invoked by the weekly-update workflow. Safe to run locally too:
- * `node scripts/update-tools.mts` produces a dirty tree that
+ * `node scripts/repo/update-tools.mts` produces a dirty tree that
  * can be committed after the usual review.
  *
  * Exits 0 when nothing changed; exits 0 + writes the file when
@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { validateExternalTools } from './validate-tools.mts'
+import { validateExternalToolsFile } from './validate-tools.mts'
 import type { ExternalTools } from './validate-tools.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 import { errorMessage } from '@socketsecurity/lib-stable/errors/message'
@@ -32,7 +32,7 @@ import { httpJson, httpRequest } from '@socketsecurity/lib-stable/http-request'
 const logger = getDefaultLogger()
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
-const repoRoot = path.resolve(scriptDir, '..')
+const repoRoot = path.resolve(scriptDir, '..', '..')
 const toolsPath = path.join(repoRoot, 'external-tools.json')
 
 type ReleaseAsset = { name: string; browser_download_url: string }
@@ -173,9 +173,9 @@ async function refreshOne(
 }
 
 async function main(): Promise<void> {
-  const tools = validateExternalTools(toolsPath)
+  const config = validateExternalToolsFile(toolsPath)
   let anyChanged = false
-  for (const [name, entry] of Object.entries(tools)) {
+  for (const [name, entry] of Object.entries(config.tools)) {
     try {
       const result = await refreshOne(name, entry)
       if (result.changed) {
@@ -190,10 +190,10 @@ async function main(): Promise<void> {
     }
   }
   if (anyChanged) {
-    writeFileSync(toolsPath, JSON.stringify(tools, null, 2) + '\n')
+    writeFileSync(toolsPath, JSON.stringify(config, null, 2) + '\n')
     /* Re-validate — catches any weird shape that slipped through
      * a partially-refreshed entry. Throws on schema violation. */
-    validateExternalTools(toolsPath)
+    validateExternalToolsFile(toolsPath)
     logger.log('✓ external-tools.json updated')
   } else {
     logger.log('✓ external-tools.json already up to date')
