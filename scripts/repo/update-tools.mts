@@ -1,4 +1,4 @@
-/**
+/*
  * Refresh external-tools.json checksums.
  *
  * For each tool entry, look up the latest published version on

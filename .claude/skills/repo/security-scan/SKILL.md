@@ -1,6 +1,6 @@
 ---
 name: security-scan
-description: Runs AgentShield on .claude/ config and zizmor on GitHub Actions, then has the security-reviewer agent grade A-F. Use after touching .claude/, hooks, agents, or workflows, and before releases.
+description: AgentShield on .claude/ config + zizmor on GitHub Actions, graded A-F by the security-reviewer agent.
 user-invocable: true
 ---
 

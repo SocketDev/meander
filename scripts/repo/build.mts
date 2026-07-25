@@ -1,4 +1,4 @@
-/**
+/*
  * @file Build runner: bundles the CLI via rolldown + emits
  *   type declarations via tsc.
  *   Two outputs:

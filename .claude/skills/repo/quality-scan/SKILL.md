@@ -1,6 +1,6 @@
 ---
 name: quality-scan
-description: Read-only quality sweep for meander. Cleans junk, runs `pnpm run check`, spawns agents for critical/logic/workflow/security/docs scans, returns a prioritized report. Use before releases.
+description: Read-only quality sweep. Runs `pnpm run check`, spawns critical/logic/workflow/security/docs scan agents, returns a prioritized report.
 user-invocable: true
 allowed-tools: Task, Skill, Bash, Read, Grep, Glob
 ---

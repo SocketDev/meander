@@ -1,4 +1,4 @@
-/**
+/*
  * Local dev entry: generate + serve the test fixture, with
  * optional file-watcher that re-runs generate on source change.
  *
