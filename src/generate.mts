@@ -1535,7 +1535,8 @@ export function renderDocumentsHtml(
   // Build tab bar
   const tabButtons = renderedDocs
     .map((doc, index) => {
-      const fileName = doc.filePath.split('/').pop() ?? doc.filePath
+      const fileName =
+        normalizePath(doc.filePath).split('/').pop() ?? doc.filePath
       const activeClass = index === 0 ? ' active' : ''
       return `<button class="doc-tab-btn${activeClass}" data-doc-index="${index}">${escapeHtml(fileName)}</button>`
     })
