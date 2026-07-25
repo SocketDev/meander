@@ -32,7 +32,7 @@ What the encryption defends against:
 What it does _not_ defend against:
 
 - **Live val compromise**: an attacker with code execution inside
-  the running val sees plaintext (the val must decrypt to serve).
+  the running val sees plaintext — the val must decrypt to serve.
 - **Reader-side leakage**: anyone with a valid JWT (or anyone, for
   open reads) gets plaintext from the API.
 - **Custodian compromise**: if more than `(shares − threshold)`
@@ -44,7 +44,7 @@ What it does _not_ defend against:
 Both encryption stories use the same construction:
 
 1. **Data Encryption Key (DEK)** — 32 random bytes. Encrypts the
-   payload (a comment body, a walkthrough blob) with AES-256-GCM.
+   payload, a comment body or a walkthrough blob, with AES-256-GCM.
 2. **Wrapping key** — 32 random bytes. Encrypts the DEK with
    AES-256-GCM. The wrapped DEK is stored alongside the
    ciphertext.
@@ -59,7 +59,7 @@ rotation.
 
 Binary formats:
 
-```
+```text
 Body ciphertext  [version 0x10] [12-byte IV] [ciphertext + 16-byte GCM tag]   base64
 Wrapped DEK      [version 0x20] [12-byte IV] [32-byte ciphertext + 16-byte GCM tag]   base64
 Envelope blob    "ENVELOPE:1:" + <wrappedDEK> + ":" + <body ciphertext>      ASCII

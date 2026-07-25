@@ -340,7 +340,7 @@ problem without running the full pipeline.
 <a id="cross-references"></a>
 ## 7. Cross-references
 
-- **SKILL.md** (this skill's main file) — the decision
+- **SKILL.md** — this skill's main file: the decision
   procedure and worked examples.
 - `/Users/jdalton/projects/meander/src/config.mts`:
   - `WalkthroughPartSchema` (line 24) — `parts[]` shape.

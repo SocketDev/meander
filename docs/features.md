@@ -662,7 +662,7 @@ Or customize:
 
 ### Directives emitted
 
-```
+```text
 default-src 'self'
 script-src 'self' + cdnHosts + inline-script sha256 hashes
 style-src 'self' + cdnHosts + inline-style sha256 hashes + 'unsafe-hashes'

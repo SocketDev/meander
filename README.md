@@ -1,23 +1,22 @@
-<p align="center">
+# meander
+
+<div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-bezel-dark.svg">
     <img alt="meander" src="assets/logo/logo-bezel-light.svg" width="420">
   </picture>
-</p>
+</div>
 
-<h1 align="center">meander</h1>
+<a href="https://socket.dev/npm/package/@socketsecurity/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@socketsecurity/meander" height="20"></a>
+<a href="https://github.com/SocketDev/meander/actions/workflows/ci.yml"><img alt="CI - @socketsecurity/meander" src="https://github.com/SocketDev/meander/actions/workflows/ci.yml/badge.svg" height="20"></a>
+<img alt="Coverage" src="https://img.shields.io/badge/coverage-99%25-brightgreen" height="20">
 
-<p align="center">
-  Annotated code walkthrough pages with a live comment system, hosted on <a href="https://val.town">Val Town</a>.
-</p>
+[![Follow @SocketSecurity](assets/fleet/badge-follow-x.svg)](https://twitter.com/SocketSecurity)
+[![Follow @socket.dev on Bluesky](assets/fleet/badge-follow-bluesky.svg)](https://bsky.app/profile/socket.dev)
 
-<p align="center">
-  <a href="https://socket.dev/npm/package/@socketsecurity/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@socketsecurity/meander"></a>
-  <a href="https://github.com/SocketDev/meander/actions/workflows/ci.yml"><img alt="CI - @socketsecurity/meander" src="https://github.com/SocketDev/meander/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Coverage" src="https://img.shields.io/badge/coverage-99%25-brightgreen">
-</p>
+Annotated code walkthrough pages with a live comment system, hosted on [Val Town](https://val.town).
 
----
+## Why this repo exists
 
 Meander turns `/* … */` comments in your source files into a
 narrated, navigable walkthrough. Each comment becomes a prose
@@ -26,29 +25,9 @@ block. Readers can leave threaded comments on any line range.
 
 The generator emits static HTML. Comments are stored server-side
 in a Val Town val (SQLite + blob storage, encrypted at rest) —
-you only need that piece if you want the commenting layer.
-
-## Features
-
-- **Side-by-side prose + code** — each block comment pairs with
-  the code that follows it.
-- **Multi-part walkthroughs** — split a codebase into ordered
-  parts; the top nav moves readers between them.
-- **Go-to-definition** — exported symbols are indexed so readers
-  can jump to any definition across parts.
-- **Line-range commenting** — shift-click to select lines, type a
-  comment, reply, resolve, delete.
-- **Documents tab** — optional Markdown pages with syntax
-  highlighting, a floating table of contents, block-level
-  comments, and cross-doc links.
-- **Reader UX** — resizable prose/code splitter, jump-to-file
-  menus, theme toggle, Cmd/Ctrl-click hotlinks, JSDoc annotation,
-  opt-in Mermaid pre-rendering.
-- **Val Town hosting** — one Hono val serves every walkthrough
-  out of blob storage, with encryption at rest.
-
-See [docs/features.md](docs/features.md) for the full feature
-list and configuration knobs.
+you only need that piece if you want the commenting layer. See
+[docs/features.md](docs/features.md) for the full feature list
+and configuration knobs.
 
 ## Install
 
@@ -64,7 +43,7 @@ npx @socketsecurity/meander generate meander.config.json
 
 **Requirements**: Node >= 20.
 
-## Quick start
+## Usage
 
 ### 1. Annotate your source
 
@@ -123,7 +102,7 @@ meander serve meander.config.json      # local preview at http://127.0.0.1:8080
 
 `generate` writes into `pages/` next to your config:
 
-```
+```text
 pages/
   index.html        part listing
   part-1.html       one file per part
@@ -132,9 +111,28 @@ pages/
   manifest.json     build summary
 ```
 
-## Config reference
+### Features
 
-### Top-level fields
+- **Side-by-side prose + code** — each block comment pairs with
+  the code that follows it.
+- **Multi-part walkthroughs** — split a codebase into ordered
+  parts; the top nav moves readers between them.
+- **Go-to-definition** — exported symbols are indexed so readers
+  can jump to any definition across parts.
+- **Line-range commenting** — shift-click to select lines, type a
+  comment, reply, resolve, delete.
+- **Documents tab** — optional Markdown pages with syntax
+  highlighting, a floating table of contents, block-level
+  comments, and cross-doc links.
+- **Reader UX** — resizable prose/code splitter, jump-to-file
+  menus, theme toggle, Cmd/Ctrl-click hotlinks, JSDoc annotation,
+  opt-in Mermaid pre-rendering.
+- **Val Town hosting** — one Hono val serves every walkthrough
+  out of blob storage, with encryption at rest.
+
+### Config reference
+
+#### Top-level fields
 
 | Field       | Type       | Required | Description                                                               |
 | ----------- | ---------- | -------- | ------------------------------------------------------------------------- |
@@ -144,7 +142,7 @@ pages/
 | `documents` | `string[]` | No       | Markdown files to render as a Documents tab, relative to the config file. |
 | `outDir`    | `string`   | No       | Directory to emit into, default `pages`. Also the Val Town blob prefix.   |
 
-### Part fields
+#### Part fields
 
 | Field       | Type       | Required | Description                                                             |
 | ----------- | ---------- | -------- | ----------------------------------------------------------------------- |
@@ -155,7 +153,7 @@ pages/
 | `files`     | `string[]` | Yes      | Source files in this part, relative to the config file.                 |
 | `filename`  | `string`   | No       | URL-friendly slug for clean part URLs (`/:slug/parts/<filename>.html`). |
 
-### How `keywords` resolves overlap
+#### How `keywords` resolves overlap
 
 When the same file appears in multiple parts, meander picks an
 owner per comment block using keyword scoring. Each `keywords`
@@ -164,13 +162,11 @@ path; the part with the most matches wins, ties broken by
 config order. Pick keywords that distinguish parts, not generic
 terms.
 
-### Full reference
-
 The full schema — comments / theme / styles opt-outs, favicon
 overrides, CSP, SRI, mermaid, minify, service worker — lives in
 [`docs/features.md`](docs/features.md).
 
-## Publishing with comments
+### Publishing with comments
 
 The commenting layer runs in a Val Town val. If you only want
 static pages, you can skip this — `meander serve` previews the
@@ -186,7 +182,7 @@ meander publish meander.config.json    # upload encrypted HTML
 See [docs/deploying.md](docs/deploying.md) for the full setup
 (env vars, CI integration, graceful skip for fork PRs).
 
-## Examples
+### Examples
 
 - [`example/minimal/`](example/minimal/) — the smallest runnable
   meander project. Start here.
@@ -194,7 +190,22 @@ See [docs/deploying.md](docs/deploying.md) for the full setup
   integrating meander as a step in your own build pipeline (CLI,
   programmatic, GH Pages workflow).
 
-## Further reading
+## Development
+
+<details>
+<summary>Contributor commands</summary>
+
+```bash
+pnpm install         # install dependencies
+pnpm run build       # bundle dist/cli.mjs + emit declarations
+pnpm dev             # generate + serve the test fixture
+pnpm run check       # lint + typecheck + fleet checks
+pnpm test            # vitest suite
+```
+
+</details>
+
+Further reading:
 
 - [Features + configuration](docs/features.md) — every opt-in and
   opt-out knob, with examples.

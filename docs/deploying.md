@@ -5,7 +5,7 @@ Meander has two deploy targets, used independently:
 - **GitHub Pages** for walkthrough HTML — the common case. No
   Val Town involvement, no encryption, GitHub gates access via
   Pages permissions.
-- **Val Town** for the comment backend (a small Hono val) — the
+- **Val Town** for the comment backend, a small Hono val — the
   server that handles email magic-code auth, JWT sessions, and
   the SQLite comment store.
 
@@ -120,7 +120,7 @@ storage under keys like `pages/<slug>/part-1.html`. The CSS file
 is uploaded plaintext (browsers can't read encrypted CSS). After
 publish, your walkthrough is live at:
 
-```
+```text
 https://<username>-<valname>.web.val.run/<slug>/
 ```
 
@@ -192,7 +192,7 @@ message and exits 0 instead of failing the job:
 
 ## Blob layout on Val Town
 
-```
+```text
 <outDir>/meander.css              shared, plaintext
 <outDir>/<slug>/index.html        plaintext OR `ENVELOPE:1:...`
 <outDir>/<slug>/part-<id>.html    plaintext OR `ENVELOPE:1:...`
