@@ -36,6 +36,13 @@
 # fight the bundler output. The template/bootstrap/src/* modules ARE formatted.
 **/bootstrap/fleet.mjs
 
+# The rolldown-bundled fleet oxlint plugin (scripts/fleet/build-oxlint-bundle.mts
+# output) — generated + gitignored; oxfmt would fight the bundler output. The
+# `**/fleet/**` glob above does not reach it (the whole-tree walk's matcher skips
+# the dotdir `.config`), so it needs an explicit line — twin of isNeverGated() in
+# scripts/fleet/_shared/format-scope.mts and the oxfmtrc.json ignorePatterns.
+**/.config/fleet/oxlint-plugin.mjs
+
 # Generated build/test output — machine-written trees whose generators own the
 # bytes; formatting them is churn against the next build. These are the
 # GENERATED_GLOBS twins (scripts/fleet/constants/generated-globs.mts is the
@@ -59,11 +66,3 @@
 # into a hardened `<name>.lock.yml`; that artifact is tool-owned and must stay
 # byte-identical to the compiler output (the .md is the source of truth).
 **/.github/workflows/*.lock.yml
-
-# Lockstep verbatim upstream mirrors — files kept byte-identical with the
-# upstream source they mirror, declared `mirror: true` in the lockstep
-# manifest and carrying the `// @lockstep-mirror` header marker. DERIVED by
-# scripts/fleet/lockstep/emit-mirror-globs.mts and asserted by
-# scripts/fleet/check/lockstep-mirror-markers-are-declared.mts — never hand-edit.
-# BEGIN lockstep-mirrors (generated)
-# END lockstep-mirrors (generated)
