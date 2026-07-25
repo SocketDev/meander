@@ -409,12 +409,12 @@ Read in this order:
 ## 8. Cross-references
 
 - SKILL.md — the phased scan workflow.
-- `.claude/skills/_shared/security-tools.md` — tool detection
+- `.claude/skills/fleet/_shared/security-tools.md` — tool detection
   (AgentShield, zizmor) + install paths.
-- `.claude/skills/_shared/report-format.md` — grade rubric +
+- `.claude/skills/fleet/_shared/report-format.md` — grade rubric +
   HANDOFF block format.
-- `.claude/skills/_shared/env-check.md` — common environment prep.
-- `.claude/agents/security-reviewer.md` — the agent that produces
+- `.claude/skills/fleet/_shared/env-check.md` — common environment prep.
+- `.claude/agents/fleet/security-reviewer.md` — the agent that produces
   the final grade.
 - `.claude/hooks/token-hygiene/` — runtime hook that blocks
   commands leaking tokens. Complements (doesn't replace) the
