@@ -115,6 +115,11 @@ packages:
   - '.config/fleet/oxlint-plugin'
   - '.config/fleet/oxlint-plugin/fleet/*'
 trustPolicy: no-downgrade
+# Drop vite 8's optional esbuild peer wiring — rolldown is the bundler.
+# meander's own direct esbuild devDep (the opt-in minify pass) stays and
+# is declared in .config/repo/vite-rolldown.json.
+ignoredOptionalDependencies:
+  - esbuild
 allowBuilds:
   # @swc/core ships a native binary + a WASM plugin cache used by the
   # vitiate coverage-guided fuzz lane's instrument transform (see the

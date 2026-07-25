@@ -5472,6 +5472,9 @@ packages:
   zod@4.1.13:
     resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
+ignoredOptionalDependencies:
+  - esbuild
+
 snapshots:
 
   '@actions/expressions@0.3.60': {}
