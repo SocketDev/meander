@@ -5,8 +5,8 @@ using it.
 
 ## Requirements
 
-- Node >= 20 (25+ is pinned in `.node-version`; earlier major
-  versions work for building but tests assume 20+ APIs).
+- Node >= 24 (the `engines` floor; `.node-version` pins the
+  exact dev version).
 - pnpm 11+.
 
 ## First-time setup

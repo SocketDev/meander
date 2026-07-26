@@ -41,7 +41,7 @@ Or run without installing:
 npx @socketsecurity/meander generate meander.config.json
 ```
 
-**Requirements**: Node >= 20.
+**Requirements**: Node >= 24.
 
 ## Usage
 
