@@ -61,9 +61,12 @@ jobs:
         # fail the job — only medium+ block the merge. Without
         # --fix; medium+ findings show up in the run output so a
         # maintainer can review before promoting them to fixes.
+        # SOCKET_TOOL_AGENTSHIELD_BIN comes from the fleet install
+        # composite; it stays empty when the provisioning was skipped,
+        # so guard on it instead of expanding an empty command.
         run: |
-          if [ -d .claude ]; then
-            "$MEANDER_AGENTSHIELD_BIN" scan --path .claude --format terminal
+          if [ -d .claude ] && [ -n "${SOCKET_TOOL_AGENTSHIELD_BIN:-}" ]; then
+            node "$SOCKET_TOOL_AGENTSHIELD_BIN" scan --path .claude --format terminal
           fi
 
       - name: Build
