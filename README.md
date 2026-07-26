@@ -9,7 +9,7 @@
 
 <a href="https://socket.dev/npm/package/@socketsecurity/meander"><img alt="Socket Badge" src="https://socket.dev/api/badge/npm/package/@socketsecurity/meander" height="20"></a>
 <a href="https://github.com/SocketDev/meander/actions/workflows/ci.yml"><img alt="CI - @socketsecurity/meander" src="https://github.com/SocketDev/meander/actions/workflows/ci.yml/badge.svg" height="20"></a>
-<img alt="Coverage" src="https://img.shields.io/badge/coverage-99%25-brightgreen" height="20">
+<img src="assets/repo/badges/coverage.svg" width="97" height="20" alt="Coverage" />
 
 [![Follow @SocketSecurity](assets/fleet/badge-follow-x.svg)](https://twitter.com/SocketSecurity)
 [![Follow @socket.dev on Bluesky](assets/fleet/badge-follow-bluesky.svg)](https://bsky.app/profile/socket.dev)
