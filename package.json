@@ -26,7 +26,6 @@
   "files": [
     "dist",
     "assets",
-    "!assets/val/lib/*.test.ts",
     "CHANGELOG.md"
   ],
   "type": "module",
@@ -44,7 +43,6 @@
     "lint": "node scripts/fleet/lint.mts",
     "test": "node scripts/fleet/test.mts",
     "test:fuzz": "node scripts/repo/fuzz.mts",
-    "test:val": "node --test assets/val/lib/*.test.ts",
     "type": "node node_modules/typescript/bin/tsc --noEmit -p .config/fleet/tsconfig.check.json",
     "update": "node scripts/fleet/update.mts",
     "prepublishOnly": "echo 'ERROR: Use GitHub Actions workflow for publishing' && exit 1",

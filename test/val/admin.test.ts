@@ -4,7 +4,7 @@
  *   wrapping-key context. The hand-rolled Hono-compatible mock and
  *   stubbed sqlite client live in `./admin-test-doubles.ts` (extracted
  *   so this file stays under the fleet's file-size cap), so the test
- *   runs under `node --test` without pulling in the real `npm:hono@4` /
+ *   runs without pulling in the real `npm:hono@4` /
  *   `https://esm.town/v/std/sqlite` dependencies.
  *   We test the routes through `app.fetch`, which is the exact
  *   surface Val Town's runtime invokes. So the handler runs in
@@ -12,10 +12,15 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { test } from 'node:test'
 
-import { constantTimeEqual, unwrapKey, wrapKey } from './admin.ts'
-import { randomDataKeyBytes } from './crypto.ts'
+import { test } from 'vitest'
+
+import {
+  constantTimeEqual,
+  unwrapKey,
+  wrapKey,
+} from '../../assets/val/lib/admin.ts'
+import { randomDataKeyBytes } from '../../assets/val/lib/crypto.ts'
 import { makeKeyContext, makeSqlite, setupApp } from './admin-test-doubles.ts'
 import type { Row } from './admin-test-doubles.ts'
 
@@ -23,18 +28,18 @@ import type { Row } from './admin-test-doubles.ts'
 /*  constantTimeEqual                                                   */
 /* ------------------------------------------------------------------ */
 
-void test('constantTimeEqual: identical strings match', () => {
+test('constantTimeEqual: identical strings match', () => {
   assert.equal(constantTimeEqual('abc', 'abc'), true)
   assert.equal(constantTimeEqual('', ''), true)
 })
 
-void test('constantTimeEqual: different strings reject', () => {
+test('constantTimeEqual: different strings reject', () => {
   assert.equal(constantTimeEqual('abc', 'abd'), false)
   assert.equal(constantTimeEqual('abc', 'abcd'), false)
   assert.equal(constantTimeEqual('abcd', 'abc'), false)
 })
 
-void test('constantTimeEqual: empty vs non-empty reject', () => {
+test('constantTimeEqual: empty vs non-empty reject', () => {
   assert.equal(constantTimeEqual('', 'a'), false)
   assert.equal(constantTimeEqual('a', ''), false)
 })
@@ -43,7 +48,7 @@ void test('constantTimeEqual: empty vs non-empty reject', () => {
 /*  /admin/key-audit auth                                              */
 /* ------------------------------------------------------------------ */
 
-void test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
+test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
   const sqlite = makeSqlite([])
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
@@ -63,7 +68,7 @@ void test('admin: returns 503 when MEANDER_ADMIN_TOKEN is unset', async () => {
   assert.match(body.error, /MEANDER_ADMIN_TOKEN/)
 })
 
-void test('admin: returns 401 when Authorization header is missing', async () => {
+test('admin: returns 401 when Authorization header is missing', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -76,7 +81,7 @@ void test('admin: returns 401 when Authorization header is missing', async () =>
   assert.equal(res.status, 401)
 })
 
-void test('admin: returns 401 on wrong bearer token', async () => {
+test('admin: returns 401 on wrong bearer token', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -93,7 +98,7 @@ void test('admin: returns 401 on wrong bearer token', async () => {
   assert.equal(res.status, 401)
 })
 
-void test('admin: returns 500 with the keyContextError when key context is missing', async () => {
+test('admin: returns 500 with the keyContextError when key context is missing', async () => {
   const app = setupApp({
     sqlite: makeSqlite([]),
     ensureDb: async () => {},
@@ -115,7 +120,7 @@ void test('admin: returns 500 with the keyContextError when key context is missi
 /*  /admin/key-audit happy path                                        */
 /* ------------------------------------------------------------------ */
 
-void test('admin: key-audit reports per-generation row counts', async () => {
+test('admin: key-audit reports per-generation row counts', async () => {
   const ctx = await makeKeyContext([1, 2], 2)
   const sqlite = makeSqlite([
     { id: 'a', dek_wrapped: 'old1', key_generation: 1 },
@@ -145,7 +150,7 @@ void test('admin: key-audit reports per-generation row counts', async () => {
   assert.deepEqual(body.rowCounts, { '1': 2, '2': 1 })
 })
 
-void test('admin: key-audit returns empty rowCounts when no rows', async () => {
+test('admin: key-audit returns empty rowCounts when no rows', async () => {
   const ctx = await makeKeyContext([1], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -167,7 +172,7 @@ void test('admin: key-audit returns empty rowCounts when no rows', async () => {
 /*  /admin/rewrap input validation                                     */
 /* ------------------------------------------------------------------ */
 
-void test('admin: rewrap rejects same fromGeneration / toGeneration', async () => {
+test('admin: rewrap rejects same fromGeneration / toGeneration', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -191,7 +196,7 @@ void test('admin: rewrap rejects same fromGeneration / toGeneration', async () =
   assert.match(body.error, /distinct/)
 })
 
-void test('admin: rewrap rejects negative generations', async () => {
+test('admin: rewrap rejects negative generations', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -213,7 +218,7 @@ void test('admin: rewrap rejects negative generations', async () => {
   assert.equal(res.status, 400)
 })
 
-void test('admin: rewrap rejects out-of-range batchSize', async () => {
+test('admin: rewrap rejects out-of-range batchSize', async () => {
   const ctx = await makeKeyContext([1, 2], 1)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -258,7 +263,7 @@ void test('admin: rewrap rejects out-of-range batchSize', async () => {
 /*  /admin/rewrap happy path — the headline case                       */
 /* ------------------------------------------------------------------ */
 
-void test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching ciphertext', async () => {
+test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching ciphertext', async () => {
   /* Build realistic seed data: 5 rows under generation 1, each
    * with a real wrapped DEK we can validate after rewrap. */
   const ctx = await makeKeyContext([1, 2], 1)
@@ -339,7 +344,7 @@ void test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching cip
   }
 })
 
-void test('admin: rewrap is idempotent — calling with no rows in the from generation reports 0/0', async () => {
+test('admin: rewrap is idempotent — calling with no rows in the from generation reports 0/0', async () => {
   const ctx = await makeKeyContext([1, 2], 2)
   const app = setupApp({
     sqlite: makeSqlite([]),
@@ -363,7 +368,7 @@ void test('admin: rewrap is idempotent — calling with no rows in the from gene
   assert.equal(body.remaining, 0)
 })
 
-void test('admin: rewrap propagates getKey failure when generation key is missing', async () => {
+test('admin: rewrap propagates getKey failure when generation key is missing', async () => {
   /* Seeded with rows at gen 1, but the key context only has gen 2 +
    * gen 3. Calling rewrap from 1 → 2 should fail (gen 1 key absent). */
   const ctx = await makeKeyContext([2, 3], 2)

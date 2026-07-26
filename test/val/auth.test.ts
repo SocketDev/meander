@@ -3,53 +3,54 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { test } from 'node:test'
+
+import { test } from 'vitest'
 
 import {
   emailDomainAllowed,
   hashCode,
   parseAllowedDomains,
   sixDigitCode,
-} from './auth.ts'
+} from '../../assets/val/lib/auth.ts'
 
-void test('parseAllowedDomains: empty → empty array', () => {
+test('parseAllowedDomains: empty → empty array', () => {
   assert.deepEqual(parseAllowedDomains(''), [])
   assert.deepEqual(parseAllowedDomains(undefined), [])
 })
 
-void test('parseAllowedDomains: splits + trims + lowercases', () => {
+test('parseAllowedDomains: splits + trims + lowercases', () => {
   assert.deepEqual(
     parseAllowedDomains(' Gmail.com , Example.ORG,  socket.dev '),
     ['gmail.com', 'example.org', 'socket.dev'],
   )
 })
 
-void test('parseAllowedDomains: drops empty segments', () => {
+test('parseAllowedDomains: drops empty segments', () => {
   assert.deepEqual(parseAllowedDomains('gmail.com,,,socket.dev,'), [
     'gmail.com',
     'socket.dev',
   ])
 })
 
-void test('emailDomainAllowed: case-insensitive match', () => {
+test('emailDomainAllowed: case-insensitive match', () => {
   const allowed = ['gmail.com', 'socket.dev']
   assert.equal(emailDomainAllowed('alice@Gmail.com', allowed), true)
   assert.equal(emailDomainAllowed('bob@GMAIL.COM', allowed), true)
 })
 
-void test('emailDomainAllowed: rejects unknown domain', () => {
+test('emailDomainAllowed: rejects unknown domain', () => {
   assert.equal(emailDomainAllowed('eve@evil.com', ['gmail.com']), false)
 })
 
-void test('emailDomainAllowed: rejects malformed input (no @)', () => {
+test('emailDomainAllowed: rejects malformed input (no @)', () => {
   assert.equal(emailDomainAllowed('no-at-sign', ['gmail.com']), false)
 })
 
-void test('emailDomainAllowed: empty allowlist refuses everything', () => {
+test('emailDomainAllowed: empty allowlist refuses everything', () => {
   assert.equal(emailDomainAllowed('alice@gmail.com', []), false)
 })
 
-void test('sixDigitCode: always 6 digits', () => {
+test('sixDigitCode: always 6 digits', () => {
   for (let i = 0; i < 100; i++) {
     const c = sixDigitCode()
     assert.equal(c.length, 6)
@@ -57,7 +58,7 @@ void test('sixDigitCode: always 6 digits', () => {
   }
 })
 
-void test('sixDigitCode: varies across calls', () => {
+test('sixDigitCode: varies across calls', () => {
   const seen = new Set<string>()
   for (let i = 0; i < 20; i++) {
     seen.add(sixDigitCode())
@@ -70,25 +71,25 @@ void test('sixDigitCode: varies across calls', () => {
   )
 })
 
-void test('hashCode: deterministic for same (code, email)', async () => {
+test('hashCode: deterministic for same (code, email)', async () => {
   const a = await hashCode('123456', 'alice@gmail.com')
   const b = await hashCode('123456', 'alice@gmail.com')
   assert.equal(a, b)
 })
 
-void test('hashCode: different codes hash differently', async () => {
+test('hashCode: different codes hash differently', async () => {
   const a = await hashCode('123456', 'alice@gmail.com')
   const b = await hashCode('654321', 'alice@gmail.com')
   assert.notEqual(a, b)
 })
 
-void test('hashCode: same code, different emails hash differently (email = salt)', async () => {
+test('hashCode: same code, different emails hash differently (email = salt)', async () => {
   const a = await hashCode('123456', 'alice@gmail.com')
   const b = await hashCode('123456', 'bob@gmail.com')
   assert.notEqual(a, b)
 })
 
-void test('hashCode: returns base64url (no +, /, =)', async () => {
+test('hashCode: returns base64url (no +, /, =)', async () => {
   const h = await hashCode('123456', 'alice@gmail.com')
   assert.ok(!h.includes('+'))
   assert.ok(!h.includes('/'))

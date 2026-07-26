@@ -91,11 +91,8 @@ jobs:
       - name: Setup and install
         uses: ./.github/actions/fleet/setup-and-install
 
-      - name: Run tests (meander CLI)
+      - name: Run tests (meander CLI + val helpers)
         run: pnpm run test --all
-
-      - name: Run tests (val helpers)
-        run: pnpm run test:val
 
       - name: Coverage
         run: pnpm run cover --summary

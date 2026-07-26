@@ -109,5 +109,5 @@ meander generates annotated code-walkthrough pages with a live comment system, d
 - **Layout**: generator + CLI in `src/` (flat, one module per concern: `generate`, `serve`, `deploy-val`, `minify`, `crypto`/`shamir` for comment encryption); the deployed Val Town runtime lives in `assets/val/` and ships in the npm tarball.
 - **Build**: `pnpm run build` (rolldown via `scripts/repo/build.mts`); esbuild is a devDep only — the opt-in minify pass (`src/minify.mts`) and the deploy-val bundle step dynamic-import it (declared in `.config/repo/socket-wheelhouse.json` `vite.allowEsbuild`).
 - **Deploy**: publishing to npm goes through the GitHub Actions pipeline only (`prepublishOnly` blocks local); Val Town deploys via `src/deploy-val.mts` (`.github/workflows/valtown.yml`).
-- **Commands**: `pnpm test` / `pnpm run check` / `pnpm run cover` / `pnpm run type`; `pnpm run test:val` exercises the Val Town runtime in `assets/val/lib/`.
+- **Commands**: `pnpm test` / `pnpm run check` / `pnpm run cover` / `pnpm run type`; the Val Town runtime tests live in `test/val/` and run with the vitest suite.
 - **Docs**: architecture / operating / deploying / encryption detail in `docs/*.md`.

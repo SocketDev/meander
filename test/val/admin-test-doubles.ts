@@ -1,5 +1,5 @@
 /**
- * Test doubles for assets/val/lib/admin.test.ts.
+ * Test doubles for test/val/admin.test.ts.
  *
  * Extracted from the test file so it stays under the fleet's
  * file-size cap. These are the hand-rolled Hono-compatible mock, the
@@ -7,15 +7,19 @@
  * route tests drive through `app.fetch` — the exact surface Val
  * Town's runtime invokes. Kept out of the real `npm:hono@4` /
  * `https://esm.town/v/std/sqlite` dependencies so the suite runs
- * under `node --test`.
+ * on plain Node.
  *
  * This module is intentionally NOT named `*.test.ts`: it holds no
- * tests, only factories, so the `node --test` glob skips it.
+ * tests, only factories, so test discovery skips it.
  */
 
-import { importKey, registerAdminRoutes } from './admin.ts'
-import type { AdminDeps, AdminKeyContext, SqliteClient } from './admin.ts'
-import { randomDataKeyBytes } from './crypto.ts'
+import { importKey, registerAdminRoutes } from '../../assets/val/lib/admin.ts'
+import type {
+  AdminDeps,
+  AdminKeyContext,
+  SqliteClient,
+} from '../../assets/val/lib/admin.ts'
+import { randomDataKeyBytes } from '../../assets/val/lib/crypto.ts'
 
 /**
  * Mini Hono — just enough surface for registerAdminRoutes and

@@ -18,16 +18,15 @@ pnpm build    # tsc emits dist/
 
 ## Everyday commands
 
-| Command         | What it does                                                                    |
-| --------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`      | Generate the fixture and serve it at `http://127.0.0.1:8080` with file-watcher. |
-| `pnpm test`     | Run the vitest suite under `test/`.                                             |
-| `pnpm test:val` | Run the val's co-located `node:test` suite under `assets/val/lib/`.             |
-| `pnpm cover`    | vitest + type-coverage, prints a combined summary.                              |
-| `pnpm check`    | lint + type-check (what CI runs).                                               |
-| `pnpm fix`      | oxfmt + oxlint --fix; mutates files in place.                                   |
-| `pnpm clean`    | Remove `dist/`, `coverage/`, fixture emit dirs.                                 |
-| `pnpm build`    | `tsc`; emits `.mjs` + `.d.mts` to `dist/`.                                      |
+| Command      | What it does                                                                    |
+| ------------ | ------------------------------------------------------------------------------- |
+| `pnpm dev`   | Generate the fixture and serve it at `http://127.0.0.1:8080` with file-watcher. |
+| `pnpm test`  | Run the vitest suite under `test/` (val runtime tests included).                |
+| `pnpm cover` | vitest + type-coverage, prints a combined summary.                              |
+| `pnpm check` | lint + type-check (what CI runs).                                               |
+| `pnpm fix`   | oxfmt + oxlint --fix; mutates files in place.                                   |
+| `pnpm clean` | Remove `dist/`, `coverage/`, fixture emit dirs.                                 |
+| `pnpm build` | `tsc`; emits `.mjs` + `.d.mts` to `dist/`.                                      |
 
 ## Tests
 
@@ -35,11 +34,10 @@ pnpm build    # tsc emits dist/
 - Fixtures live in `test/fixtures/`. The reference fixture,
   `test/fixtures/test-docs/`, also powers `pnpm dev` and the
   CI smoke test.
-- Config is at `.config/vitest.config.mts`. Coverage provider is
-  v8; thresholds are 95% lines / statements / functions, 90%
-  branches (branch coverage dips because V8 surfaces micro-
-  branches in `??` / `&&` chains that only one side hits in
-  practice).
+- Config is at `.config/repo/vitest.config.mts`. Coverage provider
+  is v8, report-only: no `cover.thresholds` are configured in
+  `.config/repo/socket-wheelhouse.json`, so `pnpm cover` prints
+  the summary without gating.
 - Need a scratch directory? Use
   `mkdtempSync(path.join(os.tmpdir(), '…'))` + `safeDelete`
   from `@socketsecurity/lib/fs` in `afterEach`. Never write
@@ -48,9 +46,9 @@ pnpm build    # tsc emits dist/
 ### Val tests
 
 The val (`assets/val/index.ts`) runs under Deno at Val Town.
-Its pure helpers — crypto, JWT, auth-domain matching — live in
-`assets/val/lib/*.ts` and have co-located `*.test.ts` files
-that run under `node:test` via `pnpm test:val`. Web Crypto is
+Its pure helpers (crypto, JWT, auth-domain matching) live in
+`assets/val/lib/*.ts` and are tested by the vitest suite in
+`test/val/`, which runs with `pnpm test`. Web Crypto is
 available in both Deno and Node so the helpers behave
 identically; tests don't mock anything.
 

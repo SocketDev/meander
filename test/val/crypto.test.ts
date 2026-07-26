@@ -1,12 +1,12 @@
 /**
- * @file Tests for assets/val/lib/crypto.ts. Runs under
- *   `node --test` (see package.json test:val). The helpers use
+ * @file Tests for assets/val/lib/crypto.ts. The helpers use
  *   Web Crypto only, so the Node copy behaves identically to the
  *   Deno runtime the val ships on.
  */
 
 import { strict as assert } from 'node:assert'
-import { test } from 'node:test'
+
+import { test } from 'vitest'
 
 import {
   decodeHexKey,
@@ -18,22 +18,22 @@ import {
   unpackEnvelope,
   unwrapKey,
   wrapKey,
-} from './crypto.ts'
+} from '../../assets/val/lib/crypto.ts'
 
 export function FRESH_BYTES() {
   return randomDataKeyBytes()
 }
 
-void test('importKey: rejects wrong size', async () => {
+test('importKey: rejects wrong size', async () => {
   await assert.rejects(() => importKey(new Uint8Array(16)), /32 bytes/)
 })
 
-void test('randomDataKeyBytes: returns 32 bytes', () => {
+test('randomDataKeyBytes: returns 32 bytes', () => {
   const k = randomDataKeyBytes()
   assert.equal(k.length, 32)
 })
 
-void test('randomDataKeyBytes: produces distinct keys per call', () => {
+test('randomDataKeyBytes: produces distinct keys per call', () => {
   const a = randomDataKeyBytes()
   const b = randomDataKeyBytes()
   assert.notEqual(
@@ -42,20 +42,20 @@ void test('randomDataKeyBytes: produces distinct keys per call', () => {
   )
 })
 
-void test('encrypt/decrypt: round-trip ASCII', async () => {
+test('encrypt/decrypt: round-trip ASCII', async () => {
   const key = await importKey(FRESH_BYTES())
   const ct = await encrypt('hello world', key)
   assert.equal(await decrypt(ct, key), 'hello world')
 })
 
-void test('encrypt/decrypt: round-trip unicode + multi-line', async () => {
+test('encrypt/decrypt: round-trip unicode + multi-line', async () => {
   const key = await importKey(FRESH_BYTES())
   const plain = 'héllo 世界 🦀\nline two\ttab'
   const ct = await encrypt(plain, key)
   assert.equal(await decrypt(ct, key), plain)
 })
 
-void test('encrypt/decrypt: round-trip large payload (>100KB)', async () => {
+test('encrypt/decrypt: round-trip large payload (>100KB)', async () => {
   /* Walkthrough HTML can exceed the spread-arg limit that broke
    * the previous base64 helper. This is the regression guard. */
   const key = await importKey(FRESH_BYTES())
@@ -64,13 +64,13 @@ void test('encrypt/decrypt: round-trip large payload (>100KB)', async () => {
   assert.equal(await decrypt(ct, key), plain)
 })
 
-void test('encrypt: produces base64 (no raw binary)', async () => {
+test('encrypt: produces base64 (no raw binary)', async () => {
   const key = await importKey(FRESH_BYTES())
   const ct = await encrypt('abc', key)
   assert.match(ct, /^[A-Za-z0-9+/]+=*$/)
 })
 
-void test('encrypt: unique IV per call (same input, different output)', async () => {
+test('encrypt: unique IV per call (same input, different output)', async () => {
   const key = await importKey(FRESH_BYTES())
   const a = await encrypt('same', key)
   const b = await encrypt('same', key)
@@ -79,7 +79,7 @@ void test('encrypt: unique IV per call (same input, different output)', async ()
   assert.equal(await decrypt(b, key), 'same')
 })
 
-void test('decrypt: rejects short ciphertext', async () => {
+test('decrypt: rejects short ciphertext', async () => {
   const key = await importKey(FRESH_BYTES())
   await assert.rejects(
     () => decrypt(Buffer.from('abc').toString('base64'), key),
@@ -87,7 +87,7 @@ void test('decrypt: rejects short ciphertext', async () => {
   )
 })
 
-void test('decrypt: rejects unknown body version byte', async () => {
+test('decrypt: rejects unknown body version byte', async () => {
   const key = await importKey(FRESH_BYTES())
   const buf = new Uint8Array(1 + 12 + 16)
   buf[0] = 0x99
@@ -95,14 +95,14 @@ void test('decrypt: rejects unknown body version byte', async () => {
   await assert.rejects(() => decrypt(b64, key), /unsupported body version/i)
 })
 
-void test('decrypt: rejects wrong key (auth tag mismatch)', async () => {
+test('decrypt: rejects wrong key (auth tag mismatch)', async () => {
   const a = await importKey(FRESH_BYTES())
   const b = await importKey(FRESH_BYTES())
   const ct = await encrypt('secret', a)
   await assert.rejects(() => decrypt(ct, b))
 })
 
-void test('decrypt: rejects tampered ciphertext (auth tag mismatch)', async () => {
+test('decrypt: rejects tampered ciphertext (auth tag mismatch)', async () => {
   const key = await importKey(FRESH_BYTES())
   const ct = await encrypt('integrity', key)
   const bytes = Buffer.from(ct, 'base64')
@@ -110,7 +110,7 @@ void test('decrypt: rejects tampered ciphertext (auth tag mismatch)', async () =
   await assert.rejects(() => decrypt(bytes.toString('base64'), key))
 })
 
-void test('wrapKey/unwrapKey: round-trips a DEK under a wrapping key', async () => {
+test('wrapKey/unwrapKey: round-trips a DEK under a wrapping key', async () => {
   const dek = randomDataKeyBytes()
   const wrapping = await importKey(FRESH_BYTES())
   const wrapped = await wrapKey(dek, wrapping)
@@ -121,7 +121,7 @@ void test('wrapKey/unwrapKey: round-trips a DEK under a wrapping key', async () 
   )
 })
 
-void test('wrapKey/unwrapKey: rejects wrong wrapping key (auth tag mismatch)', async () => {
+test('wrapKey/unwrapKey: rejects wrong wrapping key (auth tag mismatch)', async () => {
   const dek = randomDataKeyBytes()
   const a = await importKey(FRESH_BYTES())
   const b = await importKey(FRESH_BYTES())
@@ -129,18 +129,18 @@ void test('wrapKey/unwrapKey: rejects wrong wrapping key (auth tag mismatch)', a
   await assert.rejects(() => unwrapKey(wrapped, b))
 })
 
-void test('wrapKey: rejects DEK of wrong size', async () => {
+test('wrapKey: rejects DEK of wrong size', async () => {
   const wrapping = await importKey(FRESH_BYTES())
   await assert.rejects(() => wrapKey(new Uint8Array(16), wrapping), /32 bytes/)
 })
 
-void test('unwrapKey: rejects malformed wrapped length', async () => {
+test('unwrapKey: rejects malformed wrapped length', async () => {
   const wrapping = await importKey(FRESH_BYTES())
   const tooShort = Buffer.alloc(50, 0).toString('base64')
   await assert.rejects(() => unwrapKey(tooShort, wrapping), /length/)
 })
 
-void test('unwrapKey: rejects unknown wrap version byte', async () => {
+test('unwrapKey: rejects unknown wrap version byte', async () => {
   const wrapping = await importKey(FRESH_BYTES())
   const buf = new Uint8Array(1 + 12 + 32 + 16)
   buf[0] = 0x99
@@ -150,7 +150,7 @@ void test('unwrapKey: rejects unknown wrap version byte', async () => {
   )
 })
 
-void test('rotation pattern: rewrap DEK under a new wrapping key, ciphertext untouched', async () => {
+test('rotation pattern: rewrap DEK under a new wrapping key, ciphertext untouched', async () => {
   const wrapping1 = await importKey(FRESH_BYTES())
   const wrapping2 = await importKey(FRESH_BYTES())
   const dekBytes = randomDataKeyBytes()
@@ -172,7 +172,7 @@ void test('rotation pattern: rewrap DEK under a new wrapping key, ciphertext unt
   assert.equal(await decrypt(ciphertext, reCryptoKey), 'comment body')
 })
 
-void test('packEnvelope/unpackEnvelope: round-trips a wrapped blob', async () => {
+test('packEnvelope/unpackEnvelope: round-trips a wrapped blob', async () => {
   const wrapping = await importKey(FRESH_BYTES())
   const dekBytes = randomDataKeyBytes()
   const dekImported = await importKey(dekBytes)
@@ -192,19 +192,19 @@ void test('packEnvelope/unpackEnvelope: round-trips a wrapped blob', async () =>
   )
 })
 
-void test('unpackEnvelope: returns undefined for plaintext blobs (no prefix)', () => {
+test('unpackEnvelope: returns undefined for plaintext blobs (no prefix)', () => {
   assert.equal(unpackEnvelope('<html>hello</html>'), undefined)
   assert.equal(unpackEnvelope(''), undefined)
   assert.equal(unpackEnvelope('ENVE'), undefined)
 })
 
-void test('unpackEnvelope: throws on malformed envelope header', () => {
+test('unpackEnvelope: throws on malformed envelope header', () => {
   assert.throws(() => unpackEnvelope('ENVELOPE:wrong'), /malformed/)
   assert.throws(() => unpackEnvelope('ENVELOPE:2:a:b'), /malformed/)
   assert.throws(() => unpackEnvelope('ENVELOPE:1:onlytwo'), /malformed/)
 })
 
-void test('decodeHexKey: parses 64-char hex into 32 bytes', () => {
+test('decodeHexKey: parses 64-char hex into 32 bytes', () => {
   const hex = '00'.repeat(32)
   const bytes = decodeHexKey(hex)
   assert.equal(bytes.length, 32)
@@ -214,15 +214,15 @@ void test('decodeHexKey: parses 64-char hex into 32 bytes', () => {
   )
 })
 
-void test('decodeHexKey: rejects wrong length', () => {
+test('decodeHexKey: rejects wrong length', () => {
   assert.throws(() => decodeHexKey('00'.repeat(16)), /64 hex/)
 })
 
-void test('decodeHexKey: rejects non-hex characters', () => {
+test('decodeHexKey: rejects non-hex characters', () => {
   assert.throws(() => decodeHexKey('z'.repeat(64)), /64 hex/)
 })
 
-void test('decodeHexKey: round-trips through importKey + encrypt + decrypt', async () => {
+test('decodeHexKey: round-trips through importKey + encrypt + decrypt', async () => {
   const hex = Buffer.from(randomDataKeyBytes()).toString('hex')
   const key = await importKey(decodeHexKey(hex))
   const ct = await encrypt('round trip', key)
