@@ -26,7 +26,8 @@
   "files": [
     "dist",
     "assets",
-    "!assets/val/lib/*.test.ts"
+    "!assets/val/lib/*.test.ts",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "publishConfig": {
