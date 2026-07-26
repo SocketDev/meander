@@ -35,12 +35,6 @@ and configuration knobs.
 pnpm install -g @socketsecurity/meander
 ```
 
-Or run without installing:
-
-```bash
-npx @socketsecurity/meander generate meander.config.json
-```
-
 **Requirements**: Node >= 24.
 
 ## Usage
