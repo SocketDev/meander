@@ -90,14 +90,38 @@ describe('url-rewrite — fuzz', () => {
   })
 
   // DERIVED-FROM-INPUT: a single root-relative href gains exactly the basePath
-  // prefix.
-  test('root-relative URLs gain the basePath prefix', () => {
+  // prefix — UNLESS it already sits at/under basePath on a segment boundary.
+  // A string-level pass cannot distinguish "user link that already lives under
+  // the base" from "already-rewritten output", and the module doc pins the
+  // trade-off: already-prefixed values are left alone (that skip is what makes
+  // the documented IDEMPOTENCE contract hold). So the "gains the prefix" claim
+  // only applies to hrefs outside basePath; the boundary case is pinned as a
+  // named regression test below.
+  test('root-relative URLs outside basePath gain the prefix', () => {
+    const rewritablePair = fc
+      .tuple(rootRelative, basePath)
+      .filter(([href, base]) => href !== base && !href.startsWith(`${base}/`))
     fc.assert(
-      fc.property(rootRelative, basePath, (href, base) => {
+      fc.property(rewritablePair, ([href, base]) => {
         const out = applyBasePathToHtml(`<a href="${href}">x</a>`, base)
         expect(out).toContain(`${base}${href}`)
       }),
     )
+  })
+
+  // Pinned counterexample (fast-check seed 858196439, path 84:3:2): the
+  // original property claimed EVERY root-relative href gains the prefix, but
+  // "/h/a" already sits under basePath "/h" on a segment boundary, so the
+  // documented already-prefixed rule (and idempotence) requires a skip. The
+  // property over-claimed; the implementation matches the module doc.
+  test('regression: href already under basePath is left untouched', () => {
+    const html = '<a href="/h/a">x</a>'
+    expect(applyBasePathToHtml(html, '/h')).toBe(html)
+    // Exact-match sibling of the same boundary: href === basePath.
+    const exact = '<a href="/h">x</a>'
+    expect(applyBasePathToHtml(exact, '/h')).toBe(exact)
+    // Non-boundary lookalike still gains the prefix ("/hx" is NOT under "/h").
+    expect(applyBasePathToHtml('<a href="/hx">x</a>', '/h')).toContain('/h/hx')
   })
 
   // RESTRICTED-INPUT: HTML whose URLs are all protocol/hash/plain-relative has
