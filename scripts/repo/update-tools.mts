@@ -33,7 +33,7 @@ const logger = getDefaultLogger()
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(scriptDir, '..', '..')
-const toolsPath = path.join(repoRoot, 'external-tools.json')
+const toolsPath = path.join(repoRoot, '.config', 'repo', 'external-tools.json')
 
 type ReleaseAsset = { name: string; browser_download_url: string }
 type Release = { tag_name: string; assets: ReleaseAsset[] }

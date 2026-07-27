@@ -16,7 +16,7 @@ on:
       - 'test/fixtures/test-docs/**'
       - '.github/workflows/pages.yml'
       - '.github/actions/**'
-      - 'external-tools.json'
+      - '.config/repo/external-tools.json'
       - 'package.json'
       - 'pnpm-lock.yaml'
   workflow_dispatch:

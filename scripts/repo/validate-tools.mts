@@ -95,7 +95,12 @@ const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url))
   const repoRoot = path.resolve(scriptDir, '..', '..')
-  const toolsPath = path.join(repoRoot, 'external-tools.json')
+  const toolsPath = path.join(
+    repoRoot,
+    '.config',
+    'repo',
+    'external-tools.json',
+  )
   try {
     const tools = validateExternalTools(toolsPath)
     const count = Object.keys(tools).length

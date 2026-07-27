@@ -58,7 +58,7 @@ jobs:
           # external-tools.json changed after a full refresh pass.
           pnpm run update || true
           node scripts/repo/update-tools.mts || true
-          if git diff --quiet -- package.json pnpm-lock.yaml external-tools.json; then
+          if git diff --quiet -- package.json pnpm-lock.yaml .config/repo/external-tools.json; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
@@ -116,7 +116,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add package.json pnpm-lock.yaml external-tools.json
+          git add package.json pnpm-lock.yaml .config/repo/external-tools.json
           git commit -m "chore(deps): weekly dependency bump"
           git push origin "$BRANCH"
           gh pr create \

@@ -843,6 +843,12 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
 
+  .claude/hooks/fleet/denied-domain-reference-guard:
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
   .claude/hooks/fleet/dep-derived-source-nudge:
     devDependencies:
       '@types/node':
