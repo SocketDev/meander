@@ -246,7 +246,7 @@ export const MeanderConfigSchema = Type.Object({
    * file's dir. Default: `"pages"`. Used by:
    *
    * - Generate (local emit: <rootDir>/<outDir>/...)
-   * - Serve (reads from the same dir)
+   * - Serve reads from the same dir.
    * - Publish (Val Town blob key prefix: <outDir>/<slug>/...)
    * - Deploy-val (passes it to the val as MEANDER_OUT_DIR so the val serves from
    *   the same blob prefix)

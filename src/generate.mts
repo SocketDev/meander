@@ -213,7 +213,8 @@ annotationMarked.use({
  * convention so the inlined JSON stays small (no repeated
  * `"file":`/`"line":`/`"part":` keys across every entry). Order
  * mirrors how a debugger prints a location — file, then line,
- * then part (analogous to column in a stack frame).
+ * then part. The part field is analogous to the column in a
+ * stack frame.
  */
 export type SymbolLocation = readonly [file: string, line: number, part: number]
 
@@ -310,7 +311,8 @@ export type GenerateOptions = {
    * to `{basePath}/meander.css`. It's a path, not a URL —
    * matches Next.js `basePath` semantics, not Vite's `base`
    * (which allows full URLs).
-   * Default: "" (site hosted at origin root).
+   * Default: "". An empty prefix means the site is hosted at the
+   * origin root.
    */
   basePath?: string | undefined
   /**
@@ -2216,7 +2218,7 @@ export function resolveDocRef(
     targetPath = href.slice(0, hashIndex)
     const rawAnchor = href.slice(hashIndex + 1)
     // Only slugify if the anchor looks like a heading text; if it's already a
-    // valid slug (all lowercase word chars and hyphens) leave it as-is.
+    // valid slug of only lowercase word chars and hyphens, leave it as-is.
     anchor = /^[a-z0-9-]+$/.test(rawAnchor)
       ? rawAnchor
       : slugifyHeading(rawAnchor)
@@ -2542,10 +2544,11 @@ export function tokenizeUrlString(text: string): string | undefined {
 
 /**
  * Render one trail row. `tier` may be null when sizeTiers is
- * disabled (suppresses the trailing pill); `lines` is used only
- * for the pill's hover title. `searchHaystack` is concatenated
- * onto a data-attribute the filter script reads to match against
- * keywords without re-tokenising the visible text.
+ * disabled, and a null tier suppresses the trailing pill.
+ * `lines` is used only for the pill's hover title.
+ * `searchHaystack` is concatenated onto a data-attribute the
+ * filter script reads to match against keywords without
+ * re-tokenising the visible text.
  */
 export function trailRowHtml(
   href: string,

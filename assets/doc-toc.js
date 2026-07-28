@@ -230,7 +230,7 @@
     const topbar = document.querySelector('.topbar')
     const offset = topbar ? topbar.getBoundingClientRect().height + 20 : 20
 
-    // Find the current heading (last one above the offset line)
+    // Find the current heading, which is the last one above the offset line.
     let current = undefined
     for (let i = 0; i < headings.length; i++) {
       const rect = headings[i].getBoundingClientRect()

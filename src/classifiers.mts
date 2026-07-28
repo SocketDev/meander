@@ -20,8 +20,8 @@
  * purl regex doesn't restate it. Matches for one character. */
 const PCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%"
 
-/* Reused by isPurl. Query chars are pchar minus '&' and '#'
- * (these delimit pairs and fragments); version chars are pchar
+/* Reused by isPurl. Query chars are pchar minus '&' and '#',
+ * which delimit pairs and fragments; version chars are pchar
  * minus '?' and '#' (these open query / fragment). */
 const PURL_QCHAR = "A-Za-z0-9\\-._~!$'()*+,;=:@%"
 const PURL_VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%"

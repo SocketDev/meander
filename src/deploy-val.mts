@@ -56,7 +56,8 @@ export type DeployValOptions = {
   outDir?: string | undefined
   /**
    * Comma-separated email-domain allowlist written to the val's
-   * env. Default: empty (val refuses writes until configured).
+   * env. Default: empty. An empty allowlist makes the val refuse
+   * writes until it is configured.
    */
   allowedEmailDomains?: string | undefined
   /**

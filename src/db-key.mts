@@ -269,7 +269,8 @@ export async function dbKeyRotate(
 
 export type DbKeyOptions = {
   /**
-   * Shamir threshold (min shares to reconstruct). Default: 2.
+   * Shamir threshold: the minimum shares needed to reconstruct
+   * the secret. Default: 2.
    */
   threshold?: number | undefined
   /**

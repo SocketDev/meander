@@ -158,7 +158,7 @@
       return
     }
 
-    // Switch to the tab without updating hash (we're reading from hash)
+    // Switch to the tab without updating hash, since we're reading from it.
     switchToTab(index, false)
 
     // Scroll to anchor if present

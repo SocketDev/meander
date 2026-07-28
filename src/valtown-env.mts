@@ -158,7 +158,7 @@ export async function resolveVal(
 
 /**
  * Set an env var on the val. PUT first (succeeds if it already
- * exists); fall back to POST (creates a new key). Idempotent
+ * exists); fall back to POST, which creates a new key. Idempotent
  * either way.
  */
 export async function setEnvVar(

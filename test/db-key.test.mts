@@ -161,7 +161,7 @@ describe('dbKeyRotate', () => {
     expect(deps.env.store.get('MEANDER_DB_KEY_2')).toBe(HEX_OF_BYTE(0xee))
     /* CURRENT flipped to 2. */
     expect(deps.env.store.get('MEANDER_DB_KEY_CURRENT')).toBe('2')
-    /* Old generation 1 still in env (retire is a separate step). */
+    /* Old generation 1 stays in env; retiring it is a separate step. */
     expect(deps.env.store.get('MEANDER_DB_KEY_1')).toBe(HEX_OF_BYTE(0x33))
     /* Both rewrap batches were called. */
     expect(deps.admin.rewrapCalls).toHaveLength(2)

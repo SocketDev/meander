@@ -59,7 +59,7 @@ export function resolveValTownToken(
   const token = process.env[resolvedName] ?? undefined
   return {
     envName: resolvedName,
-    // oxlint-disable-next-line socket/prefer-undefined-over-null -- public TokenResolution contract: `null` signals "resolved, but no token present" (distinct from an unresolved name); callers branch on `!token` and tests assert toBeNull().
+    // oxlint-disable-next-line socket/prefer-undefined-over-null -- public TokenResolution contract: `null` signals "resolved, but no token present" and is distinct from an unresolved name; callers branch on `!token` and tests assert toBeNull().
     token: token && token.length > 0 ? token : null,
   }
 }

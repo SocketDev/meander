@@ -176,7 +176,7 @@
       return
     }
 
-    // Ensure the pane is visible (switch tabs if necessary).
+    // Ensure the pane is visible, switching tabs if necessary.
     // Use the public API from doc-tabs.js to avoid double scroll/hash handling.
     const docIndex = parseInt(pane.getAttribute('data-doc-index'), 10)
     if (!isNaN(docIndex) && !pane.classList.contains('active')) {

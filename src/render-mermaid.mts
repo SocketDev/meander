@@ -74,7 +74,7 @@ const svgoConfig = {
  * `close()` when the build is done.
  *
  * Throws if `puppeteer` or `svgo` isn't installed. Mermaid is
- * loaded from disk (the source text is injected into the page),
+ * loaded from disk by injecting its source text into the page,
  * so it also has to be in the consumer's node_modules.
  */
 export async function createMermaidRenderer(

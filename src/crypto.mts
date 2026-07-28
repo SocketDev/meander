@@ -115,8 +115,8 @@ export function randomWrappingKey(): Buffer {
 
 /**
  * Recognize and parse an envelope-wrapped blob. Returns undefined
- * if the input lacks the prefix (caller treats as plaintext).
- * Throws if the prefix is present but malformed.
+ * if the input lacks the prefix; the caller then treats the blob
+ * as plaintext. Throws if the prefix is present but malformed.
  */
 export function unpackEnvelope(
   blob: string,

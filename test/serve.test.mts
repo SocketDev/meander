@@ -340,7 +340,7 @@ describe('serve (HTTP handler)', () => {
     /* `/demo/part/` with a part id matches routeToFile → `part-`;
      * that file doesn't exist so we fall through to asset path.
      * To trigger the directory branch: request the pages dir
-     * itself via `/pages` (routes through as an asset ref). */
+     * itself via `/pages`, which routes through as an asset ref. */
     mkdirSync(path.join(tmpDir, 'pages', 'adir'), { recursive: true })
     const res = await httpRequest(`${baseUrl}/adir`)
     expect(res.status).toBe(404)
