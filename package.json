@@ -74,8 +74,8 @@
   },
   "dependencies": {
     "@sinclair/typebox": "catalog:",
-    "@valtown/sdk": "1.0.0",
-    "marked": "18.0.6",
+    "@valtown/sdk": "1.14.0",
+    "marked": "18.0.7",
     "node-html-parser": "7.1.0",
     "svgo": "4.0.2"
   },
@@ -99,7 +99,7 @@
     "c8": "catalog:",
     "chrome-devtools-mcp": "catalog:",
     "ecc-agentshield": "1.4.0",
-    "esbuild": "0.25.11",
+    "esbuild": "0.25.12",
     "fast-check": "catalog:",
     "fast-glob": "3.3.3",
     "magic-string": "catalog:",
@@ -114,7 +114,7 @@
     "oxlint-tsgolint": "catalog:",
     "playwright-core": "catalog:",
     "portless": "catalog:",
-    "puppeteer": "24.42.0",
+    "puppeteer": "24.43.1",
     "regjsparser": "catalog:",
     "rolldown": "catalog:",
     "semver": "catalog:",

@@ -2,14 +2,14 @@ catalog:
   '@redwoodjs/agent-ci': 0.17.1
   '@shadscan/cli': 0.2.0
   '@sinclair/typebox': 0.34.52
-  '@socketregistry/packageurl-js': 1.4.7
-  '@socketregistry/packageurl-js-stable': npm:@socketregistry/packageurl-js@1.4.7
-  '@socketsecurity/lib': 6.2.3
-  '@socketsecurity/lib-stable': npm:@socketsecurity/lib@6.2.3
-  '@socketsecurity/registry': 2.0.4
-  '@socketsecurity/registry-stable': npm:@socketsecurity/registry@2.0.4
-  '@socketsecurity/sdk': 4.1.0
-  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.1.0
+  '@socketregistry/packageurl-js': 1.4.8
+  '@socketregistry/packageurl-js-stable': npm:@socketregistry/packageurl-js@1.4.8
+  '@socketsecurity/lib': 6.3.0
+  '@socketsecurity/lib-stable': npm:@socketsecurity/lib@6.3.0
+  '@socketsecurity/registry': 2.0.5
+  '@socketsecurity/registry-stable': npm:@socketsecurity/registry@2.0.5
+  '@socketsecurity/sdk': 4.1.2
+  '@socketsecurity/sdk-stable': npm:@socketsecurity/sdk@4.1.2
   '@types/mdast': 4.0.4
   '@types/node': 26.1.1
   '@types/semver': 7.7.1
@@ -48,7 +48,7 @@ catalog:
   'typescript': 7.0.2
   # vite 8.x is rolldown-native (no esbuild transitive); the override
   # below pins every transitive vite (vitest, @vitest/*) to it.
-  'vite': 8.1.0
+  'vite': 8.1.5
   'vitiate': 0.3.1
   'vitest': 4.1.10
 
@@ -67,9 +67,9 @@ overrides:
   'has-symbols': 'npm:@socketregistry/has-symbols@1.0.7'
   'has-tostringtag': 'npm:@socketregistry/has-tostringtag@1.0.7'
   'hasown': 'npm:@socketregistry/hasown@1.0.7'
-  'iconv-lite': '0.7.2'
+  'iconv-lite': '0.7.3'
   'isexe@>=3': '4.0.0'
-  'lru-cache@>=10': '11.3.6'
+  'lru-cache@>=10': '11.5.2'
   'magic-string': '1.0.0'
   'mime-db': '1.54.0'
   'mime-types@>=3': '3.0.2'
