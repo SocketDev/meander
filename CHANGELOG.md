@@ -50,7 +50,6 @@
 - **`brand`** — add logo asset set and feature in readme
 - **`render`** — classify inline code as email, purl, scoped package, or url
 - **`render`** — emit file-anchors.json for cross-file link targets
-- **`config`** — comments: false to skip inlined comment client
 - **`render`** — include per-section metadata in manifest.json
 - **`cli`** — --base-path and --asset-dir for subpath hosting + asset subdir
 - **`render`** — hand-tokenize purl identifiers in inline code
@@ -68,31 +67,35 @@
 
 ### Fixed
 
-- **`deps`** — absorb the fleet catalog heal
-- **`fleet`** — restore fetch-fleet-bundle to the v1.0.14 manifest bytes
-- **`ci`** — reference the agentshield binary env the install composite exports
 - **`fuzz`** — sweep orphaned vitiate shm segments before the run
 - **`readme`** — reconcile the coverage badge with measured coverage
-- **`deps`** — sync the sdk-stable alias to the 4.1.0 catalog pin
 - **`types`** — extend the fleet tsconfig base
-- **`ci`** — converge on the fleet checkout v6.0.2 pin and stamp the pages pins
-- **`deps`** — ignore vite's optional esbuild peer and regen the lockfile
 - **`paths`** — normalize doc.filePath before splitting on slash
 - **`types`** — clear tsc errors under the fleet check tsconfig
-- **`deps`** — resolve dependabot security alerts for svgo and js-yaml
 - **`repo`** — plain doc-header blocks and skill descriptions within catalog budget
-- **`deps`** — pin vite 8 rolldown-native and sync the -stable aliases
 - **`claude`** — segment agents/commands/skills into repo/ and drop stale shadows
-- **`deps`** — sync package-manager pins and regenerate the lockfile snapshot
 - **`minify`** — hoist required kind out of the minifyAsset options bag
-- **`deps`** — resolve dependabot security alerts
 - **`a11y`** — drop redundant title attrs on topbar action buttons
 - **`ui`** — unresolved-comments dropdown sizes to its content
 - **`ui`** — paint pair-grid code column as one continuous dark band
 - **`claude`** — clear AgentShield medium+ findings from ported agents
-- **`ci`** — drop ecc-agentshield package.json resolve, use bin shim
 - **`minify`** — dynamic-import esbuild so JS/CSS pass degrades gracefully
-- **`ci`** — resolve puppeteer build-script approval that broke install
 - **`render`** — drop mailto auto-link for name@version patterns in annotations
 - **`documents`** — make tab bar horizontally scrollable with fade indicator
 - **`documents`** — harden rendering, API validation, and client-side navigation
+
+### Internal
+
+- **`config`** — comments: false to skip inlined comment client
+- **`deps`** — absorb the fleet catalog heal
+- **`fleet`** — restore fetch-fleet-bundle to the v1.0.14 manifest bytes
+- **`ci`** — reference the agentshield binary env the install composite exports
+- **`deps`** — sync the sdk-stable alias to the 4.1.0 catalog pin
+- **`ci`** — converge on the fleet checkout v6.0.2 pin and stamp the pages pins
+- **`deps`** — ignore vite's optional esbuild peer and regen the lockfile
+- **`deps`** — resolve dependabot security alerts for svgo and js-yaml
+- **`deps`** — pin vite 8 rolldown-native and sync the -stable aliases
+- **`deps`** — sync package-manager pins and regenerate the lockfile snapshot
+- **`deps`** — resolve dependabot security alerts
+- **`ci`** — drop ecc-agentshield package.json resolve, use bin shim
+- **`ci`** — resolve puppeteer build-script approval that broke install
