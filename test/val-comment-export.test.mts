@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { signJwt } from '../assets/val/lib/jwt.ts'
+import { SESSION_SCOPE } from '../assets/val/lib/session.ts'
 import {
   ADMIN_TOKEN,
   EXPORT_ROUTE,
@@ -36,8 +37,14 @@ describe('GET /:slug/api/comments/export', () => {
       await makeRow({ id: 'c1', slug: 'alpha', author: 'a@socket.dev' }),
     ]
     const real = await sessionFor('a@socket.dev')
+    /* Same claims a real session carries, so the signature is the
+     * only thing wrong with it. */
     const forged = await signJwt(
-      { email: 'a@socket.dev', exp: Math.floor(Date.now() / 1000) + 3600 },
+      {
+        email: 'a@socket.dev',
+        scope: SESSION_SCOPE,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
       'not-the-secret',
     )
     expect(forged.split('.')).toHaveLength(3)
@@ -52,7 +59,11 @@ describe('GET /:slug/api/comments/export', () => {
   it('denies an expired session', async () => {
     const h = await makeHarness()
     const stale = await signJwt(
-      { email: 'a@socket.dev', exp: Math.floor(Date.now() / 1000) - 60 },
+      {
+        email: 'a@socket.dev',
+        scope: SESSION_SCOPE,
+        exp: Math.floor(Date.now() / 1000) - 60,
+      },
       JWT_SECRET,
     )
     const res = await h.call(EXPORT_ROUTE, {

@@ -2,11 +2,9 @@
  * Walkthrough Val — Hono HTTP handler.
  *
  * Serves walkthrough HTML out of Val Town blob storage and
- * manages comments via SQLite, with email magic-code auth for
- * writes. Reads are open (unauthenticated visitors can see
- * walkthrough pages and discussions); writes require an
- * authenticated session token, and so does the comment export,
- * which returns every author identity in plaintext.
+ * manages comments via SQLite, with email magic-code auth. Comment
+ * writes and the comment export require an authenticated session
+ * token; per-part comment reads are open.
  *
  * At-rest encryption posture (see docs/encryption.md):
  *
@@ -19,11 +17,15 @@
  *   prefix) are served as-is. Most projects publish to GitHub Pages and don't
  *   engage this path at all.
  *
- * `encryptBlobs` protects storage, not the page routes: the val
- * decrypts a blob for every visitor, exactly as it serves a
- * plaintext one. Gating pages on the session JWT is impossible
- * here, since a top-level browser navigation to /:slug/ carries no
- * Authorization header. See docs/encryption.md.
+ * `encryptBlobs` is both the at-rest control and the reader gate.
+ * A walkthrough whose blob carries the `ENVELOPE:` prefix is
+ * private: `lib/pages.ts` resolves the caller before decrypting,
+ * and refuses with the sign-in page unless they present the slug's
+ * reader cookie, a comment-API session token, or the val's admin
+ * token. A plaintext blob stays public with no sign-in. The reader
+ * cookie is minted by `POST /:slug/api/auth/session` and scoped to
+ * `Path=/<slug>/`, which is how a top-level browser navigation
+ * carries credentials the `Authorization` header cannot.
  *
  * Required env vars (set by ops via `meander db key init`):
  * MEANDER_DB_KEY_<n>             Hex-encoded 32-byte wrapping
@@ -77,10 +79,15 @@ import {
 import type { AuthGateOptions } from './lib/auth.ts'
 import { registerAdminRoutes } from './lib/admin.ts'
 import { registerCommentRoutes } from './lib/comments.ts'
-import { decrypt, importKey, unpackEnvelope, unwrapKey } from './lib/crypto.ts'
-import { signJwt, verifyJwt } from './lib/jwt.ts'
+import {
+  consumeMagicCode,
+  MAGIC_CODE_TTL_SECONDS,
+  storeMagicCode,
+} from './lib/magic-code.ts'
 import { loadBlobKey, loadDbKeyContext } from './lib/keys.ts'
 import type { WrappingKeyContext } from './lib/keys.ts'
+import { registerPageRoutes } from './lib/pages.ts'
+import { mintSessionToken, readSessionToken } from './lib/session.ts'
 import { errorMessage } from '@socketsecurity/lib/errors/message'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
@@ -195,22 +202,50 @@ export async function ensureDb() {
 }
 
 /**
- * Mint a 30-day session JWT with the caller's email.
+ * Every slug with blobs under the deployment's out-dir, sorted.
  */
-export async function mintSession(email: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  return signJwt({ email, iat: now, exp: now + 60 * 60 * 24 * 30 }, JWT_SECRET)
+export async function listSlugs(): Promise<string[]> {
+  const blobs = await blob.list(`${OUT_DIR}/`)
+  const slugs = new Set<string>()
+  for (const b of blobs) {
+    /* Keys look like <OUT_DIR>/<slug>/index.html. The shared
+     * CSS file lives at <OUT_DIR>/meander.css — its key has
+     * only two segments, so the slug branch skips it. */
+    const parts = b.key.split('/')
+    if (parts.length >= 3 && parts[0] === OUT_DIR) {
+      slugs.add(parts[1])
+    }
+  }
+  return [...slugs].toSorted()
 }
 
 /**
- * Verify a token and return the email claim, or undefined.
+ * Mint a 30-day comment-API session token with the caller's email.
  */
-export async function readSession(token: string): Promise<string | undefined> {
-  const payload = await verifyJwt(token, JWT_SECRET)
-  if (!payload || typeof payload['email'] !== 'string') {
+export async function mintSession(email: string): Promise<string> {
+  return mintSessionToken(email, JWT_SECRET)
+}
+
+/**
+ * Blob text for a key relative to the out-dir, or undefined when
+ * the blob does not exist.
+ */
+export async function readBlobText(
+  relativeKey: string,
+): Promise<string | undefined> {
+  try {
+    const data = await blob.get(`${OUT_DIR}/${relativeKey}`)
+    return await data.text()
+  } catch {
     return undefined
   }
-  return payload['email']
+}
+
+/**
+ * Verify a session token and return the email claim, or undefined.
+ */
+export async function readSession(token: string): Promise<string | undefined> {
+  return readSessionToken(token, JWT_SECRET)
 }
 
 /**
@@ -230,48 +265,6 @@ export async function sendMagicCode(
     await sendEmail({ to: email, subject, text })
   } catch (e) {
     logger.log(`[meander] email send failed, code for ${email}: ${code}`, e)
-  }
-}
-
-/**
- * Serve a walkthrough HTML blob. If the publisher uploaded an
- * envelope-encrypted blob (recognized by the `ENVELOPE:` prefix),
- * decrypt before serving. Plaintext blobs pass through. Failure
- * to decrypt — wrong key, malformed envelope — surfaces as a 500
- * so misconfiguration doesn't silently serve garbage. Public for
- * encrypted and plaintext blobs alike; see the module docblock.
- */
-export async function serveBlobHtml(c: Context, relativeKey: string) {
-  let text: string
-  try {
-    const data = await blob.get(`${OUT_DIR}/${relativeKey}`)
-    text = await data.text()
-  } catch {
-    return c.text('Not found', 404)
-  }
-  let envelope: { wrappedDek: string; ciphertext: string } | undefined
-  try {
-    envelope = unpackEnvelope(text)
-  } catch {
-    return c.text('Server error: malformed encrypted blob', 500)
-  }
-  if (!envelope) {
-    return c.html(text)
-  }
-  const blobKey = await loadBlobKey()
-  if (!blobKey) {
-    return c.text(
-      'Server error: encrypted blob present but MEANDER_BLOB_KEY is unset',
-      500,
-    )
-  }
-  try {
-    const dekBytes = await unwrapKey(envelope.wrappedDek, blobKey)
-    const dek = await importKey(dekBytes)
-    const html = await decrypt(envelope.ciphertext, dek)
-    return c.html(html)
-  } catch {
-    return c.text('Server error: blob decrypt failed', 500)
   }
 }
 
@@ -320,18 +313,8 @@ app.post('/api/auth/request', async c => {
   }
   const code = sixDigitCode()
   const codeHash = await hashCode(code, email)
-  const expiresAt = Math.floor(Date.now() / 1000) + 10 * 60
-  await sqlite.execute({
-    sql: `
-      INSERT INTO magic_codes (email, code_hash, expires_at, attempts)
-      VALUES (:email, :codeHash, :expiresAt, 0)
-      ON CONFLICT(email) DO UPDATE SET
-        code_hash = excluded.code_hash,
-        expires_at = excluded.expires_at,
-        attempts = 0
-    `,
-    args: { email, codeHash, expiresAt },
-  })
+  const expiresAt = Math.floor(Date.now() / 1000) + MAGIC_CODE_TTL_SECONDS
+  await storeMagicCode(sqlite, email, codeHash, expiresAt)
   await sendMagicCode(email, code)
   return c.json({ ok: true })
 })
@@ -352,36 +335,10 @@ app.post('/api/auth/verify', async c => {
   if (!email || !code) {
     return c.json({ error: 'email + code required' }, 400)
   }
-  const row = (
-    await sqlite.execute({
-      sql: 'SELECT code_hash, expires_at, attempts FROM magic_codes WHERE email = :email',
-      args: { email },
-    })
-  ).rows[0] as
-    | { code_hash: string; expires_at: number; attempts: number }
-    | undefined
-  if (!row) {
-    return c.json({ error: 'no code for this email' }, 400)
+  const outcome = await consumeMagicCode(sqlite, email, code)
+  if (!outcome.ok) {
+    return c.json({ error: outcome.error }, outcome.status)
   }
-  if (row.expires_at < Math.floor(Date.now() / 1000)) {
-    return c.json({ error: 'code expired' }, 400)
-  }
-  if (row.attempts >= 5) {
-    return c.json({ error: 'too many attempts; request a new code' }, 429)
-  }
-  const codeHash = await hashCode(code, email)
-  if (codeHash !== row.code_hash) {
-    await sqlite.execute({
-      sql: 'UPDATE magic_codes SET attempts = attempts + 1 WHERE email = :email',
-      args: { email },
-    })
-    return c.json({ error: 'invalid code' }, 401)
-  }
-  /* One-shot: delete the code after successful use. */
-  await sqlite.execute({
-    sql: 'DELETE FROM magic_codes WHERE email = :email',
-    args: { email },
-  })
   const token = await mintSession(email)
   return c.json({ token, email })
 })
@@ -405,73 +362,26 @@ app.get('/api/auth/me', async c => {
 app.get('/meander.css', async c => serveBlobText(c, 'meander.css', 'text/css'))
 
 /* ------------------------------------------------------------------ */
-/*  Root — list available walkthroughs                                 */
+/*  Walkthrough pages + comments + admin endpoints                      */
 /* ------------------------------------------------------------------ */
 
-/* Public index of every slug in blob storage, matching the public
- * page routes it links to. A walkthrough whose existence is itself
- * sensitive wants its own val: the slug namespace has no per-slug
- * visibility. */
-app.get('/', async c => {
-  try {
-    const blobs = await blob.list(`${OUT_DIR}/`)
-    const slugs = new Set<string>()
-    for (const b of blobs) {
-      /* Keys look like <OUT_DIR>/<slug>/index.html. The shared
-       * CSS file lives at <OUT_DIR>/meander.css — its key has
-       * only two segments, so the slug branch skips it. */
-      const parts = b.key.split('/')
-      if (parts.length >= 3 && parts[0] === OUT_DIR) {
-        slugs.add(parts[1])
-      }
-    }
-    const links = [...slugs]
-      .map(s => `<li><a href="/${s}/">${s}</a></li>`)
-      .join('\n')
-    const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Walkthroughs</title>
-<link rel="stylesheet" href="/meander.css"></head>
-<body><header class="topbar"><h1>Walkthroughs</h1></header>
-<main style="padding:16px;max-width:900px;"><ul>${links || '<li>No walkthroughs published yet.</li>'}</ul></main></body></html>`
-    return c.html(html)
-  } catch {
-    return c.text('Error listing walkthroughs', 500)
-  }
+/* Routes are registered from `lib/pages.ts`, `lib/comments.ts`, and
+ * `lib/admin.ts` so tests can drive them with a stub blob store,
+ * sqlite client, and key context, without pulling in val.town's
+ * `https://esm.town/...` imports at test time. */
+registerPageRoutes(app, {
+  adminToken: ADMIN_TOKEN,
+  allowedDomains: ALLOWED_EMAIL_DOMAINS,
+  blobKey: loadBlobKey,
+  consumeMagicCode: async (email, code) => {
+    await ensureDb()
+    return consumeMagicCode(sqlite, email, code)
+  },
+  jwtSecret: JWT_SECRET,
+  listSlugs,
+  readBlobText,
 })
 
-/* ------------------------------------------------------------------ */
-/*  Walkthrough pages                                                   */
-/* ------------------------------------------------------------------ */
-
-app.get('/:slug/', async c => {
-  const slug = c.req.param('slug')
-  return serveBlobHtml(c, `${slug}/index.html`)
-})
-
-app.get('/:slug', async c => {
-  const slug = c.req.param('slug')
-  return c.redirect(`/${slug}/`, 301)
-})
-
-app.get('/:slug/documents', async c => {
-  const slug = c.req.param('slug')
-  return serveBlobHtml(c, `${slug}/documents.html`)
-})
-
-app.get('/:slug/part/:id', async c => {
-  const slug = c.req.param('slug')
-  const id = c.req.param('id')
-  return serveBlobHtml(c, `${slug}/part-${id}.html`)
-})
-
-/* ------------------------------------------------------------------ */
-/*  Comments + admin endpoints                                          */
-/* ------------------------------------------------------------------ */
-
-/* Routes are registered from `lib/comments.ts` and `lib/admin.ts`
- * so tests can drive them with a stub sqlite client + key context,
- * without pulling in val.town's `https://esm.town/...` imports at
- * test time. */
 registerCommentRoutes(app, {
   sqlite,
   ensureDb,

@@ -4,7 +4,8 @@
  *   `registerCommentRoutes` takes the Hono app and a `CommentDeps` struct, so
  *   this hands it a recorder app (collects `method path` → handler) and a fake
  *   Hono context. Nothing here stubs the gate: `currentUser` verifies a real
- *   HS256 JWT through `lib/jwt.ts`, `authRequired` is the real `authGate`, and
+ *   HS256 session token through `lib/session.ts`, `authRequired` is the real
+ *   `authGate`, and
  *   rows carry real AES-256-GCM ciphertext, so a token with a valid shape but a
  *   bad signature is rejected by the code under test rather than by a mock.
  *   The fake sqlite interprets the WHERE clause it is handed, so a query that
@@ -21,7 +22,10 @@ import {
   randomDataKeyBytes,
   wrapKey,
 } from '../../assets/val/lib/crypto.ts'
-import { signJwt, verifyJwt } from '../../assets/val/lib/jwt.ts'
+import {
+  mintSessionToken,
+  readSessionToken,
+} from '../../assets/val/lib/session.ts'
 
 export const JWT_SECRET = 'test-jwt-secret'
 export const ADMIN_TOKEN = 'test-admin-token'
@@ -248,9 +252,7 @@ export async function makeHarness(
         if (!m) {
           return undefined
         }
-        const payload = await verifyJwt(m[1]!, JWT_SECRET)
-        const email = payload?.['email']
-        return typeof email === 'string' ? email : undefined
+        return readSessionToken(m[1]!, JWT_SECRET)
       },
       authRequired: (email, options) =>
         authGate(email, {
@@ -277,6 +279,5 @@ export async function makeHarness(
 }
 
 export async function sessionFor(email: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  return signJwt({ email, iat: now, exp: now + 3600 }, JWT_SECRET)
+  return mintSessionToken(email, JWT_SECRET, 3600)
 }

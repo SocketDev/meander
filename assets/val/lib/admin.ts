@@ -25,6 +25,7 @@ import type { Hono } from 'npm:hono@4'
 import type { Context } from 'npm:hono@4'
 
 import { importKey, unwrapKey, wrapKey } from './crypto.ts'
+import { bearerToken, constantTimeEqual } from './session.ts'
 
 export function adminAuth(
   c: Context,
@@ -88,22 +89,6 @@ export type AdminDeps = {
 }
 
 /**
- * Constant-time string comparison. JS `===` short-circuits on the
- * first mismatched character; this loops over `max(a, b)` so the
- * comparison's runtime is independent of which input the caller
- * supplied. Mismatched lengths still reject (via the seeded
- * length-XOR), but in equal time.
- */
-export function constantTimeEqual(a: string, b: string): boolean {
-  const len = Math.max(a.length, b.length)
-  let diff = a.length ^ b.length
-  for (let i = 0; i < len; i++) {
-    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
-  }
-  return diff === 0
-}
-
-/**
  * Predicate form of `adminAuth` for routes that accept *either* an
  * admin token or a user session: it answers "is this the admin
  * token?" without deciding the response. Comparison stays
@@ -131,9 +116,7 @@ export function noKeyContextResponse(c: Context, deps: AdminDeps): Response {
  * undefined when the header is absent or shaped differently.
  */
 export function readBearerToken(c: Context): string | undefined {
-  const auth = c.req.header('authorization') || ''
-  const m = auth.match(/^Bearer\s+(.+)$/i)
-  return m ? m[1] : undefined
+  return bearerToken(c.req)
 }
 
 /**

@@ -49,19 +49,7 @@ export function authGate(
   if (cfg.demoMode) {
     return { error: `demo mode — ${operation} disabled`, status: 403 }
   }
-  if (!email) {
-    return { error: 'authentication required', status: 401 }
-  }
-  if (cfg.allowedDomains.length === 0) {
-    return {
-      error: `${operation} disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS`,
-      status: 403,
-    }
-  }
-  if (!emailDomainAllowed(email, cfg.allowedDomains)) {
-    return { error: 'email domain not allowed', status: 403 }
-  }
-  return undefined
+  return identityGate(email, cfg.allowedDomains, operation)
 }
 
 export function emailDomainAllowed(
@@ -84,6 +72,36 @@ export async function hashCode(code: string, email: string): Promise<string> {
   const bytes = new TextEncoder().encode(`${email}:${code}`)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return b64urlEncode(new Uint8Array(digest))
+}
+
+/**
+ * Decide whether a verified identity clears the deployment's
+ * allowlist for `operation`. This is the half of the gate that
+ * asks "who are you"; `authGate` layers the demo-mode refusal on
+ * top for write paths.
+ *
+ * Reader gating calls this directly. Demo mode disables *writes* —
+ * a demo deployment still serves its pages — so a reader must not
+ * inherit the write path's demo refusal.
+ */
+export function identityGate(
+  email: string | undefined,
+  allowedDomains: readonly string[],
+  operation: string,
+): { error: string; status: 401 | 403 } | undefined {
+  if (!email) {
+    return { error: 'authentication required', status: 401 }
+  }
+  if (allowedDomains.length === 0) {
+    return {
+      error: `${operation} disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS`,
+      status: 403,
+    }
+  }
+  if (!emailDomainAllowed(email, allowedDomains)) {
+    return { error: 'email domain not allowed', status: 403 }
+  }
+  return undefined
 }
 
 export function parseAllowedDomains(raw: string | undefined): string[] {
