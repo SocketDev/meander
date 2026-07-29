@@ -117,17 +117,25 @@ meander publish meander.config.json
 `publish` envelope-encrypts each generated HTML blob (per-blob DEK,
 wrapped under `MEANDER_BLOB_KEY`) and uploads to Val Town blob
 storage under keys like `pages/<slug>/part-1.html`. The CSS file
-is uploaded plaintext (browsers can't read encrypted CSS). The val
-decrypts each blob as it serves it, and the page routes are public
-either way, so this protects the bytes at rest rather than the URL.
-After publish, your walkthrough is live at:
+is uploaded plaintext (browsers can't read encrypted CSS). An
+encrypted blob makes the walkthrough private: the val asks the
+reader to sign in before it decrypts, and omits the slug from `/`
+for callers who can't open it. After publish, your walkthrough is
+live at:
 
 ```text
 https://<username>-<valname>.web.val.run/<slug>/
 ```
 
+Readers reach it by signing in with an email on
+`MEANDER_ALLOWED_EMAIL_DOMAINS`; set that variable before you
+publish encrypted blobs, or nobody (the operator included) can
+read them. See [encryption.md](./encryption.md) for the cookie and
+what stays visible without one.
+
 When `encryptBlobs: false` (the default), `publish` uploads
-plaintext bytes — `MEANDER_BLOB_KEY` is not needed.
+plaintext bytes — `MEANDER_BLOB_KEY` is not needed, and the
+walkthrough is public.
 
 Re-run `generate` + `publish` whenever the source files or
 annotations change. The val itself only needs `deploy-val` again

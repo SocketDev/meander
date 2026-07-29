@@ -17,10 +17,11 @@ import crypto from 'node:crypto'
  * re-encrypting comment bodies.
  *
  * Walkthrough HTML uses the same two layers when the publisher
- * sets `encryptBlobs: true`, which is a storage-at-rest control
- * only. The val decrypts every blob it serves and the page routes
- * are public, so the ciphertext defends a cold blob-storage dump,
- * not the URL. See docs/encryption.md.
+ * sets `encryptBlobs: true`. The ciphertext defends a cold
+ * blob-storage dump, and the `ENVELOPE:` prefix it carries is also
+ * what tells the val the walkthrough is private: the val resolves
+ * the reader's cookie or token before it decrypts. See
+ * docs/encryption.md.
  *
  * Both layers use AES-256-GCM with a fresh random 96-bit IV. The
  * GCM auth tag means tampered ciphertext fails to decrypt — we

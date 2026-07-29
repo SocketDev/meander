@@ -1,18 +1,29 @@
 # Comment API
 
 The deployed val exposes a small REST API. Per-part comment reads
-are open (so every visitor can see existing discussions); writes
-and the bulk export require a signed-in session. One val can host
-many walkthroughs — every query is scoped by `slug`, so a comment
-id from one walkthrough does not resolve against another.
+are open (so every visitor can see existing discussions), on
+public and encrypted walkthroughs alike; writes and the bulk
+export require a signed-in session. One val can host many
+walkthroughs — every query is scoped by `slug`, so a comment id
+from one walkthrough does not resolve against another.
 
 ## Auth endpoints
 
-| Method | Path                | What it does                                   |
-| ------ | ------------------- | ---------------------------------------------- |
-| `POST` | `/api/auth/request` | Email a 6-digit magic code.                    |
-| `POST` | `/api/auth/verify`  | Verify the code; returns a session JWT.        |
-| `GET`  | `/api/auth/me`      | Echo the authenticated email + demo-mode flag. |
+| Method   | Path                      | What it does                                         |
+| -------- | ------------------------- | ---------------------------------------------------- |
+| `POST`   | `/api/auth/request`       | Email a 6-digit magic code.                          |
+| `POST`   | `/api/auth/verify`        | Verify the code; returns a session JWT.              |
+| `GET`    | `/api/auth/me`            | Echo the authenticated email + demo-mode flag.       |
+| `POST`   | `/:slug/api/auth/session` | Verify the code; sets the reader cookie for `:slug`. |
+| `DELETE` | `/:slug/api/auth/session` | Expire that cookie.                                  |
+
+`/:slug/api/auth/session` is the page-reading counterpart of
+`/api/auth/verify`. It takes the same `{ email, code }`, returns
+the same `{ token, email }`, and additionally sets the `HttpOnly`
+cookie that unlocks an encrypted walkthrough's pages for a browser
+navigation. The sign-in page the val serves on a refused private
+walkthrough drives it. See
+[encryption.md](./encryption.md) for the cookie's shape and scope.
 
 ### Magic-code flow
 

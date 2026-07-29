@@ -8,15 +8,15 @@ have different recoverability properties.
 
 ## At a glance
 
-| Data class                         | Encrypted?                                                        | Key                  | Rotation                             |
-| ---------------------------------- | ----------------------------------------------------------------- | -------------------- | ------------------------------------ |
-| Comment `body` + `author`          | Always (envelope)                                                 | `MEANDER_DB_KEY_<n>` | Re-wrap DEKs, atomic generation flip |
-| Comment metadata (id, file, lines) | No (indexable plaintext)                                          | —                    | —                                    |
-| Walkthrough HTML in Val Town blobs | Opt-in (`encryptBlobs`), at rest only; served decrypted to anyone | `MEANDER_BLOB_KEY`   | Re-publish under a fresh key         |
-| Walkthrough HTML on GitHub Pages   | No (Pages-gated access)                                           | —                    | —                                    |
-| `meander.css`, `manifest.json`     | No                                                                | —                    | —                                    |
-| Magic-code hashes                  | One-way SHA-256                                                   | (salted by email)    | One-shot, ten-minute expiry          |
-| Session JWTs                       | Signed (HS256), not encrypted                                     | `MEANDER_JWT_SECRET` | Rotation logs every user out         |
+| Data class                         | Encrypted?                                                              | Key                  | Rotation                             |
+| ---------------------------------- | ----------------------------------------------------------------------- | -------------------- | ------------------------------------ |
+| Comment `body` + `author`          | Always (envelope)                                                       | `MEANDER_DB_KEY_<n>` | Re-wrap DEKs, atomic generation flip |
+| Comment metadata (id, file, lines) | No (indexable plaintext)                                                | —                    | —                                    |
+| Walkthrough HTML in Val Town blobs | Opt-in (`encryptBlobs`); at rest, and served only to a signed-in reader | `MEANDER_BLOB_KEY`   | Re-publish under a fresh key         |
+| Walkthrough HTML on GitHub Pages   | No (Pages-gated access)                                                 | —                    | —                                    |
+| `meander.css`, `manifest.json`     | No                                                                      | —                    | —                                    |
+| Magic-code hashes                  | One-way SHA-256                                                         | (salted by email)    | One-shot, ten-minute expiry          |
+| Session JWTs                       | Signed (HS256), not encrypted                                           | `MEANDER_JWT_SECRET` | Rotation logs every user out         |
 
 ## Threat model
 
@@ -34,12 +34,17 @@ What it does _not_ defend against:
 - **Live val compromise**: an attacker with code execution inside
   the running val sees plaintext, because the val must decrypt to
   serve.
-- **Anonymous reads**: walkthrough pages, the `/` slug index, and
-  per-part comment reads are open to anyone with the URL, whether
-  or not `encryptBlobs` is on. Comment writes and the bulk comment
-  export are the gated routes.
-- **Reader-side leakage**: anyone holding a valid JWT can export
-  every comment body and author identity for a slug in plaintext.
+- **Anonymous reads of a plaintext walkthrough**: a walkthrough
+  published without `encryptBlobs` is public, by design. Its pages
+  and its `/` index entry are open to anyone with the URL.
+- **Comment reads on a private walkthrough**: the per-part comment
+  route returns decrypted bodies and author identities to any
+  caller, on an encrypted walkthrough as on a public one. Gating
+  the prose does not gate the discussion about it.
+- **Reader-side leakage**: anyone holding a valid session token can
+  read every private walkthrough on the deployment and export every
+  comment body and author identity for a slug in plaintext. The
+  grant is "an allowed email domain", not a per-walkthrough ACL.
 - **Custodian compromise**: if more than `(shares − threshold)`
   share-holders are compromised, the wrapping key is recoverable
   by an attacker.
@@ -132,24 +137,66 @@ serving. Plaintext blobs (no prefix) are served as-is. The val and
 the operator both hold `MEANDER_BLOB_KEY`: the val needs it to
 serve, the publisher needs it to encrypt.
 
-> [!IMPORTANT]
-> `encryptBlobs` protects storage, not the page routes. The val
-> serves a decrypted walkthrough to anyone who requests the URL,
-> exactly as it serves a plaintext one, and `/` lists every
-> published slug. What the flag buys you is that a cold
-> blob-storage dump yields ciphertext. That covers a Val Town
-> platform compromise, an over-scoped API token, or a leaked
-> snapshot.
+`encryptBlobs` is both the at-rest control and the reader gate.
+The encrypted bytes defend a cold blob-storage dump, covering a
+Val Town platform compromise, an over-scoped API token, or a
+leaked snapshot. The `ENVELOPE:` prefix is also what marks the
+walkthrough private at serve time, so the two cannot drift apart:
+the val decides on the blob it holds, not on a config value it was
+told about.
 
-Gating the page routes on the session JWT is not possible with
-this design. The token lives in `localStorage` and is attached by
-`fetch`; a top-level browser navigation to `/:slug/` carries no
-`Authorization` header, so a JWT check there would 401 every human
-visitor. Access control over walkthrough pages needs cookie
-sessions, which meander does not implement. Until it does, host
-prose that must stay unread behind something that does access
-control (a private GitHub Pages site, an SSO proxy) and treat
-`encryptBlobs` as the at-rest layer underneath it.
+### What a private walkthrough asks of a reader
+
+A reader who opens `/:slug/` on an encrypted walkthrough gets a
+sign-in page instead of the prose. Signing in emails them a
+six-digit code (the same magic-code flow the comment composer
+uses) and sets a reader cookie:
+
+```text
+meander_read=<jwt>; Path=/<slug>/; Max-Age=604800; HttpOnly; Secure; SameSite=Lax
+```
+
+The cookie carries the grant because a top-level browser
+navigation cannot carry an `Authorization` header. `HttpOnly`
+keeps it out of reach of page scripts, `SameSite=Lax` lets it ride
+a click from an email or a chat message while staying off
+cross-site POSTs, and `Path=/<slug>/` means the browser never
+offers walkthrough A's cookie on a request for walkthrough B. The
+token's own `slug` claim is checked as well, so the scoping does
+not rest on the browser honoring `Path`.
+
+Three credentials open a private walkthrough: that cookie, a
+comment-API session token on `Authorization: Bearer` (for scripts
+and mirrors), and `MEANDER_ADMIN_TOKEN` (for headless jobs). All
+three are re-checked against `MEANDER_ALLOWED_EMAIL_DOMAINS` on
+every request, so removing a domain revokes the cookies already
+issued to it. Rotating `MEANDER_JWT_SECRET` revokes all of them at
+once.
+
+`MEANDER_ALLOWED_EMAIL_DOMAINS` gates reads as well as writes. A
+deployment with an empty allowlist serves its public walkthroughs
+and refuses every private one, including to the operator.
+
+### What stays visible without signing in
+
+- `/meander.css`.
+- Every comment on every walkthrough, via `GET /:slug/api/comments?part=N`.
+- Public walkthroughs: pages, parts, documents, and their `/` index entries.
+- The existence of a slug, to anyone who guesses or is told the URL. The
+  refusal page names the slug it is refusing.
+
+The `/` index omits a private walkthrough from a caller who cannot
+open it. A browser sees no private entries there even when signed
+in, because the reader cookie is scoped to `/<slug>/` and is not
+sent to `/`; a private walkthrough is reached by its URL. A client
+presenting a session token or the admin token on `Authorization`
+sees the full list.
+
+Per-walkthrough authorization is not modeled: any reader on an
+allowed email domain can sign in to any private walkthrough on the
+deployment. The per-slug cookie bounds what one stolen credential
+reaches, not what a legitimate reader may ask for. A deployment
+that needs distinct audiences per walkthrough wants distinct vals.
 
 The lifecycle commands are under `meander blob key`:
 

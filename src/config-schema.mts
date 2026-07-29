@@ -272,17 +272,24 @@ export const MeanderConfigSchema = Type.Object({
    * by setting this flag *and* having `MEANDER_BLOB_KEY` set on
    * both the publisher and the val.
    *
-   * This is a storage-at-rest control, not an access control. The
-   * val's page routes stay public: it decrypts an encrypted blob
-   * for whoever requests the URL, exactly as it serves a plaintext
-   * one. What the flag defends is a cold blob-storage dump.
+   * The flag is a storage-at-rest control and a reader gate at
+   * once. Encrypted bytes defend a cold blob-storage dump, and the
+   * `ENVELOPE:` prefix is what marks the walkthrough private when
+   * the val serves it: a reader must present the slug's reader
+   * cookie (obtained through the magic-code sign-in page), a
+   * comment-API session token, or `MEANDER_ADMIN_TOKEN`, and the
+   * email behind it must sit on `MEANDER_ALLOWED_EMAIL_DOMAINS`.
+   * The `/` index omits the walkthrough from callers who cannot
+   * open it. Comments on the walkthrough stay readable without a
+   * session; see docs/encryption.md.
    *
    * Default: `false`. The common case is GitHub-Pages-served
    * walkthroughs where Val Town hosts only the comments.
    * Set `true` for private-repo projects that publish HTML to
-   * Val Town and don't want the prose readable from a cold blob
-   * dump. Prose that must not be readable from the URL needs a
-   * host that does access control; see docs/encryption.md.
+   * Val Town and don't want the prose readable — from a cold blob
+   * dump or from the URL. A deployment with an empty
+   * `MEANDER_ALLOWED_EMAIL_DOMAINS` refuses every reader,
+   * including the operator.
    */
   encryptBlobs: Type.Optional(Type.Boolean()),
 
