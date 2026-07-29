@@ -47,6 +47,7 @@ import {
   resolveReaderAccess,
 } from './session.ts'
 import type { ReaderAccessConfig } from './session.ts'
+import { blobTextIsEncrypted } from './visibility.ts'
 
 export type PageDeps = {
   /**
@@ -80,10 +81,15 @@ export type PageDeps = {
 }
 
 /**
- * Is this walkthrough's stored HTML envelope-encrypted? A blob
- * that carries the prefix but does not parse counts as encrypted:
- * the val cannot serve it either way, and guessing "public" on a
- * malformed private blob would be the wrong side to fail on.
+ * Is this walkthrough's stored HTML envelope-encrypted? Decided by
+ * `lib/visibility.ts`'s oracle, the same one the comment gate reads
+ * through.
+ *
+ * A slug with no index blob answers false here. The index route is
+ * this function's only caller, and a slug it cannot fetch is one it
+ * has nothing to hide: listing it costs a visitor a 404, while
+ * treating it as private would hide a public walkthrough whose blob
+ * read merely raced a publish.
  */
 export async function isEncryptedSlug(
   deps: PageDeps,
@@ -93,11 +99,7 @@ export async function isEncryptedSlug(
   if (text === undefined) {
     return false
   }
-  try {
-    return unpackEnvelope(text) !== undefined
-  } catch {
-    return true
-  }
+  return blobTextIsEncrypted(text)
 }
 
 /**

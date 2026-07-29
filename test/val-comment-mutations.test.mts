@@ -1,7 +1,8 @@
 /**
  * @file Ownership + slug-scoping coverage for the val's comment mutations
- *   (PATCH / DELETE /:slug/api/comments/:id), plus a check that the open
- *   per-part read stays open. Harness: test/utils/val-comment-harness.mts.
+ *   (PATCH / DELETE /:slug/api/comments/:id).
+ *   Harness: test/utils/val-comment-harness.mts. The read routes and their
+ *   reader gate live in test/val-comment-reads.test.mts.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -12,7 +13,6 @@ import {
   makeHarness,
   makeRow,
   PATCH_ROUTE,
-  READ_ROUTE,
   sessionFor,
 } from './utils/val-comment-harness.mts'
 
@@ -214,31 +214,5 @@ describe('DELETE /:slug/api/comments/:id', () => {
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true, id: 'reply', deleted: 1 })
     expect(h.sqlite.rows.map(row => row.id)).toEqual(['root'])
-  })
-})
-
-/* ------------------------------------------------------------------ */
-/*  Open reads stay open                                                */
-/* ------------------------------------------------------------------ */
-
-describe('GET /:slug/api/comments', () => {
-  it('serves a part to an anonymous visitor', async () => {
-    const h = await makeHarness()
-    h.sqlite.rows = [
-      await makeRow({
-        id: 'c1',
-        slug: 'alpha',
-        author: 'a@socket.dev',
-        body: 'visible',
-      }),
-    ]
-    const res = await h.call(READ_ROUTE, {
-      params: { slug: 'alpha' },
-      query: { part: '1' },
-    })
-    expect(res.status).toBe(200)
-    const comments = res.body as Array<Record<string, unknown>>
-    expect(comments).toHaveLength(1)
-    expect(comments[0]!['body']).toBe('visible')
   })
 })

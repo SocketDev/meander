@@ -11,6 +11,12 @@
  *   The fake sqlite interprets the WHERE clause it is handed, so a query that
  *   drops its `slug = :slug` scoping starts matching rows from other
  *   walkthroughs and the cross-walkthrough tests go red.
+ *   The reader gate is unstubbed the same way. `isSlugPrivate` runs the real
+ *   `resolveSlugPrivacy` over the fake sqlite and a fake blob store, so a read
+ *   of a slug named in `privateSlugs` really does probe a real `ENVELOPE:`
+ *   blob, record the verdict, and answer from the recorded row afterwards.
+ *   Cookies are parsed from a real `Cookie` header and reader tokens are real
+ *   HS256 JWTs.
  */
 
 import type { EncryptedCommentRow } from '../../assets/val/lib/comment-store.ts'
@@ -19,13 +25,20 @@ import { authGate } from '../../assets/val/lib/auth.ts'
 import {
   encrypt,
   importKey,
+  packEnvelope,
   randomDataKeyBytes,
   wrapKey,
 } from '../../assets/val/lib/crypto.ts'
 import {
+  mintReaderToken,
   mintSessionToken,
+  READER_COOKIE_NAME,
   readSessionToken,
 } from '../../assets/val/lib/session.ts'
+import {
+  probeSlugPrivacy,
+  resolveSlugPrivacy,
+} from '../../assets/val/lib/visibility.ts'
 
 export const JWT_SECRET = 'test-jwt-secret'
 export const ADMIN_TOKEN = 'test-admin-token'
@@ -34,7 +47,9 @@ export const EXPORT_ROUTE = 'GET /:slug/api/comments/export'
 export const PATCH_ROUTE = 'PATCH /:slug/api/comments/:id'
 export const DELETE_ROUTE = 'DELETE /:slug/api/comments/:id'
 export const READ_ROUTE = 'GET /:slug/api/comments'
+export const UNRESOLVED_ROUTE = 'GET /:slug/api/comments/unresolved'
 const WRAPPING_KEY_BYTES = new Uint8Array(32).fill(0x5a)
+const BLOB_KEY_BYTES = new Uint8Array(32).fill(0x3c)
 
 export type FakeResponse = {
   status: number
@@ -59,6 +74,10 @@ export type RequestSpec = {
   params?: Record<string, string> | undefined
   query?: Record<string, string> | undefined
   token?: string | undefined
+  /**
+   * Raw `Cookie` request header. Build one with `readerCookieFor`.
+   */
+  cookie?: string | undefined
   // oxlint-disable-next-line typescript/no-redundant-type-constituents -- fleet optional-explicit-undefined convention: the explicit | undefined on an optional is intentional, not redundant.
   body?: unknown | undefined
 }
@@ -102,10 +121,16 @@ export function makeContext(request: RequestSpec): FakeContext {
     req: {
       param: (name: string) => spec.params?.[name],
       query: (name: string) => spec.query?.[name],
-      header: (name: string) =>
-        name.toLowerCase() === 'authorization' && spec.token
-          ? `Bearer ${spec.token}`
-          : undefined,
+      header: (name: string) => {
+        const lower = name.toLowerCase()
+        if (lower === 'authorization') {
+          return spec.token ? `Bearer ${spec.token}` : undefined
+        }
+        if (lower === 'cookie') {
+          return spec.cookie
+        }
+        return undefined
+      },
       json: async () => spec.body,
     },
     header: (name: string, value: string) => {
@@ -127,6 +152,12 @@ export function makeContext(request: RequestSpec): FakeContext {
 export class FakeSqlite {
   rows: EncryptedCommentRow[] = []
   readonly statements: string[] = []
+  /**
+   * The `walkthrough_visibility` table: slug → 1 when private. A
+   * separate map because the visibility statements name their own
+   * table and never touch `comments`.
+   */
+  readonly visibility = new Map<string, number>()
 
   async execute(
     arg: string | { sql: string; args?: Record<string, unknown> | undefined },
@@ -134,6 +165,9 @@ export class FakeSqlite {
     const sql = typeof arg === 'string' ? arg : arg.sql
     const args = typeof arg === 'string' ? {} : (arg.args ?? {})
     this.statements.push(sql)
+    if (sql.includes('walkthrough_visibility')) {
+      return this.executeVisibility(sql, args)
+    }
     const matches = this.matching(sql, args)
     if (sql.startsWith('SELECT')) {
       return { rows: matches }
@@ -148,6 +182,21 @@ export class FakeSqlite {
       const doomed = new Set(matches.map(row => row.id))
       this.rows = this.rows.filter(row => !doomed.has(row.id))
       return { rows: [] }
+    }
+    return { rows: [] }
+  }
+
+  executeVisibility(
+    sql: string,
+    args: Record<string, unknown>,
+  ): { rows: readonly unknown[] } {
+    const slug = String(args['slug'])
+    if (sql.startsWith('SELECT')) {
+      const recorded = this.visibility.get(slug)
+      return { rows: recorded === undefined ? [] : [{ is_private: recorded }] }
+    }
+    if (sql.startsWith('INSERT')) {
+      this.visibility.set(slug, Number(args['isPrivate']))
     }
     return { rows: [] }
   }
@@ -225,27 +274,83 @@ export async function makeRow(spec: RowSpec): Promise<EncryptedCommentRow> {
 }
 
 /**
- * Wire the real routes against fakes. `demoMode` and
- * `allowedDomains` flow into the real `authGate`, and
- * `currentUser` verifies the JWT signature for real.
+ * Seal HTML the way `meander publish` does with `encryptBlobs: true`,
+ * so a probe of the fake blob store meets a real `ENVELOPE:` prefix.
  */
-export async function makeHarness(
-  overrides: {
-    allowedDomains?: readonly string[] | undefined
-    demoMode?: boolean | undefined
-    adminToken?: string | undefined
-    withKeyContext?: boolean | undefined
-  } = {},
-) {
-  const opts = { __proto__: null, ...overrides } as typeof overrides
+export async function encryptedBlobText(html: string): Promise<string> {
+  const wrapping = await importKey(BLOB_KEY_BYTES)
+  const dekBytes = randomDataKeyBytes()
+  const dek = await importKey(dekBytes)
+  return packEnvelope(
+    await encrypt(html, dek),
+    await wrapKey(dekBytes, wrapping),
+  )
+}
+
+/**
+ * A `Cookie` request header carrying a reader token for `slug`.
+ */
+export async function readerCookieFor(
+  email: string,
+  slug: string,
+  ttlSeconds = 3600,
+): Promise<string> {
+  const token = await mintReaderToken(email, slug, JWT_SECRET, ttlSeconds)
+  return `${READER_COOKIE_NAME}=${token}`
+}
+
+export type HarnessOptions = {
+  allowedDomains?: readonly string[] | undefined
+  demoMode?: boolean | undefined
+  adminToken?: string | undefined
+  jwtSecret?: string | undefined
+  /**
+   * Slugs whose blob store answers with no index page at all, which
+   * is how a slug the deployment never published looks.
+   */
+  missingSlugs?: readonly string[] | undefined
+  /**
+   * Slugs published with `encryptBlobs: true`. Their fake blobs are
+   * really envelope-sealed, so the gate decides on a prefix rather
+   * than on a flag the harness handed it. Every other slug serves
+   * plaintext and stays public.
+   */
+  privateSlugs?: readonly string[] | undefined
+  withKeyContext?: boolean | undefined
+}
+
+/**
+ * Wire the real routes against fakes. `demoMode` and
+ * `allowedDomains` flow into the real `authGate`, `currentUser`
+ * verifies the JWT signature for real, and `isSlugPrivate` runs the
+ * real `resolveSlugPrivacy` over the fake sqlite + blob store.
+ */
+export async function makeHarness(overrides: HarnessOptions = {}) {
+  const opts = { __proto__: null, ...overrides } as HarnessOptions
+  const missingSlugs = opts.missingSlugs ?? []
+  const privateSlugs = opts.privateSlugs ?? []
   const app = makeRecorderApp()
   const sqlite = new FakeSqlite()
   const keyContext = await makeKeyContext()
+  const blobReads: string[] = []
+  const readBlobText = async (
+    relativeKey: string,
+  ): Promise<string | undefined> => {
+    blobReads.push(relativeKey)
+    const slug = relativeKey.slice(0, relativeKey.indexOf('/'))
+    if (missingSlugs.includes(slug)) {
+      return undefined
+    }
+    return privateSlugs.includes(slug)
+      ? encryptedBlobText(`<html>${slug}</html>`)
+      : `<html>${slug}</html>`
+  }
   registerCommentRoutes(
     app as never,
     {
       sqlite,
       ensureDb: async () => {},
+      allowedDomains: opts.allowedDomains ?? ['socket.dev'],
       currentUser: async (c: FakeContext) => {
         const auth = c.req.header('authorization') || ''
         const m = auth.match(/^Bearer\s+(.+)$/i)
@@ -260,6 +365,11 @@ export async function makeHarness(
           demoMode: opts.demoMode ?? false,
           operation: options?.operation,
         }),
+      isSlugPrivate: (slug: string) =>
+        resolveSlugPrivacy(sqlite, slug, s =>
+          probeSlugPrivacy(readBlobText, s),
+        ),
+      jwtSecret: opts.jwtSecret ?? JWT_SECRET,
       keyContext: opts.withKeyContext === false ? undefined : keyContext,
       keyContextError: undefined,
       adminToken: opts.adminToken ?? ADMIN_TOKEN,
@@ -268,6 +378,7 @@ export async function makeHarness(
   return {
     app,
     sqlite,
+    blobReads: () => blobReads.slice(),
     call: (route: string, request: RequestSpec) => {
       const handler = app.routes.get(route)
       if (!handler) {

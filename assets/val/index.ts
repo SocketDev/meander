@@ -4,7 +4,8 @@
  * Serves walkthrough HTML out of Val Town blob storage and
  * manages comments via SQLite, with email magic-code auth. Comment
  * writes and the comment export require an authenticated session
- * token; per-part comment reads are open.
+ * token. Comment reads are open on a public walkthrough and carry
+ * the same reader gate as the prose on a private one.
  *
  * At-rest encryption posture (see docs/encryption.md):
  *
@@ -26,6 +27,14 @@
  * cookie is minted by `POST /:slug/api/auth/session` and scoped to
  * `Path=/<slug>/`, which is how a top-level browser navigation
  * carries credentials the `Authorization` header cannot.
+ *
+ * The comment read routes accept the same three credentials on a
+ * private walkthrough, because a comment thread carries decrypted
+ * prose and author identities of its own. They decide from the
+ * `walkthrough_visibility` table rather than the blob, so a comment
+ * poll costs an indexed row read instead of a blob fetch; see
+ * `lib/visibility.ts` for who writes that table and why an
+ * unrecorded slug reads as private.
  *
  * Required env vars (set by ops via `meander db key init`):
  * MEANDER_DB_KEY_<n>             Hex-encoded 32-byte wrapping
@@ -88,6 +97,11 @@ import { loadBlobKey, loadDbKeyContext } from './lib/keys.ts'
 import type { WrappingKeyContext } from './lib/keys.ts'
 import { registerPageRoutes } from './lib/pages.ts'
 import { mintSessionToken, readSessionToken } from './lib/session.ts'
+import {
+  probeSlugPrivacy,
+  resolveSlugPrivacy,
+  WALKTHROUGH_VISIBILITY_TABLE_SQL,
+} from './lib/visibility.ts'
 import { errorMessage } from '@socketsecurity/lib/errors/message'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
@@ -198,7 +212,23 @@ export async function ensureDb() {
       attempts   INTEGER NOT NULL DEFAULT 0
     )
   `)
+  /* `meander publish` creates this table too, with the identical
+   * statement, because it records a slug's privacy before the val
+   * has necessarily served its first request. */
+  await sqlite.execute(WALKTHROUGH_VISIBILITY_TABLE_SQL)
   dbInitialized = true
+}
+
+/**
+ * Is this walkthrough private? Reads the recorded flag, deriving
+ * and persisting it from the blob store the first time a slug is
+ * asked about. See lib/visibility.ts.
+ */
+export async function isSlugPrivate(slug: string): Promise<boolean> {
+  await ensureDb()
+  return resolveSlugPrivacy(sqlite, slug, s =>
+    probeSlugPrivacy(readBlobText, s),
+  )
 }
 
 /**
@@ -385,8 +415,11 @@ registerPageRoutes(app, {
 registerCommentRoutes(app, {
   sqlite,
   ensureDb,
+  allowedDomains: ALLOWED_EMAIL_DOMAINS,
   currentUser,
   authRequired,
+  isSlugPrivate,
+  jwtSecret: JWT_SECRET,
   keyContext: dbKeyContext,
   keyContextError: dbKeyContextError,
   adminToken: ADMIN_TOKEN,

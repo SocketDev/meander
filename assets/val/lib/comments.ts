@@ -11,8 +11,9 @@
  * `lib/comment-store.ts`; this file owns routing and authorization.
  *
  * Endpoints (all under `/:slug/api/comments`):
- * GET    /unresolved   Unresolved top-level comments for a slug.
- * GET    /             Comments for a slug + part.
+ * GET    /unresolved   Unresolved top-level comments for a slug
+ * (reader gate).
+ * GET    /             Comments for a slug + part (reader gate).
  * POST   /             Create a comment (auth required).
  * PATCH  /:id          Toggle resolved (author or admin).
  * DELETE /:id          Delete a comment + its replies (author or admin).
@@ -25,6 +26,24 @@
  * or the val's `MEANDER_ADMIN_TOKEN`. The admin token is how a
  * headless backup job reaches `/export`, since the magic-code
  * flow needs a human mailbox.
+ *
+ * The two read routes carry the *reader* gate instead, the same one
+ * `lib/pages.ts` puts on the prose: a private walkthrough's comments
+ * open to the slug's reader cookie, a session bearer, or the admin
+ * token, and a public walkthrough's comments stay open to everyone
+ * with no sign-in. Reading a comment thread means reading decrypted
+ * bodies and author identities, so gating the prose without gating
+ * the discussion of it would leave the walkthrough private in name
+ * only. Which walkthroughs are private is `lib/visibility.ts`'s
+ * recorded flag, not a per-request blob probe.
+ *
+ * The export keeps its stronger gate. It hands back every body and
+ * author for a slug at once, which is worth a session even when the
+ * walkthrough is public.
+ *
+ * Writes are gated on the session alone. An author with a valid
+ * session may comment on a private walkthrough whether or not their
+ * browser also holds that slug's reader cookie.
  *
  * Every route scopes its SQL by `:slug`. One val hosts many
  * walkthroughs, so an id alone is not an authorization decision —
@@ -52,6 +71,8 @@ import {
 } from './comment-store.ts'
 import { encrypt, importKey, randomDataKeyBytes, wrapKey } from './crypto.ts'
 import type { WrappingKeyContext } from './keys.ts'
+import { resolveReaderAccess } from './session.ts'
+import type { ReaderAccessConfig } from './session.ts'
 import type {
   ApiComment,
   BaseComment,
@@ -62,6 +83,23 @@ import type {
 export type CommentDeps = {
   sqlite: SqliteClient
   ensureDb: () => Promise<void>
+  /**
+   * Lowercased email domains permitted to read a private
+   * walkthrough's comments. Empty refuses every reader.
+   */
+  allowedDomains: readonly string[]
+  /**
+   * Is this walkthrough private? Wired to `lib/visibility.ts`'s
+   * recorded flag, which answers from an indexed row rather than a
+   * blob probe. An unrecorded slug resolves to private.
+   */
+  isSlugPrivate: (slug: string) => Promise<boolean>
+  /**
+   * `MEANDER_JWT_SECRET`. Empty means no reader cookie or session
+   * token verifies, so a private walkthrough's comments refuse
+   * every caller short of the admin token.
+   */
+  jwtSecret: string
   /**
    * Resolve the authenticated email from the request, or undefined.
    */
@@ -94,6 +132,48 @@ export type CommentDeps = {
 }
 
 /**
+ * Narrow the comment deps to what the reader-identity resolver
+ * reads. Mirrors `lib/pages.ts`'s `readerAccessConfig`, so a page
+ * and its comment thread accept exactly the same credentials.
+ */
+export function commentReaderConfig(deps: CommentDeps): ReaderAccessConfig {
+  return {
+    adminToken: deps.adminToken,
+    allowedDomains: deps.allowedDomains,
+    jwtSecret: deps.jwtSecret,
+  }
+}
+
+/**
+ * Gate one comment read. Returns the refusal to render, or
+ * undefined when the caller may proceed.
+ *
+ * A public walkthrough's comments are readable with no credential
+ * at all — that is the common case, and the one a mistaken gate
+ * would break loudest. A private walkthrough's comments want the
+ * slug's reader cookie, a comment-API session token, or the val's
+ * admin token, the same three `lib/pages.ts` accepts for the prose.
+ */
+export async function refuseCommentRead(
+  c: Context,
+  deps: CommentDeps,
+  slug: string,
+): Promise<{ error: string; status: 401 | 403 } | undefined> {
+  if (!(await deps.isSlugPrivate(slug))) {
+    return undefined
+  }
+  const access = await resolveReaderAccess(
+    c.req,
+    slug,
+    commentReaderConfig(deps),
+  )
+  if (access.granted) {
+    return undefined
+  }
+  return { error: access.reason, status: access.status }
+}
+
+/**
  * Register the comment routes on the Hono app. Returns the same app
  * for chainability — matches Hono's idiom (and `registerAdminRoutes`).
  */
@@ -101,6 +181,10 @@ export function registerCommentRoutes(app: Hono, deps: CommentDeps): Hono {
   app.get('/:slug/api/comments/unresolved', async c => {
     await deps.ensureDb()
     const slug = c.req.param('slug')
+    const refused = await refuseCommentRead(c, deps, slug)
+    if (refused) {
+      return c.json({ error: refused.error }, refused.status)
+    }
     if (!deps.keyContext) {
       return c.json(
         { error: serverMissingDbKeyMessage(deps.keyContextError) },
@@ -117,6 +201,10 @@ export function registerCommentRoutes(app: Hono, deps: CommentDeps): Hono {
   app.get('/:slug/api/comments', async c => {
     await deps.ensureDb()
     const slug = c.req.param('slug')
+    const refused = await refuseCommentRead(c, deps, slug)
+    if (refused) {
+      return c.json({ error: refused.error }, refused.status)
+    }
     const part = c.req.query('part')
     if (!part) {
       return c.json({ error: 'part query parameter required' }, 400)
