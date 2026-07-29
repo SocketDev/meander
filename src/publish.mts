@@ -2,13 +2,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { encrypt, packEnvelope, randomDataKey, wrapKey } from './crypto.mts'
+import { API_BASE, recordPublishedVisibility } from './val-visibility.mts'
 import { missingTokenMessage, resolveValTownToken } from './valtown-token.mts'
 import { httpRequest } from '@socketsecurity/lib-stable/http-request'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
 const logger = getDefaultLogger()
-
-const API_BASE = 'https://api.val.town'
 
 /**
  * Encrypt a single HTML payload using the envelope scheme:
@@ -109,6 +108,18 @@ export async function publish(
   const wrap = (html: string): string =>
     wrappingKey ? encryptBlob(html, wrappingKey) : html
 
+  /* Close the gate before the first private byte lands. The val
+   * refuses anonymous comment reads on a walkthrough recorded
+   * private, so marking it up front means there is no instant at
+   * which the uploaded blobs are ciphertext and the val still thinks
+   * the walkthrough is public. Publishing plaintext skips this and
+   * relaxes the record only after the last upload, below — either
+   * way the recorded flag is the more restrictive of the old and new
+   * states for the whole of the transition. */
+  if (encryptBlobsEnabled) {
+    await recordPublishedVisibility(token, { slug, isPrivate: true })
+  }
+
   // Upload shared CSS (always plaintext — browsers can't read encrypted CSS)
   const css = readFileSync(path.join(localOutDir, 'meander.css'), 'utf-8')
   await uploadBlob(token, `${outDirName}/meander.css`, css)
@@ -145,9 +156,19 @@ export async function publish(
   )
   await uploadBlob(token, `${outDirName}/${slug}/manifest.json`, manifest)
 
+  /* Settle the record once every blob is up. This is what opens a
+   * walkthrough that was private and is now published in plaintext. */
+  await recordPublishedVisibility(token, {
+    slug,
+    isPrivate: encryptBlobsEnabled,
+  })
+
   const fileCount = parts.length + 2 + (hasDocuments ? 1 : 0)
   logger.log('')
   logger.log(`Done! Published ${fileCount} files for "${slug}".`)
+  logger.log(
+    `Recorded "${slug}" as ${encryptBlobsEnabled ? 'private' : 'public'} — the val gates its comment reads accordingly.`,
+  )
 }
 
 export type PublishOptions = {
