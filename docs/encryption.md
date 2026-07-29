@@ -8,15 +8,15 @@ have different recoverability properties.
 
 ## At a glance
 
-| Data class                         | Encrypted?                    | Key                  | Rotation                             |
-| ---------------------------------- | ----------------------------- | -------------------- | ------------------------------------ |
-| Comment `body` + `author`          | Always (envelope)             | `MEANDER_DB_KEY_<n>` | Re-wrap DEKs, atomic generation flip |
-| Comment metadata (id, file, lines) | No (indexable plaintext)      | —                    | —                                    |
-| Walkthrough HTML in Val Town blobs | Opt-in (`encryptBlobs`)       | `MEANDER_BLOB_KEY`   | Re-publish under a fresh key         |
-| Walkthrough HTML on GitHub Pages   | No (Pages-gated access)       | —                    | —                                    |
-| `meander.css`, `manifest.json`     | No                            | —                    | —                                    |
-| Magic-code hashes                  | One-way SHA-256               | (salted by email)    | One-shot, ten-minute expiry          |
-| Session JWTs                       | Signed (HS256), not encrypted | `MEANDER_JWT_SECRET` | Rotation logs every user out         |
+| Data class                         | Encrypted?                                                        | Key                  | Rotation                             |
+| ---------------------------------- | ----------------------------------------------------------------- | -------------------- | ------------------------------------ |
+| Comment `body` + `author`          | Always (envelope)                                                 | `MEANDER_DB_KEY_<n>` | Re-wrap DEKs, atomic generation flip |
+| Comment metadata (id, file, lines) | No (indexable plaintext)                                          | —                    | —                                    |
+| Walkthrough HTML in Val Town blobs | Opt-in (`encryptBlobs`), at rest only; served decrypted to anyone | `MEANDER_BLOB_KEY`   | Re-publish under a fresh key         |
+| Walkthrough HTML on GitHub Pages   | No (Pages-gated access)                                           | —                    | —                                    |
+| `meander.css`, `manifest.json`     | No                                                                | —                    | —                                    |
+| Magic-code hashes                  | One-way SHA-256                                                   | (salted by email)    | One-shot, ten-minute expiry          |
+| Session JWTs                       | Signed (HS256), not encrypted                                     | `MEANDER_JWT_SECRET` | Rotation logs every user out         |
 
 ## Threat model
 
@@ -32,9 +32,14 @@ What the encryption defends against:
 What it does _not_ defend against:
 
 - **Live val compromise**: an attacker with code execution inside
-  the running val sees plaintext — the val must decrypt to serve.
-- **Reader-side leakage**: anyone with a valid JWT (or anyone, for
-  open reads) gets plaintext from the API.
+  the running val sees plaintext, because the val must decrypt to
+  serve.
+- **Anonymous reads**: walkthrough pages, the `/` slug index, and
+  per-part comment reads are open to anyone with the URL, whether
+  or not `encryptBlobs` is on. Comment writes and the bulk comment
+  export are the gated routes.
+- **Reader-side leakage**: anyone holding a valid JWT can export
+  every comment body and author identity for a slug in plaintext.
 - **Custodian compromise**: if more than `(shares − threshold)`
   share-holders are compromised, the wrapping key is recoverable
   by an attacker.
@@ -88,13 +93,13 @@ them has been re-wrapped (rotation) and the generation is retired.
 
 The lifecycle commands are under `meander db key`:
 
-| Command                     | Effect                                                                                                                                                                             |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `meander db key init`       | First-time setup. Generates `MEANDER_DB_KEY_1`, plants `MEANDER_DB_KEY_CURRENT=1`, prints Shamir shares.                                                                           |
-| `meander db key rotate`     | Reconstructs the current key from shares, mints `MEANDER_DB_KEY_<N+1>`, drives `/admin/rewrap` to re-wrap every row, atomically flips `MEANDER_DB_KEY_CURRENT`, prints new shares. |
-| `meander db key restore`    | Reassembles a wrapping key from shares + plants it on the val. Used after env-var loss.                                                                                            |
-| `meander db key audit`      | Prints visible generations, the current pointer, and per-generation row counts.                                                                                                    |
-| `meander db key retire <N>` | Removes `MEANDER_DB_KEY_<N>` from env. Pre-flights audit; refuses if any rows still reference generation N.                                                                        |
+| Command                     | Effect                                                                                                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meander db key init`       | First-time setup. Generates `MEANDER_DB_KEY_1`, plants `MEANDER_DB_KEY_CURRENT=1`, prints Shamir shares.                                                                                                  |
+| `meander db key rotate`     | Reconstructs the current key from shares, mints `MEANDER_DB_KEY_<N+1>`, drives `/admin/rewrap` to re-wrap every row, atomically flips `MEANDER_DB_KEY_CURRENT`, prints new shares.                        |
+| `meander db key restore`    | Reassembles a wrapping key from shares. Plants it when the val holds no generation (env-var loss); reports match or mismatch and writes nothing when it does. `--plant-new-generation` forces a new slot. |
+| `meander db key audit`      | Prints visible generations, the current pointer, and per-generation row counts.                                                                                                                           |
+| `meander db key retire <N>` | Removes `MEANDER_DB_KEY_<N>` from env. Pre-flights audit; refuses if any rows still reference generation N.                                                                                               |
 
 The wrapping key never leaves the val after `init`. The operator's
 machine doesn't hold it; only the custodians' shares do.
@@ -123,9 +128,28 @@ When enabled, `meander publish`:
 4. Uploads `ENVELOPE:1:<wrappedDEK>:<ciphertext>`.
 
 The val recognizes the `ENVELOPE:` prefix and decrypts before
-serving (gated by JWT auth). Plaintext blobs (no prefix) are served
-as-is. The val and the operator both hold `MEANDER_BLOB_KEY` —
-the val needs it to serve, the publisher needs it to encrypt.
+serving. Plaintext blobs (no prefix) are served as-is. The val and
+the operator both hold `MEANDER_BLOB_KEY`: the val needs it to
+serve, the publisher needs it to encrypt.
+
+> [!IMPORTANT]
+> `encryptBlobs` protects storage, not the page routes. The val
+> serves a decrypted walkthrough to anyone who requests the URL,
+> exactly as it serves a plaintext one, and `/` lists every
+> published slug. What the flag buys you is that a cold
+> blob-storage dump yields ciphertext. That covers a Val Town
+> platform compromise, an over-scoped API token, or a leaked
+> snapshot.
+
+Gating the page routes on the session JWT is not possible with
+this design. The token lives in `localStorage` and is attached by
+`fetch`; a top-level browser navigation to `/:slug/` carries no
+`Authorization` header, so a JWT check there would 401 every human
+visitor. Access control over walkthrough pages needs cookie
+sessions, which meander does not implement. Until it does, host
+prose that must stay unread behind something that does access
+control (a private GitHub Pages site, an SSO proxy) and treat
+`encryptBlobs` as the at-rest layer underneath it.
 
 The lifecycle commands are under `meander blob key`:
 

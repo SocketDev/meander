@@ -16,8 +16,11 @@ import crypto from 'node:crypto'
  * wrapping key means re-wrapping each row's small DEK, not
  * re-encrypting comment bodies.
  *
- * Walkthrough HTML is *not* encrypted at rest — reader access is
- * gated by JWT auth, and the prose is the published artifact.
+ * Walkthrough HTML uses the same two layers when the publisher
+ * sets `encryptBlobs: true`, which is a storage-at-rest control
+ * only. The val decrypts every blob it serves and the page routes
+ * are public, so the ciphertext defends a cold blob-storage dump,
+ * not the URL. See docs/encryption.md.
  *
  * Both layers use AES-256-GCM with a fresh random 96-bit IV. The
  * GCM auth tag means tampered ciphertext fails to decrypt — we
