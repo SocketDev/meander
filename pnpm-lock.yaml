@@ -371,7 +371,7 @@ importers:
     devDependencies:
       '@redwoodjs/agent-ci':
         specifier: 'catalog:'
-        version: 0.17.1
+        version: 0.17.1(supports-color@7.2.0)
       '@shadscan/cli':
         specifier: 'catalog:'
         version: 0.2.0
@@ -440,16 +440,16 @@ importers:
         version: 1.0.0
       markdownlint-cli2:
         specifier: 'catalog:'
-        version: 0.23.1
+        version: 0.23.1(supports-color@7.2.0)
       mdast-util-from-markdown:
         specifier: 'catalog:'
-        version: 2.0.3
+        version: 2.0.3(supports-color@7.2.0)
       mermaid:
         specifier: 11.16.0
         version: 11.16.0
       micromark:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.2(supports-color@7.2.0)
       neosanitize:
         specifier: 'catalog:'
         version: 0.3.0
@@ -473,7 +473,7 @@ importers:
         version: 0.15.4
       puppeteer:
         specifier: 24.43.1
-        version: 24.43.1(typescript@7.0.2)
+        version: 24.43.1(supports-color@7.2.0)(typescript@7.0.2)
       regjsparser:
         specifier: 'catalog:'
         version: 0.13.2
@@ -1131,6 +1131,16 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
 
+  .claude/hooks/fleet/land-as-you-go-nudge:
+    dependencies:
+      '@socketsecurity/lib-stable':
+        specifier: 'catalog:'
+        version: '@socketsecurity/lib@6.3.0(typescript@7.0.2)'
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
   .claude/hooks/fleet/land-fast-nudge:
     devDependencies:
       '@socketsecurity/lib-stable':
@@ -1184,6 +1194,12 @@ importers:
         version: 26.1.1
 
   .claude/hooks/fleet/memory-codify-nudge:
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
+  .claude/hooks/fleet/memory-enforcement-stamp-guard:
     devDependencies:
       '@types/node':
         specifier: 26.1.1
@@ -1246,6 +1262,12 @@ importers:
       '@socketsecurity/lib-stable':
         specifier: 'catalog:'
         version: '@socketsecurity/lib@6.3.0(typescript@7.0.2)'
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
+  .claude/hooks/fleet/no-chained-pausing-git-guard:
     devDependencies:
       '@types/node':
         specifier: 26.1.1
@@ -1467,6 +1489,12 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
 
+  .claude/hooks/fleet/no-pr-in-squash-repo-guard:
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
   .claude/hooks/fleet/no-pr-review-verdict-guard:
     dependencies:
       shell-quote:
@@ -1497,6 +1525,16 @@ importers:
         version: 26.1.1
 
   .claude/hooks/fleet/no-private-ref-in-tests-docs-guard:
+    dependencies:
+      '@socketsecurity/lib-stable':
+        specifier: 'catalog:'
+        version: '@socketsecurity/lib@6.3.0(typescript@7.0.2)'
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
+  .claude/hooks/fleet/no-private-repo-leak-guard:
     dependencies:
       '@socketsecurity/lib-stable':
         specifier: 'catalog:'
@@ -2060,7 +2098,7 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
 
-  .claude/hooks/fleet/rg-replace-flag-nudge:
+  .claude/hooks/fleet/rg-replace-flag-guard:
     devDependencies:
       '@socketsecurity/lib-stable':
         specifier: 'catalog:'
@@ -2282,6 +2320,16 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
 
+  .claude/hooks/fleet/tsc-canonical-tsconfig-guard:
+    dependencies:
+      '@socketsecurity/lib-stable':
+        specifier: 'catalog:'
+        version: '@socketsecurity/lib@6.3.0(typescript@7.0.2)'
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
   .claude/hooks/fleet/unaddressed-review-feedback-guard:
     dependencies:
       '@socketsecurity/lib-stable':
@@ -2321,6 +2369,12 @@ importers:
         version: 26.1.1
 
   .claude/hooks/fleet/untrusted-coauthor-guard:
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+
+  .claude/hooks/fleet/use-repo-test-script-guard:
     devDependencies:
       '@types/node':
         specifier: 26.1.1
@@ -2576,8 +2630,6 @@ importers:
 
   .config/fleet/oxlint-plugin/fleet/prefer-node-builtin-imports: {}
 
-  .config/fleet/oxlint-plugin/fleet/prefer-node-modules-dot-cache: {}
-
   .config/fleet/oxlint-plugin/fleet/prefer-non-capturing-group: {}
 
   .config/fleet/oxlint-plugin/fleet/prefer-normalize-path: {}
@@ -2585,6 +2637,8 @@ importers:
   .config/fleet/oxlint-plugin/fleet/prefer-optional-chain: {}
 
   .config/fleet/oxlint-plugin/fleet/prefer-pure-call-form: {}
+
+  .config/fleet/oxlint-plugin/fleet/prefer-repo-root-dot-cache: {}
 
   .config/fleet/oxlint-plugin/fleet/prefer-safe-delete: {}
 
@@ -6258,12 +6312,12 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@puppeteer/browsers@2.13.2':
+  '@puppeteer/browsers@2.13.2(supports-color@7.2.0)':
     dependencies:
-      debug: 4.4.3
-      extract-zip: 2.0.1
+      debug: 4.4.3(supports-color@7.2.0)
+      extract-zip: 2.0.1(supports-color@7.2.0)
       progress: 2.0.3
-      proxy-agent: 6.5.0
+      proxy-agent: 6.5.0(supports-color@7.2.0)
       semver: 7.8.5
       tar-fs: 3.1.3
       yargs: 17.7.3
@@ -6277,11 +6331,11 @@ snapshots:
     dependencies:
       quansync: 1.0.0
 
-  '@redwoodjs/agent-ci@0.17.1':
+  '@redwoodjs/agent-ci@0.17.1(supports-color@7.2.0)':
     dependencies:
       '@actions/workflow-parser': 0.3.43
-      dockerode: 5.0.1
-      dtu-github-actions: 0.17.1
+      dockerode: 5.0.1(supports-color@7.2.0)
+      dtu-github-actions: 0.17.1(supports-color@7.2.0)
       minimatch: 10.2.5
       yaml: 2.9.0
     transitivePeerDependencies:
@@ -6921,11 +6975,11 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  body-parser@2.3.0:
+  body-parser@2.3.0(supports-color@7.2.0):
     dependencies:
       bytes: 3.1.2
       content-type: 2.0.0
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       http-errors: 2.0.1
       iconv-lite: 0.7.3
       on-finished: 2.4.1
@@ -7278,9 +7332,11 @@ snapshots:
 
   dayjs@1.11.21: {}
 
-  debug@4.4.3:
+  debug@4.4.3(supports-color@7.2.0):
     dependencies:
       ms: 2.1.3
+    optionalDependencies:
+      supports-color: 7.2.0
 
   decode-named-character-reference@1.3.0:
     dependencies:
@@ -7314,21 +7370,21 @@ snapshots:
 
   devtools-protocol@0.0.1608973: {}
 
-  docker-modem@5.0.7:
+  docker-modem@5.0.7(supports-color@7.2.0):
     dependencies:
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       readable-stream: 3.6.2
       split-ca: 1.0.1
       ssh2: 1.17.0
     transitivePeerDependencies:
       - supports-color
 
-  dockerode@5.0.1:
+  dockerode@5.0.1(supports-color@7.2.0):
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@grpc/grpc-js': 1.14.4
       '@grpc/proto-loader': 0.7.15
-      docker-modem: 5.0.7
+      docker-modem: 5.0.7(supports-color@7.2.0)
       protobufjs: 7.6.5
       tar-fs: 2.1.5
     transitivePeerDependencies:
@@ -7356,9 +7412,9 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 5.0.3
 
-  dtu-github-actions@0.17.1:
+  dtu-github-actions@0.17.1(supports-color@7.2.0):
     dependencies:
-      body-parser: 2.3.0
+      body-parser: 2.3.0(supports-color@7.2.0)
       minimatch: 10.2.5
       polka: 0.5.2
       zod: 3.25.76
@@ -7459,9 +7515,9 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  extract-zip@2.0.1:
+  extract-zip@2.0.1(supports-color@7.2.0):
     dependencies:
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       get-stream: 5.2.0
       yauzl: 2.10.0
     optionalDependencies:
@@ -7543,11 +7599,11 @@ snapshots:
     dependencies:
       pump: 3.0.4
 
-  get-uri@6.0.5:
+  get-uri@6.0.5(supports-color@7.2.0):
     dependencies:
       basic-ftp: 5.3.1
       data-uri-to-buffer: 6.0.2
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -7588,17 +7644,17 @@ snapshots:
       statuses: 2.0.2
       toidentifier: 1.0.1
 
-  http-proxy-agent@7.0.2:
+  http-proxy-agent@7.0.2(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
-  https-proxy-agent@7.0.6:
+  https-proxy-agent@7.0.6(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -7799,27 +7855,27 @@ snapshots:
       punycode.js: 2.3.1
       uc.micro: 2.1.0
 
-  markdownlint-cli2-formatter-default@0.0.6(markdownlint-cli2@0.23.1):
+  markdownlint-cli2-formatter-default@0.0.6(markdownlint-cli2@0.23.1(supports-color@7.2.0)):
     dependencies:
-      markdownlint-cli2: 0.23.1
+      markdownlint-cli2: 0.23.1(supports-color@7.2.0)
 
-  markdownlint-cli2@0.23.1:
+  markdownlint-cli2@0.23.1(supports-color@7.2.0):
     dependencies:
       globby: 16.2.1
       js-yaml: 5.2.2
       jsonc-parser: 3.3.1
       jsonpointer: 5.0.1
       markdown-it: 14.3.0
-      markdownlint: 0.41.1
-      markdownlint-cli2-formatter-default: 0.0.6(markdownlint-cli2@0.23.1)
+      markdownlint: 0.41.1(supports-color@7.2.0)
+      markdownlint-cli2-formatter-default: 0.0.6(markdownlint-cli2@0.23.1(supports-color@7.2.0))
       micromatch: 4.0.8
       smol-toml: 1.7.0
     transitivePeerDependencies:
       - supports-color
 
-  markdownlint@0.41.1:
+  markdownlint@0.41.1(supports-color@7.2.0):
     dependencies:
-      micromark: 4.0.2
+      micromark: 4.0.2(supports-color@7.2.0)
       micromark-core-commonmark: 2.0.3
       micromark-extension-directive: 4.0.0
       micromark-extension-gfm-autolink-literal: 2.1.0
@@ -7839,14 +7895,14 @@ snapshots:
     dependencies:
       '@arr/every': 1.0.1
 
-  mdast-util-from-markdown@2.0.3:
+  mdast-util-from-markdown@2.0.3(supports-color@7.2.0):
     dependencies:
       '@types/mdast': 4.0.4
       '@types/unist': 3.0.3
       decode-named-character-reference: 1.3.0
       devlop: 1.1.0
       mdast-util-to-string: 4.0.0
-      micromark: 4.0.2
+      micromark: 4.0.2(supports-color@7.2.0)
       micromark-util-decode-numeric-character-reference: 2.0.2
       micromark-util-decode-string: 2.0.1
       micromark-util-normalize-identifier: 2.0.1
@@ -8049,10 +8105,10 @@ snapshots:
 
   micromark-util-types@2.0.2: {}
 
-  micromark@4.0.2:
+  micromark@4.0.2(supports-color@7.2.0):
     dependencies:
       '@types/debug': 4.1.13
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       decode-named-character-reference: 1.3.0
       devlop: 1.1.0
       micromark-core-commonmark: 2.0.3
@@ -8224,16 +8280,16 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
-  pac-proxy-agent@7.2.0:
+  pac-proxy-agent@7.2.0(supports-color@7.2.0):
     dependencies:
       '@tootallnate/quickjs-emscripten': 0.23.0
       agent-base: 7.1.4
-      debug: 4.4.3
-      get-uri: 6.0.5
-      http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      debug: 4.4.3(supports-color@7.2.0)
+      get-uri: 6.0.5(supports-color@7.2.0)
+      http-proxy-agent: 7.0.2(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6(supports-color@7.2.0)
       pac-resolver: 7.0.1
-      socks-proxy-agent: 8.0.5
+      socks-proxy-agent: 8.0.5(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -8330,16 +8386,16 @@ snapshots:
       '@types/node': 26.1.1
       long: 5.3.2
 
-  proxy-agent@6.5.0:
+  proxy-agent@6.5.0(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3
-      http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      debug: 4.4.3(supports-color@7.2.0)
+      http-proxy-agent: 7.0.2(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6(supports-color@7.2.0)
       lru-cache: 7.18.3
-      pac-proxy-agent: 7.2.0
+      pac-proxy-agent: 7.2.0(supports-color@7.2.0)
       proxy-from-env: 1.1.0
-      socks-proxy-agent: 8.0.5
+      socks-proxy-agent: 8.0.5(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -8352,11 +8408,11 @@ snapshots:
 
   punycode.js@2.3.1: {}
 
-  puppeteer-core@24.43.1:
+  puppeteer-core@24.43.1(supports-color@7.2.0):
     dependencies:
-      '@puppeteer/browsers': 2.13.2
+      '@puppeteer/browsers': 2.13.2(supports-color@7.2.0)
       chromium-bidi: 14.0.0(devtools-protocol@0.0.1608973)
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       devtools-protocol: 0.0.1608973
       typed-query-selector: 2.12.2
       webdriver-bidi-protocol: 0.4.1
@@ -8369,13 +8425,13 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  puppeteer@24.43.1(typescript@7.0.2):
+  puppeteer@24.43.1(supports-color@7.2.0)(typescript@7.0.2):
     dependencies:
-      '@puppeteer/browsers': 2.13.2
+      '@puppeteer/browsers': 2.13.2(supports-color@7.2.0)
       chromium-bidi: 14.0.0(devtools-protocol@0.0.1608973)
       cosmiconfig: 9.0.2(typescript@7.0.2)
       devtools-protocol: 0.0.1608973
-      puppeteer-core: 24.43.1
+      puppeteer-core: 24.43.1(supports-color@7.2.0)
       typed-query-selector: 2.12.2
     transitivePeerDependencies:
       - bare-abort-controller
@@ -8493,10 +8549,10 @@ snapshots:
 
   smol-toml@1.7.0: {}
 
-  socks-proxy-agent@8.0.5:
+  socks-proxy-agent@8.0.5(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       socks: 2.8.9
     transitivePeerDependencies:
       - supports-color
