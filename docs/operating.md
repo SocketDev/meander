@@ -256,17 +256,17 @@ magic-code flow needs a mailbox no CI job has.
 
 ## When to involve which custodian
 
-| Operation                     | Threshold custodians needed                     |
-| ----------------------------- | ----------------------------------------------- |
-| Read comments (val running)   | 0                                               |
-| Read comments (val env wiped) | `threshold` (db key restore)                    |
-| New comment writes            | 0                                               |
-| Annual rotation               | `threshold`                                     |
-| Suspected compromise rotation | `threshold`                                     |
-| Add a new custodian           | `threshold` (rotate to issue new shares)        |
-| Remove a custodian            | `threshold` (rotate; old shares decommissioned) |
-| Retire an old generation      | 0 (no shares — val-only)                        |
-| Audit                         | 0 (no shares — val-only)                        |
+| Operation                     | Threshold custodians needed                              |
+| ----------------------------- | -------------------------------------------------------- |
+| Read comments (val running)   | 0 — an encrypted walkthrough also wants a reader sign-in |
+| Read comments (val env wiped) | `threshold` (db key restore)                             |
+| New comment writes            | 0                                                        |
+| Annual rotation               | `threshold`                                              |
+| Suspected compromise rotation | `threshold`                                              |
+| Add a new custodian           | `threshold` (rotate to issue new shares)                 |
+| Remove a custodian            | `threshold` (rotate; old shares decommissioned)          |
+| Retire an old generation      | 0 (no shares — val-only)                                 |
+| Audit                         | 0 (no shares — val-only)                                 |
 
 Most day-to-day operation needs zero custodian involvement.
 Custodians are only invoked for rotation, restoration, and

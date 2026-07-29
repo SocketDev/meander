@@ -130,8 +130,16 @@ https://<username>-<valname>.web.val.run/<slug>/
 Readers reach it by signing in with an email on
 `MEANDER_ALLOWED_EMAIL_DOMAINS`; set that variable before you
 publish encrypted blobs, or nobody (the operator included) can
-read them. See [encryption.md](./encryption.md) for the cookie and
-what stays visible without one.
+read them or their comments. See [encryption.md](./encryption.md)
+for the cookie and what stays visible without one.
+
+`publish` records the walkthrough as private as part of the upload,
+which is how the val gates its comment reads without a blob probe.
+Walkthroughs published before that record existed are treated as
+private until the val or the next `publish` settles the question, so
+re-run `meander publish` for each public walkthrough after you deploy
+this val to restore anonymous comment reads on them without waiting
+for the first request to derive it.
 
 When `encryptBlobs: false` (the default), `publish` uploads
 plaintext bytes — `MEANDER_BLOB_KEY` is not needed, and the

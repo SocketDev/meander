@@ -134,10 +134,11 @@ export const DocEntrySchema = Type.Union([
  * when the HTML is hosted same-origin as the
  * backend (default Val Town deploy).
  * allowedEmailDomains
- * Gating for writes. Empty (or absent) means
- * the backend refuses writes entirely — the
- * safe default. Set to ["gmail.com"] or
- * similar to open writes to those domains.
+ * Gating for writes, and for reads of an
+ * encrypted walkthrough. Empty (or absent)
+ * means the backend refuses both entirely —
+ * the safe default. Set to ["gmail.com"] or
+ * similar to open them to those domains.
  * seedPath          Path to a JSON file of seed comments,
  * relative to the config file. Rendered at
  * build time; used for both demo mode and
@@ -280,8 +281,12 @@ export const MeanderConfigSchema = Type.Object({
    * comment-API session token, or `MEANDER_ADMIN_TOKEN`, and the
    * email behind it must sit on `MEANDER_ALLOWED_EMAIL_DOMAINS`.
    * The `/` index omits the walkthrough from callers who cannot
-   * open it. Comments on the walkthrough stay readable without a
-   * session; see docs/encryption.md.
+   * open it, and its comment reads take the same three credentials
+   * the pages do — gating the prose without gating the discussion
+   * of it would leave the walkthrough private in name only.
+   * `meander publish` records which state it published so the val
+   * gates a comment read on an indexed row rather than a blob
+   * probe; see docs/encryption.md.
    *
    * Default: `false`. The common case is GitHub-Pages-served
    * walkthroughs where Val Town hosts only the comments.

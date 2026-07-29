@@ -37,10 +37,11 @@ What it does _not_ defend against:
 - **Anonymous reads of a plaintext walkthrough**: a walkthrough
   published without `encryptBlobs` is public, by design. Its pages
   and its `/` index entry are open to anyone with the URL.
-- **Comment reads on a private walkthrough**: the per-part comment
-  route returns decrypted bodies and author identities to any
-  caller, on an encrypted walkthrough as on a public one. Gating
-  the prose does not gate the discussion about it.
+- **Comment metadata on a private walkthrough**: a refused caller
+  still learns the walkthrough exists and is private, and a comment
+  read costs one indexed row lookup whose timing does not depend on
+  how much discussion there is. The bodies, the author identities,
+  and the count are gated; the fact of a gate is not.
 - **Reader-side leakage**: anyone holding a valid session token can
   read every private walkthrough on the deployment and export every
   comment body and author identity for a slug in plaintext. The
@@ -180,10 +181,18 @@ and refuses every private one, including to the operator.
 ### What stays visible without signing in
 
 - `/meander.css`.
-- Every comment on every walkthrough, via `GET /:slug/api/comments?part=N`.
-- Public walkthroughs: pages, parts, documents, and their `/` index entries.
+- Public walkthroughs: pages, parts, documents, their `/` index entries, and
+  their comments via `GET /:slug/api/comments?part=N`.
 - The existence of a slug, to anyone who guesses or is told the URL. The
   refusal page names the slug it is refusing.
+
+A private walkthrough's comments take the same three credentials its
+pages do — the slug's reader cookie, a session token on
+`Authorization`, or the val's admin token — because a comment thread
+carries prose and author identities of its own. The val answers "is
+this walkthrough private?" from a `walkthrough_visibility` row rather
+than by probing the blob, so a comment poll costs an index seek. See
+[what records that row](#recording-which-walkthroughs-are-private).
 
 The `/` index omits a private walkthrough from a caller who cannot
 open it. A browser sees no private entries there even when signed
@@ -197,6 +206,49 @@ allowed email domain can sign in to any private walkthrough on the
 deployment. The per-slug cookie bounds what one stolen credential
 reaches, not what a legitimate reader may ask for. A deployment
 that needs distinct audiences per walkthrough wants distinct vals.
+
+### Recording which walkthroughs are private
+
+Serving a page decides on the blob in hand: the `ENVELOPE:` prefix
+is already in the bytes the val fetched to serve. A comment read has
+no such luxury — it touches no blob, and fetching a whole encrypted
+document to look at nine bytes would put a full blob GET behind
+every poll of a comment thread.
+
+So the val keeps a `walkthrough_visibility` table: one row per slug,
+`slug` as the primary key, holding whether that walkthrough is
+private. Two writers keep it true.
+
+`meander publish` is the primary writer, because publishing is what
+makes a walkthrough private. It marks a slug private **before**
+uploading ciphertext and writes the settled value **after** the last
+upload, so during a transition the recorded flag is the more
+restrictive of the old and new states. Going public → private the
+gate closes before the first private byte lands; going private →
+public it opens once the plaintext is up. A write that fails aborts
+the publish with a message naming the slug and the fix, rather than
+reporting success over a stale flag.
+
+The val is the second writer. Asked about a slug it has no row for,
+it derives the answer from the blob store once, records it, and
+answers from the row every time after. That is what carries a
+deployment whose walkthroughs were published before the table
+existed: an unrecorded slug is never assumed public.
+
+Everything that cannot be resolved lands on private. No row and no
+blob, or a blob store that will not answer, both refuse. That costs
+an availability blip on a public walkthrough whose blob read failed;
+the other way round would hand a private walkthrough's discussion to
+anyone who asked.
+
+The record is not a cache and carries no TTL. A TTL would fail open
+for its whole window at the moment a walkthrough turns private,
+which is the moment it must fail closed.
+
+One residue: the flag reads stale-public if a private blob is
+uploaded by something other than `meander publish` — a hand-written
+blob, or a publish from a build that predates this table. Republish
+with `meander publish` to settle it.
 
 The lifecycle commands are under `meander blob key`:
 
