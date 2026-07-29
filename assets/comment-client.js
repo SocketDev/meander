@@ -113,6 +113,17 @@ const logger = getDefaultLogger()
     })
   }
 
+  /* Publish the session to sibling scripts in the inlined bundle
+   * (export-comments.js) so the bearer token has exactly one owner
+   * and one localStorage key. Sibling scripts are concatenated
+   * after this one, so `ns.auth` is set before they run. */
+  const ns = (window[Symbol.for('meander:pages')] ??= {})
+  ns.auth = {
+    fetch: authFetch,
+    getEmail: getEmail,
+    getToken: getToken,
+  }
+
   function requestMagicCode(email) {
     return httpRequest(authBase + '/request', {
       method: 'POST',

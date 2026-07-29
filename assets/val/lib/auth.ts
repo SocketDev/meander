@@ -1,10 +1,68 @@
 /**
- * Auth helpers — email-domain allowlist, 6-digit code gen,
- * salted-hash for the magic_codes table. Pure; importable by
- * both the val (Deno) and Node tests.
+ * Auth helpers — the session gate, email-domain allowlist, 6-digit
+ * code gen, salted-hash for the magic_codes table. Pure; importable
+ * by both the val (Deno) and Node tests.
  */
 
 import { b64urlEncode } from './jwt.ts'
+
+/**
+ * Everything the gate decides on. `index.ts` fills it from the
+ * val's env; tests pass literals.
+ */
+export type AuthGateConfig = {
+  /**
+   * Lowercased email domains permitted to act. Empty means nobody
+   * is — the safe posture for a fresh deploy.
+   */
+  allowedDomains: readonly string[]
+  demoMode: boolean
+  /**
+   * Names the action in the denial message. Default: 'writes'.
+   */
+  operation?: string | undefined
+}
+
+export type AuthGateOptions = {
+  /**
+   * Names the action in the denial message. Default: 'writes'.
+   */
+  operation?: string | undefined
+}
+
+/**
+ * Decide whether a session identity may perform a gated action.
+ * Comment writes and the comment export share this gate: both hand
+ * the caller plaintext other people authored, so both want a
+ * verified session on an allowed domain.
+ *
+ * Returns undefined when the caller may proceed. `email` must
+ * already be a *verified* identity — the caller resolves it from a
+ * signature-checked JWT, never from an unverified claim.
+ */
+export function authGate(
+  email: string | undefined,
+  config: AuthGateConfig,
+): { error: string; status: 401 | 403 } | undefined {
+  const cfg = { __proto__: null, ...config } as AuthGateConfig
+  const operation = cfg.operation ?? 'writes'
+  if (cfg.demoMode) {
+    return { error: `demo mode — ${operation} disabled`, status: 403 }
+  }
+  if (!email) {
+    return { error: 'authentication required', status: 401 }
+  }
+  if (cfg.allowedDomains.length === 0) {
+    return {
+      error: `${operation} disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS`,
+      status: 403,
+    }
+  }
+  if (!emailDomainAllowed(email, cfg.allowedDomains)) {
+    return { error: 'email domain not allowed', status: 403 }
+  }
+  return undefined
+}
 
 export function emailDomainAllowed(
   email: string,

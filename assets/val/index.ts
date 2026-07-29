@@ -4,7 +4,9 @@
  * Serves walkthrough HTML out of Val Town blob storage and
  * manages comments via SQLite, with email magic-code auth for
  * writes. Reads are open (unauthenticated visitors can see
- * discussions); writes require an authenticated session token.
+ * walkthrough pages and discussions); writes require an
+ * authenticated session token, and so does the comment export,
+ * which returns every author identity in plaintext.
  *
  * At-rest encryption posture (see docs/encryption.md):
  *
@@ -16,6 +18,12 @@
  *   the prefix and decrypts using `MEANDER_BLOB_KEY`. Plaintext blobs (no
  *   prefix) are served as-is. Most projects publish to GitHub Pages and don't
  *   engage this path at all.
+ *
+ * `encryptBlobs` protects storage, not the page routes: the val
+ * decrypts a blob for every visitor, exactly as it serves a
+ * plaintext one. Gating pages on the session JWT is impossible
+ * here, since a top-level browser navigation to /:slug/ carries no
+ * Authorization header. See docs/encryption.md.
  *
  * Required env vars (set by ops via `meander db key init`):
  * MEANDER_DB_KEY_<n>             Hex-encoded 32-byte wrapping
@@ -60,11 +68,13 @@ import { sqlite } from 'https://esm.town/v/std/sqlite/main.ts'
 import { Hono } from 'npm:hono@4'
 import type { Context } from 'npm:hono@4'
 import {
+  authGate,
   emailDomainAllowed,
   hashCode,
   parseAllowedDomains,
   sixDigitCode,
 } from './lib/auth.ts'
+import type { AuthGateOptions } from './lib/auth.ts'
 import { registerAdminRoutes } from './lib/admin.ts'
 import { registerCommentRoutes } from './lib/comments.ts'
 import { decrypt, importKey, unpackEnvelope, unwrapKey } from './lib/crypto.ts'
@@ -113,25 +123,21 @@ let dbInitialized = false
 /*  Handlers + helpers (sorted alphanumerically)                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Bind `authGate` to this val's env config. The gate itself lives
+ * in lib/auth.ts so Node tests can drive it without importing the
+ * val-town modules this file loads at module scope.
+ */
 export function authRequired(
   email: string | undefined,
+  options?: AuthGateOptions | undefined,
 ): { error: string; status: 401 | 403 } | undefined {
-  if (DEMO_MODE) {
-    return { error: 'demo mode — writes disabled', status: 403 }
-  }
-  if (!email) {
-    return { error: 'authentication required', status: 401 }
-  }
-  if (ALLOWED_EMAIL_DOMAINS.length === 0) {
-    return {
-      error: 'writes disabled — server has no MEANDER_ALLOWED_EMAIL_DOMAINS',
-      status: 403,
-    }
-  }
-  if (!emailDomainAllowed(email, ALLOWED_EMAIL_DOMAINS)) {
-    return { error: 'email domain not allowed', status: 403 }
-  }
-  return undefined
+  const opts = { __proto__: null, ...options } as AuthGateOptions
+  return authGate(email, {
+    allowedDomains: ALLOWED_EMAIL_DOMAINS,
+    demoMode: DEMO_MODE,
+    operation: opts.operation,
+  })
 }
 
 /**
@@ -232,7 +238,8 @@ export async function sendMagicCode(
  * envelope-encrypted blob (recognized by the `ENVELOPE:` prefix),
  * decrypt before serving. Plaintext blobs pass through. Failure
  * to decrypt — wrong key, malformed envelope — surfaces as a 500
- * so misconfiguration doesn't silently serve garbage.
+ * so misconfiguration doesn't silently serve garbage. Public for
+ * encrypted and plaintext blobs alike; see the module docblock.
  */
 export async function serveBlobHtml(c: Context, relativeKey: string) {
   let text: string
@@ -401,6 +408,10 @@ app.get('/meander.css', async c => serveBlobText(c, 'meander.css', 'text/css'))
 /*  Root — list available walkthroughs                                 */
 /* ------------------------------------------------------------------ */
 
+/* Public index of every slug in blob storage, matching the public
+ * page routes it links to. A walkthrough whose existence is itself
+ * sensitive wants its own val: the slug namespace has no per-slug
+ * visibility. */
 app.get('/', async c => {
   try {
     const blobs = await blob.list(`${OUT_DIR}/`)
@@ -468,6 +479,7 @@ registerCommentRoutes(app, {
   authRequired,
   keyContext: dbKeyContext,
   keyContextError: dbKeyContextError,
+  adminToken: ADMIN_TOKEN,
 })
 
 registerAdminRoutes(app, {

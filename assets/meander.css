@@ -1115,13 +1115,22 @@ html:not([data-ua='safari']) .unresolved-item {
   border-bottom: 1px solid var(--border);
 }
 
-.export-option:last-child {
+.export-option:last-of-type {
   border-bottom: none;
 }
 
 .export-option:hover {
   background: var(--bg-elev);
   text-decoration: none;
+}
+
+.export-dropdown-status {
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
 }
 
 @media (max-width: 1100px) {

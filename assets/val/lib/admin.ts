@@ -36,12 +36,11 @@ export function adminAuth(
       503,
     )
   }
-  const auth = c.req.header('authorization') || ''
-  const m = auth.match(/^Bearer\s+(.+)$/i)
-  if (!m) {
+  const presented = readBearerToken(c)
+  if (presented === undefined) {
     return c.json({ error: 'admin auth required' }, 401)
   }
-  if (!constantTimeEqual(m[1], adminToken)) {
+  if (!constantTimeEqual(presented, adminToken)) {
     return c.json({ error: 'admin auth failed' }, 401)
   }
   return undefined
@@ -104,11 +103,37 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
+/**
+ * Predicate form of `adminAuth` for routes that accept *either* an
+ * admin token or a user session: it answers "is this the admin
+ * token?" without deciding the response. Comparison stays
+ * constant-time, and an unset `adminToken` is never a match, so a
+ * val without MEANDER_ADMIN_TOKEN can't be admin-authed by sending
+ * an empty bearer.
+ */
+export function isAdminToken(c: Context, adminToken: string): boolean {
+  if (!adminToken) {
+    return false
+  }
+  const presented = readBearerToken(c)
+  return presented !== undefined && constantTimeEqual(presented, adminToken)
+}
+
 export function noKeyContextResponse(c: Context, deps: AdminDeps): Response {
   const reason =
     deps.keyContextError ??
     'server missing MEANDER_DB_KEY_<n> + MEANDER_DB_KEY_CURRENT — run `meander db key init`'
   return c.json({ error: reason }, 500)
+}
+
+/**
+ * Read the token out of `Authorization: Bearer <token>`, or
+ * undefined when the header is absent or shaped differently.
+ */
+export function readBearerToken(c: Context): string | undefined {
+  const auth = c.req.header('authorization') || ''
+  const m = auth.match(/^Bearer\s+(.+)$/i)
+  return m ? m[1] : undefined
 }
 
 /**

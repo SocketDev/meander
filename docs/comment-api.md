@@ -1,9 +1,10 @@
 # Comment API
 
-The deployed val exposes a small REST API. Reads are open (so
-every visitor can see existing discussions); writes require a
-signed-in session. One val can host many walkthroughs — rows are
-isolated by `slug`.
+The deployed val exposes a small REST API. Per-part comment reads
+are open (so every visitor can see existing discussions); writes
+and the bulk export require a signed-in session. One val can host
+many walkthroughs — every query is scoped by `slug`, so a comment
+id from one walkthrough does not resolve against another.
 
 ## Auth endpoints
 
@@ -38,14 +39,14 @@ Rejection reasons the client can surface:
 
 ## Comment endpoints
 
-| Method   | Path                             | What it does                                         |
-| -------- | -------------------------------- | ---------------------------------------------------- |
-| `GET`    | `/:slug/api/comments?part=N`     | Fetch all comments for part `N` of `:slug`.          |
-| `POST`   | `/:slug/api/comments`            | Create a new comment or a reply. **Auth required.**  |
-| `PATCH`  | `/:slug/api/comments/:id`        | Mark `:id` resolved / unresolved. **Auth required.** |
-| `DELETE` | `/:slug/api/comments/:id`        | Delete comment `:id`. **Auth required.**             |
-| `GET`    | `/:slug/api/comments/unresolved` | List every open (unresolved) root comment.           |
-| `GET`    | `/:slug/api/comments/export`     | Download all comments for `:slug` as JSON.           |
+| Method   | Path                             | What it does                                                        |
+| -------- | -------------------------------- | ------------------------------------------------------------------- |
+| `GET`    | `/:slug/api/comments?part=N`     | Fetch all comments for part `N` of `:slug`.                         |
+| `POST`   | `/:slug/api/comments`            | Create a new comment or a reply. **Auth required.**                 |
+| `PATCH`  | `/:slug/api/comments/:id`        | Mark `:id` resolved / unresolved. **Author or admin.**              |
+| `DELETE` | `/:slug/api/comments/:id`        | Delete comment `:id` and its replies. **Author or admin.**          |
+| `GET`    | `/:slug/api/comments/unresolved` | List every open (unresolved) root comment.                          |
+| `GET`    | `/:slug/api/comments/export`     | Download all comments for `:slug` as JSON. **Auth or admin token.** |
 
 Auth-required routes check for `Authorization: Bearer <jwt>`.
 No header → `401`. Bad / expired token → `401`. Domain not on
@@ -54,6 +55,33 @@ the allowlist → `403`.
 The `author` field on a POST is **not** honored — the server
 stamps the authenticated email. Clients can't spoof a different
 name through the API.
+
+### Ownership
+
+`PATCH` and `DELETE` resolve `:id` only within `:slug`, and only
+for the session that authored the comment. An id that belongs to
+a different walkthrough reads as `404`; a comment authored by
+someone else is `403`. `Authorization: Bearer <MEANDER_ADMIN_TOKEN>`
+overrides both checks, so an operator can clear anything.
+
+Deleting a root comment deletes its replies with it. Orphaned
+replies would be retained but unreachable — the export walks
+roots, and the thread UI has nothing to hang them under — so the
+thread is the unit that goes. Deleting a reply removes only that
+reply. The response reports the count: `{ ok, id, deleted }`.
+
+### Export auth
+
+The export returns every comment body and author identity for a
+slug, decrypted. It takes either identity:
+
+- A session JWT, same as the write routes. The in-page export
+  button sends this — it fetches the JSON and saves it through an
+  object URL, because a plain link download can't carry the
+  `Authorization` header.
+- `Authorization: Bearer <MEANDER_ADMIN_TOKEN>`, for a headless
+  backup job. The magic-code flow needs a human mailbox, so a
+  scheduled export uses the admin token instead.
 
 ## Storage
 
@@ -93,6 +121,11 @@ each row's small wrapped DEK moves. See
 
 When the val boots with `MEANDER_DEMO_MODE=true`, every write
 route returns `403 {"error": "demo mode — writes disabled"}`,
-regardless of the caller's session. Reads still work. The
-served HTML carries `data-demo-mode="true"` on the `<body>` so
-the client can render a banner + disable the composer.
+regardless of the caller's session, and the export returns
+`403 {"error": "demo mode — export disabled"}`. Per-part reads
+still work. The served HTML carries `data-demo-mode="true"` on
+the `<body>` so the client can render a banner + disable the
+composer.
+
+The admin token bypasses demo mode on the routes that accept it —
+it is an operator credential, not a visitor session.

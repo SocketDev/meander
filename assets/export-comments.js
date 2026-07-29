@@ -8,6 +8,65 @@
 
   const ns = window[Symbol.for('meander:pages')]
   let dropdown = undefined
+  let status = undefined
+
+  /* ------------------------------------------------------------------ */
+  /*  Download                                                           */
+  /* ------------------------------------------------------------------ */
+
+  /* The export route is gated, and the session token rides on the
+   * Authorization header that comment-client.js attaches. A plain
+   * <a href> download is a top-level navigation, which cannot
+   * carry that header, so request the JSON through the shared
+   * session client and hand the response to a synthetic
+   * object-URL anchor instead. */
+  function download(url, filename) {
+    const auth = ns?.auth
+    if (!auth) {
+      setStatus('Export needs the comment client, which did not load.')
+      return Promise.resolve()
+    }
+    return auth
+      .fetch(url)
+      .then(function (response) {
+        if (!response.ok) {
+          return response
+            .json()
+            .catch(function () {
+              return {}
+            })
+            .then(function (body) {
+              throw new Error(
+                body.error ||
+                  'Export failed (' + response.status + '). Sign in and retry.',
+              )
+            })
+        }
+        return response.blob()
+      })
+      .then(function (blob) {
+        const objectUrl = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = objectUrl
+        anchor.download = filename
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        URL.revokeObjectURL(objectUrl)
+        setStatus('')
+        hideDropdown()
+      })
+      .catch(function (e) {
+        setStatus(e.message)
+      })
+  }
+
+  function setStatus(text) {
+    if (status) {
+      status.textContent = text
+      status.style.display = text ? 'block' : 'none'
+    }
+  }
 
   /* ------------------------------------------------------------------ */
   /*  SVG Icon                                                           */
@@ -84,27 +143,46 @@
     header.textContent = 'Export Comments'
     el.appendChild(header)
 
-    const exportAll = document.createElement('a')
-    exportAll.className = 'export-option'
-    exportAll.setAttribute('role', 'menuitem')
-    exportAll.href = '/' + slug + '/api/comments/export'
-    exportAll.setAttribute('download', slug + '-comments-all.json')
-    exportAll.textContent = 'Export All'
-    el.appendChild(exportAll)
-
-    const exportUnresolved = document.createElement('a')
-    exportUnresolved.className = 'export-option'
-    exportUnresolved.setAttribute('role', 'menuitem')
-    exportUnresolved.href = '/' + slug + '/api/comments/export?unresolved=true'
-    exportUnresolved.setAttribute(
-      'download',
-      slug + '-comments-unresolved.json',
+    el.appendChild(
+      createOption(
+        'Export All',
+        '/' + slug + '/api/comments/export',
+        slug + '-comments-all.json',
+      ),
     )
-    exportUnresolved.textContent = 'Export Unresolved'
-    el.appendChild(exportUnresolved)
+    el.appendChild(
+      createOption(
+        'Export Unresolved',
+        '/' + slug + '/api/comments/export?unresolved=true',
+        slug + '-comments-unresolved.json',
+      ),
+    )
+
+    status = document.createElement('div')
+    status.className = 'export-dropdown-status'
+    status.setAttribute('role', 'status')
+    status.style.display = 'none'
+    el.appendChild(status)
 
     document.body.appendChild(el)
     return el
+  }
+
+  /* Kept as an anchor with a real href: it stays keyboard-focusable
+   * for the menu pattern and the URL is copyable. Activation is
+   * intercepted so the request carries the session token. */
+  function createOption(label, url, filename) {
+    const option = document.createElement('a')
+    option.className = 'export-option'
+    option.setAttribute('role', 'menuitem')
+    option.href = url
+    option.textContent = label
+    option.addEventListener('click', function (e) {
+      e.preventDefault()
+      setStatus('Exporting…')
+      download(url, filename)
+    })
+    return option
   }
 
   function positionDropdown() {
