@@ -35,9 +35,10 @@ custodian must:
    itself, but it lowers it: leaking 1 share in a 2-of-3 split
    means a single additional leak compromises the key.
 
-4. **Test their share once a year**. The CLI's `restore` command
-   doesn't write any state — it's safe to run as a drill (see
-   "Restoration drill" below).
+4. **Test their share once a year**. Against a val that already
+   holds a wrapping key, the CLI's `restore` command writes no
+   state — it reports match or mismatch and stops, so it's safe to
+   run as a drill (see "Restoration drill" below).
 
 ## Rotation cadence
 
@@ -135,8 +136,9 @@ key is whatever's last planted on the val.
 
 ## Restoration drill
 
-Practice once per quarter. No state changes — `restore` is a
-no-op when shares match the val's existing key.
+Practice once per quarter. No state changes: against a val that
+holds at least one generation, `restore` reports whether the
+shares match and stops either way.
 
 ```bash
 # Pick `threshold` custodians. Each one extracts their share
@@ -150,8 +152,8 @@ meander db key restore walkthrough --threshold 2
 #   Shares match existing MEANDER_DB_KEY_1 — nothing to restore
 ```
 
-If the command reports a mismatch, your share storage has drifted
-from what the val holds. Either:
+A mismatch fails the command and leaves the val's env untouched.
+Your share storage has drifted from what the val holds. Either:
 
 - A share has been corrupted at rest (storage decay, manual
   retyping error). Replace the bad copy from a custodian who
@@ -159,6 +161,17 @@ from what the val holds. Either:
   share entirely.
 - The val's env was rotated without all custodians being
   updated. Find the most recent rotation's shares.
+
+If you have confirmed the shares are a legitimate key the val
+lost — a retired generation whose rows you still need to read —
+plant them deliberately:
+
+```bash
+meander db key restore walkthrough --threshold 2 --plant-new-generation
+#   Set MEANDER_DB_KEY_3
+```
+
+The flag exists so no drill can plant a generation by accident.
 
 ## Recovery from env-var loss
 
@@ -224,11 +237,12 @@ The val's SQLite is hosted on Val Town's infrastructure. Their
 durability is generally good but not your-only-copy good. Two
 backup paths, neither built into meander today:
 
-- **Comment export**: `GET /:slug/api/comments/export` (auth
-  required) returns a JSON dump of all comments for a slug,
-  decrypted server-side. Useful for migrating off Val Town or
-  archiving discussions; not appropriate as a daily backup
-  (round-trips full plaintext through the val).
+- **Comment export**: `GET /:slug/api/comments/export` returns a
+  JSON dump of all comments for a slug, decrypted server-side.
+  Requires either a session JWT or
+  `Authorization: Bearer <MEANDER_ADMIN_TOKEN>`. Useful for
+  migrating off Val Town or archiving discussions; not appropriate
+  as a daily backup (round-trips full plaintext through the val).
 
 - **SQLite dump via Val Town's data UI**: a manual backup option
   if you want a full snapshot. Contains ciphertext only — useless
@@ -237,7 +251,8 @@ backup paths, neither built into meander today:
 A scheduled-export GitHub Action that runs against
 `/api/comments/export` and commits the JSON to a private backup
 repo is a reasonable follow-up if your discussion volume justifies
-it.
+it. Give it `MEANDER_ADMIN_TOKEN` as a repository secret — the
+magic-code flow needs a mailbox no CI job has.
 
 ## When to involve which custodian
 

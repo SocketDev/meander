@@ -42,6 +42,10 @@ Flags (db key, blob key):
   --share-file <path>          Read a share from a file (repeatable, rotate/restore).
                                Otherwise prompts interactively.
   --generation <N>             Generation to operate on (db key retire only).
+  --plant-new-generation       Let 'db key restore' plant a new generation when
+                               the shares match nothing already on the val.
+                               Without it, restore reports the mismatch and
+                               changes no state, so drills stay read-only.
 
 Environment variables:
   VALTOWN_TOKEN              Val Town API bearer token (default env name).
@@ -164,6 +168,7 @@ export async function dispatchDb(args: readonly string[]): Promise<void> {
     threshold: parsed.threshold,
     shares: parsed.shares,
     generation: parsed.generation,
+    plantNewGeneration: parsed.plantNewGeneration,
   }
   switch (verb) {
     case 'init': {
@@ -216,6 +221,7 @@ export type CeremonyParsedArgs = {
   shares: number | undefined
   shareFiles: readonly string[]
   generation: number | undefined
+  plantNewGeneration: boolean
 }
 
 export function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
@@ -227,6 +233,7 @@ export function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
       shares: { type: 'string' },
       'share-file': { type: 'string', multiple: true },
       generation: { type: 'string' },
+      'plant-new-generation': { type: 'boolean' },
     },
     strict: false,
     allowPositionals: true,
@@ -238,6 +245,7 @@ export function parseCeremonyArgs(rest: readonly string[]): CeremonyParsedArgs {
     shares: undefined,
     shareFiles: [],
     generation: undefined,
+    plantNewGeneration: values['plant-new-generation'] === true,
   }
   if (typeof values['token-env'] === 'string') {
     out.tokenEnv = values['token-env']

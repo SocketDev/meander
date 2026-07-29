@@ -10,8 +10,13 @@
  * via /admin/rewrap, atomically flip
  * MEANDER_DB_KEY_CURRENT to point at the new key,
  * and emit new shares.
- * restore  Reassemble a wrapping key from shares + plant it on
- * the val. Used after accidental env-var loss.
+ * restore  Reassemble a wrapping key from shares. Plants it only
+ * when the val holds no generation at all (recovery from
+ * env-var loss). Shares that match a generation already on
+ * the val report a match; shares that match nothing while
+ * generations exist are reported as a mismatch and change
+ * no state, so the command is safe as a custodian drill.
+ * Planting anyway needs --plant-new-generation.
  * audit    Print which generations exist, which is current,
  * and how many rows reference each.
  * retire   Delete an old generation's MEANDER_DB_KEY_<n> from
@@ -128,11 +133,26 @@ export async function dbKeyRestore(
     return
   }
 
-  /* No match. The most likely scenario: env was wiped and we're
-   * planting back. Use the lowest-numbered missing generation
-   * (typically 1 if everything is gone). */
+  /* No match. Two very different situations share this branch, and
+   * only one of them is a restore:
+   *
+   * - Env holds no generation at all — the documented
+   *   recovery-from-env-loss path. Plant generation 1.
+   * - Env holds generations, none of which these shares
+   *   reconstruct. That is a mismatch report, not a restore, so the
+   *   drill stays read-only unless the operator explicitly asks for
+   *   a new generation. Mirrors blobKeyRestore, which refuses when
+   *   MEANDER_BLOB_KEY is set to a different value. */
   const planTarget =
     snapshot.generations.length > 0 ? Math.max(...snapshot.generations) + 1 : 1
+  if (snapshot.generations.length > 0 && cfg.plantNewGeneration !== true) {
+    throw new Error(
+      `Reconstructed key matches no wrapping key on the val — refusing to plant a new generation.\n` +
+        `  Where: \`meander db key restore\`, share verification against the val's env.\n` +
+        `  Saw: a key matching none of generation(s) ${snapshot.generations.join(', ')}; wanted a match with one of them.\n` +
+        `  Fix: re-check share provenance — a corrupted share or a share from a retired generation is the usual cause. To deliberately plant these shares as ${DB_KEY_PREFIX}${planTarget}, re-run with --plant-new-generation.`,
+    )
+  }
   await deps.env.setEnvVar(`${DB_KEY_PREFIX}${planTarget}`, recoveredHex)
   deps.io.printLine(`  Set ${DB_KEY_PREFIX}${planTarget}`)
   if (snapshot.currentGeneration === undefined) {
@@ -281,6 +301,13 @@ export type DbKeyOptions = {
    * Generation to operate on (retire only).
    */
   generation?: number | undefined
+  /**
+   * Restore only. When the reconstructed key matches no generation
+   * already on the val, plant it as a fresh generation instead of
+   * refusing. Off by default so a custodian drill cannot mutate
+   * production key state.
+   */
+  plantNewGeneration?: boolean | undefined
 }
 
 /* ------------------------------------------------------------------ */

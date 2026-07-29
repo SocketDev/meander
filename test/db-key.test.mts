@@ -281,10 +281,10 @@ describe('dbKeyRestore', () => {
     expect(deps.env.store.get('MEANDER_DB_KEY_CURRENT')).toBe('1')
   })
 
-  it('plants the next-numbered generation when shares do not match any existing generation', async () => {
+  it('refuses and leaves env untouched when shares match no existing generation', async () => {
     /* Env has gen 1 + 2 with two different keys; the operator's
-     * shares reconstruct a *third* key. Restore plants gen 3
-     * without touching CURRENT (which already points at gen 2). */
+     * shares reconstruct a *third* key. The drill must report the
+     * mismatch, not silently plant a generation on production. */
     const deps = makeDeps({
       envInitial: {
         MEANDER_DB_KEY_1: HEX_OF_BYTE(0x11),
@@ -295,7 +295,25 @@ describe('dbKeyRestore', () => {
         .slice(0, 2)
         .map(encodeShare),
     })
-    await dbKeyRestore({ threshold: 2 }, deps)
+    await expect(dbKeyRestore({ threshold: 2 }, deps)).rejects.toThrow(
+      /--plant-new-generation/,
+    )
+    expect(deps.env.store.has('MEANDER_DB_KEY_3')).toBe(false)
+    expect(deps.env.store.size).toBe(3)
+  })
+
+  it('plants the next-numbered generation when --plant-new-generation is passed', async () => {
+    const deps = makeDeps({
+      envInitial: {
+        MEANDER_DB_KEY_1: HEX_OF_BYTE(0x11),
+        MEANDER_DB_KEY_2: HEX_OF_BYTE(0x22),
+        MEANDER_DB_KEY_CURRENT: '2',
+      },
+      shares: split(new Uint8Array(KEY_OF_BYTE(0x99)), 2, 3)
+        .slice(0, 2)
+        .map(encodeShare),
+    })
+    await dbKeyRestore({ threshold: 2, plantNewGeneration: true }, deps)
     expect(deps.env.store.get('MEANDER_DB_KEY_3')).toBe(HEX_OF_BYTE(0x99))
     expect(deps.env.store.get('MEANDER_DB_KEY_CURRENT')).toBe('2')
   })
