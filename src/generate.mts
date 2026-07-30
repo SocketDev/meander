@@ -1031,7 +1031,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         basePath,
         cacheDir: sriOpts?.cacheDir
           ? path.resolve(rootDir, sriOpts.cacheDir)
-          : path.join(rootDir, 'node_modules', '.cache', 'meander', 'sri'),
+          : path.join(rootDir, '.cache', 'meander', 'sri'),
       })
     }
     return out
@@ -1111,7 +1111,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         repoRoot: rootDir,
         cacheDir: mOpts.cacheDir
           ? path.resolve(rootDir, mOpts.cacheDir)
-          : path.join(rootDir, 'node_modules', '.cache', 'meander', 'mermaid'),
+          : path.join(rootDir, '.cache', 'meander', 'mermaid'),
       })
     }
     const mermaidTheme: MermaidTheme =
