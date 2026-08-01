@@ -1,0 +1,7 @@
+{
+  "allow": {
+    ".oxfmtrc.json": "oxfmt discovers its config at the repo root; the fleet resolve-tools default is repo-root .oxfmtrc.json.",
+    ".oxlintrc.json": "oxlint discovers its config at the repo root; the fleet resolve-tools default is repo-root .oxlintrc.json.",
+    "example": "Runnable consumer examples linked from README.md; renaming to examples/ would break published doc links."
+  }
+}

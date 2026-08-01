@@ -1,0 +1,101 @@
+name: ⚡ CI
+
+# Lint + typecheck on every PR and every push to main. Runs the
+# setup-and-install composite which also self-audits .github/
+# via zizmor and routes pnpm install through sfw.
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Fleet no-phone-home posture: CI runners don't source the shell-rc that dev
+# machines get from setup-security-tools, so set every FLEET_ENV knob
+# workflow-level or the telemetry-env-is-disabled +
+# package-manager-auto-update-is-disabled gates (under `check --all`) fail.
+# Lockstep source: .claude/hooks/fleet/_shared/fleet-env.mts (FLEET_ENV) —
+# the telemetry-env-is-disabled check asserts each knob at CI runtime.
+env:
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  COREPACK_ENABLE_PROJECT_SPEC: '0'
+  DISABLE_TELEMETRY: '1'
+  DO_NOT_TRACK: '1'
+  # Markdown conformance gate (markdownlint-cli2 + the socket-* GFM rules)
+  # runs inside `pnpm run lint` when set. Flipped on 2026-07-12 after the
+  # fleet-wide burn-down took every member to zero findings.
+  LINT_MARKDOWN: '1'
+  NO_UPDATE_NOTIFIER: '1'
+
+jobs:
+  check:
+    name: Lint + typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2 (2026-05-15)
+        with:
+          fetch-depth: 100
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/fleet/setup-and-install
+
+      - name: Run checks
+        run: pnpm run check --all
+
+      - name: AgentShield audit (.claude configs)
+        # Audits this repo's .claude/ settings + hooks for known
+        # misconfigs + injection risks. Info/low findings don't
+        # fail the job — only medium+ block the merge. Without
+        # --fix; medium+ findings show up in the run output so a
+        # maintainer can review before promoting them to fixes.
+        # SOCKET_TOOL_AGENTSHIELD_BIN comes from the fleet install
+        # composite; it stays empty when the provisioning was skipped,
+        # so guard on it instead of expanding an empty command.
+        run: |
+          if [ -d .claude ] && [ -n "${SOCKET_TOOL_AGENTSHIELD_BIN:-}" ]; then
+            node "$SOCKET_TOOL_AGENTSHIELD_BIN" scan --path .claude --format terminal
+          fi
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Generate fixture (smoke test)
+        run: |
+          node --input-type=module -e "
+            import { generate } from './src/generate.mts';
+            await generate('./test/fixtures/test-docs/meander.config.json', { __proto__: null });
+          "
+
+  test:
+    name: Test + coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2 (2026-05-15)
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup and install
+        uses: ./.github/actions/fleet/setup-and-install
+
+      - name: Run tests (meander CLI + val helpers)
+        run: pnpm run test --all
+
+      - name: Coverage
+        run: pnpm run cover --summary
