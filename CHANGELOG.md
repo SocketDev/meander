@@ -4,6 +4,9 @@
 
 ### Added
 
+- **`publish`** — record whether a walkthrough was published private
+- **`val`** — gate an encrypted walkthrough's comment reads
+- **`val`** — gate encrypted walkthroughs on a slug-scoped reader cookie
 - **`ui`** — only the word "meander" is linked in the footer tagline
 - trail index layout, popover a11y, and footer tagline rotation
 - **`ux`** — trail vocabulary, popover registry, lazy auth widget
@@ -67,6 +70,9 @@
 
 ### Fixed
 
+- **`generate`** — move the sri and mermaid caches out of node\_modules
+- **`db-key`** — refuse to plant a generation on a restore mismatch
+- **`val`** — gate the comment export and scope mutations by slug
 - **`fuzz`** — sweep orphaned vitiate shm segments before the run
 - **`readme`** — reconcile the coverage badge with measured coverage
 - **`types`** — extend the fleet tsconfig base
