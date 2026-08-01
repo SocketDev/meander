@@ -16,8 +16,6 @@
 
 Annotated code walkthrough pages with a live comment system, hosted on [Val Town](https://val.town).
 
-## Why this repo exists
-
 Meander turns `/* … */` comments in your source files into a
 narrated, navigable walkthrough. Each comment becomes a prose
 card; the code that follows becomes the paired, highlighted code
