@@ -1,6 +1,6 @@
 ---
 name: content-filename-from-title
-description: Picks a short, URL-friendly filename for a meander walkthrough part or document. Use when adding or renaming `parts[].filename` or `documents[].filename` in `meander.config.json`.
+description: Picks a short, URL-friendly filename for a meander part or document. Use when setting `parts[].filename` or `documents[].filename`.
 ---
 
 # content-filename-from-title

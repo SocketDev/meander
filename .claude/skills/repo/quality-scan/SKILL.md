@@ -1,6 +1,6 @@
 ---
 name: quality-scan
-description: Read-only quality sweep. Runs `pnpm run check`, spawns critical/logic/workflow/security/docs scan agents, returns a prioritized report.
+description: Read-only quality sweep. Runs `pnpm run check`, spawns bug/logic/workflow/security/docs agents, returns a prioritized report.
 user-invocable: true
 allowed-tools: Task, Skill, Bash, Read, Grep, Glob
 ---

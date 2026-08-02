@@ -1,6 +1,6 @@
 ---
 name: security-scan
-description: AgentShield on .claude/ config + zizmor on GitHub Actions, graded A-F by the security-reviewer agent.
+description: AgentShield on .claude/ + zizmor on GitHub Actions, graded A-F by the security-reviewer agent.
 user-invocable: true
 ---
 
