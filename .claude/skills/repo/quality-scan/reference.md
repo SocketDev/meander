@@ -366,10 +366,10 @@ meander is a single-package TypeScript repo (no monorepo workspaces beyond `.cla
 - CI: GitHub Actions in `.github/workflows/`:
   - ci.yml — lint + type + test + AgentShield
   - pages.yml — emits the dev fixture as a GitHub Pages preview
-  - provenance.yml — npm publish provenance
+  - npm-publish.yml — the cascade-owned staged npm publisher
   - valtown.yml — deploys the Hono handler in `assets/val/` to Val Town
   - weekly-update.yml — runs `pnpm run update` weekly
-- Hooks live at `.claude/hooks/{check-new-deps,token-hygiene,public-surface-reminder}/` registered as workspace packages
+- Hooks live at `.claude/hooks/fleet/<name>/` registered as workspace packages
 - Node version pinned in `.node-version` (currently 25.9.0)
 </context>
 
@@ -508,10 +508,10 @@ Your task is to run zizmor on meander's GitHub Actions workflows and identify fi
 <context>
 zizmor is provisioned via `external-tools.json` (currently `zizmor@1.23.1`). It lands in `.cache/external-tools/` after the shared `setup-and-install` composite runs. If unavailable locally, run `brew install zizmor` or run the setup composite — don't `pnpm dlx zizmor` (forbidden by CLAUDE.md).
 
-meander's `.github/workflows/zizmor.yml` configuration disables the `secrets-outside-env` rule. Don't re-flag findings the upstream config has silenced.
+meander's `.github/zizmor.yml` configuration disables the `secrets-outside-env` rule. Don't re-flag findings the upstream config has silenced.
 
 Workflows in `.github/workflows/`:
-- ci.yml, pages.yml, provenance.yml, valtown.yml, weekly-update.yml
+- ci.yml, github-release.yml, npm-publish.yml, pages.yml, release-reconcile.yml, valtown.yml, weekly-update.yml
 </context>
 
 <instructions>
