@@ -3,8 +3,8 @@
  *
  * - `minifyEmittedHtml(html, options)` — walk every inline
  *
- *   <script> body through esbuild, every inline <svg> through
- *   SVGO. Returns the transformed HTML string.
+ *   <script> body through rolldown's minifier, every inline
+ *   <svg> through SVGO. Returns the transformed HTML string.
  *
  * All passes are best-effort: a single malformed asset (rare
  * SVGO parser choke, invalid JS in a consumer-provided snippet)
@@ -12,17 +12,23 @@
  * a string that's always valid HTML / CSS / JS even on partial
  * failure.
  *
- * Both `esbuild` and `svgo` are loaded via dynamic import so
- * the generator still works when a consumer opts into minify
- * without installing esbuild. `svgo` ships as a direct meander
- * dep; `esbuild` is a meander devDep that consumers add to
- * their own project if they want JS/CSS minification.
+ * `rolldown`, `svgo`, and `csso` are loaded via dynamic import
+ * so the generator still works when a consumer opts into minify
+ * without installing rolldown. `svgo` and `csso` ship as direct
+ * meander deps; `rolldown` is a meander devDep that consumers
+ * add to their own project if they want inline-script / sw.js
+ * minification.
  */
 import type { HTMLElement } from 'node-html-parser'
 import { parse as parseHtml } from 'node-html-parser'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
 const logger = getDefaultLogger()
+
+/* Synthetic filename handed to rolldown's minifier so oxc parses the
+ * source as plain JS (never TS/JSX) regardless of what the real emitted
+ * asset is named. */
+const JS_MINIFY_FILENAME = 'meander-inline.js'
 
 export type MinifyHtmlOptions = {
   js?: boolean | undefined
@@ -53,23 +59,26 @@ const svgoConfig = {
 }
 
 /**
- * Minify a standalone JS or CSS source string via esbuild.
- * Used for the external meander.css and sw.js. Returns
- * the original string on failure so callers don't ship an
- * empty/broken asset.
+ * Minify a standalone JS or CSS source string via rolldown's
+ * minifier (JS) or csso (CSS). Used for the external
+ * meander.css and sw.js. Returns the original string on
+ * failure so callers don't ship an empty/broken asset.
  */
 export async function minifyAsset(
   code: string,
   kind: 'js' | 'css',
 ): Promise<string> {
   try {
-    const { transform } = await import('esbuild')
-    const out = await transform(code, {
-      loader: kind,
-      minify: true,
-      target: 'es2022',
-      legalComments: 'none',
-    })
+    if (kind === 'css') {
+      const { minify } = await import('csso')
+      const out = minify(code)
+      return out.css || code
+    }
+    const { minify } = await import('rolldown/experimental')
+    const out = await minify(JS_MINIFY_FILENAME, code, {})
+    if (out.errors.length > 0) {
+      throw new Error(out.errors.map(e => e.message).join('; '))
+    }
     return out.code
   } catch (e) {
     logger.fail(`[minify] ${kind} minify failed:`, (e as Error)?.message ?? e)
@@ -93,15 +102,15 @@ export async function minifyEmittedHtml(
   let changed = false
 
   if (js) {
-    /* esbuild isn't installed — skip the JS pass rather than
+    /* rolldown isn't installed — skip the JS pass rather than
      * erroring. Consumers enable minify.js by installing it
      * alongside mermaid + puppeteer. */
-    const esbuildMod = await import('esbuild').catch(
-      /* v8 ignore next -- optional-dep absence; esbuild is a meander devDep so this branch never fires in tests. */
+    const rolldownMod = await import('rolldown/experimental').catch(
+      /* v8 ignore next -- optional-dep absence; rolldown is a meander devDep so this branch never fires in tests. */
       () => undefined,
     )
-    if (esbuildMod) {
-      const { transform } = esbuildMod
+    if (rolldownMod) {
+      const { minify } = rolldownMod
       const scripts = root.querySelectorAll('script')
       /* Inline <script> only — tags with a `src` attribute fetch
        * their body over the network and are minified (if at all)
@@ -117,21 +126,19 @@ export async function minifyEmittedHtml(
         inlineScripts.push(s)
       }
       const results = await Promise.allSettled(
-        inlineScripts.map(s =>
-          transform(s.text, {
-            loader: 'js',
-            minify: true,
-            target: 'es2022',
-            legalComments: 'none',
-          }),
-        ),
+        inlineScripts.map(s => minify(JS_MINIFY_FILENAME, s.text, {})),
       )
       for (const [i, r] of results.entries()) {
-        if (r.status !== 'fulfilled') {
-          logger.fail(
-            '[minify] inline <script> failed:',
-            (r.reason as Error)?.message ?? r.reason,
-          )
+        /* rolldown's minify() resolves even on a parse error — it
+         * never rejects — so a failure shows up as a fulfilled
+         * result carrying a non-empty `errors` array, not a
+         * rejection. Both shapes are treated as failure here. */
+        if (r.status !== 'fulfilled' || r.value.errors.length > 0) {
+          const reason =
+            r.status === 'fulfilled'
+              ? r.value.errors.map(e => e.message).join('; ')
+              : ((r.reason as Error)?.message ?? r.reason)
+          logger.fail('[minify] inline <script> failed:', reason)
           continue
         }
         const el = inlineScripts[i]!

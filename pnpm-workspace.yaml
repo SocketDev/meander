@@ -112,8 +112,9 @@ packages:
   - '.config/fleet/oxlint-plugin/fleet/*'
 trustPolicy: no-downgrade
 # Drop vite 8's optional esbuild peer wiring — rolldown is the bundler.
-# meander's own direct esbuild devDep (the opt-in minify pass) stays and
-# is declared in .config/repo/vite-rolldown.json.
+# meander carries no direct esbuild devDep at all; the opt-in minify pass
+# (src/minify.mts) and the deploy-val bundle step (src/deploy-val.mts) both
+# use rolldown instead.
 ignoredOptionalDependencies:
   - esbuild
 allowBuilds:
@@ -123,11 +124,7 @@ allowBuilds:
   # test:fuzz` can SWC-instrument src/.
   '@socketsecurity/sdk': false
   '@swc/core': true
-  # esbuild ships platform-specific binaries via a postinstall;
-  # it's a devDep of meander and a peer dep consumers use for
-  # the opt-in minify pass, so always let it run.
   cpu-features: false
-  esbuild: true
   # puppeteer's postinstall downloads ~300MB of Chromium. meander
   # itself never renders mermaid in CI — the fixture has no
   # mermaid blocks — so skip the build script here. Consumers

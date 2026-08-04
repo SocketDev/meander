@@ -15,25 +15,23 @@ const logger = getDefaultLogger()
  * API takes one file per path; bundling sidesteps uploading
  * the whole `lib/` tree.
  *
- * External: `npm:*`, `https://esm.town/*` — Deno resolves those
- * at runtime.
+ * External: `npm:*`, `https://esm.town/*`, `jsr:*` — Deno
+ * resolves those at runtime.
  */
 export async function bundleValSource(entryPath: string): Promise<string> {
-  const esbuild = await import('esbuild')
-  const result = await esbuild.build({
-    entryPoints: [entryPath],
-    bundle: true,
-    write: false,
+  const { build } = await import('rolldown')
+  const result = await build({
+    input: entryPath,
     platform: 'neutral',
-    format: 'esm',
-    target: 'deno2',
-    external: ['npm:*', 'https://*', 'jsr:*'],
+    external: [/^npm:/, /^https:\/\//, /^jsr:/],
+    write: false,
+    output: { format: 'esm' },
   })
-  const file = result.outputFiles?.[0]
-  if (!file) {
-    throw new Error('esbuild produced no output for the val bundle')
+  const chunk = result.output[0]
+  if (!chunk || !('code' in chunk) || !chunk.code) {
+    throw new Error('rolldown produced no output for the val bundle')
   }
-  return file.text
+  return chunk.code
 }
 
 export type DeployValOptions = {

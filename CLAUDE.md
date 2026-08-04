@@ -124,7 +124,7 @@
 meander generates annotated code-walkthrough pages with a live comment system, deployed to Val Town.
 
 - **Layout**: generator + CLI in `src/`, flat, one module per concern (`generate`, `serve`, `deploy-val`, `minify`, `crypto`/`shamir`); the Val Town runtime is `assets/val/`, shipped in the tarball.
-- **Build**: `pnpm run build` (rolldown via `scripts/repo/build.mts`); esbuild is a devDep the minify pass and the deploy-val bundle dynamic-import behind the `vite.allowEsbuild` opt-in.
+- **Build**: `pnpm run build` (rolldown via `scripts/repo/build.mts` + `.config/repo/rolldown.cli.config.mts`); the minify pass and the deploy-val bundle step both dynamic-import `rolldown` too.
 - **Deploy**: publishing to npm goes through the GitHub Actions pipeline only (`prepublishOnly` blocks local); Val Town deploys via `src/deploy-val.mts` (`.github/workflows/valtown.yml`).
 - **Commands**: `pnpm test` / `pnpm run check` / `pnpm run cover` / `pnpm run type`; the Val Town runtime tests live in `test/val/` and run with the vitest suite.
 - **Docs**: architecture / operating / deploying / encryption detail in `docs/*.md`.

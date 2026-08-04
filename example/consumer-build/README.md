@@ -1,7 +1,7 @@
 # Consumer build integration
 
 How to wire `meander generate` into your project's own build
-pipeline (CI, Makefile, esbuild bundle, whatever).
+pipeline (CI, Makefile, rolldown bundle, whatever).
 
 meander is usable as a CLI **and** as a library. Pick whichever
 matches the rest of your toolchain.
@@ -48,8 +48,9 @@ node --experimental-strip-types scripts/build-walkthrough.mts
 
 ## Option 3 — Minify your pages at emit time
 
-meander can run inline scripts through esbuild and inline SVGs
-through svgo at emit time — enable via the config:
+meander can run inline scripts through rolldown's minifier,
+inline SVGs through svgo, and `meander.css` through csso at
+emit time — enable via the config:
 
 ```json
 {
@@ -63,16 +64,16 @@ through svgo at emit time — enable via the config:
 
 Requirements:
 
-- `svgo` is already installed as a meander dep — no action needed
-  for `svg: true`.
-- For `js: true` or `css: true`, install esbuild in your project:
+- `svgo` and `csso` are already installed as meander deps — no
+  action needed for `svg: true` or `css: true`.
+- For `js: true`, install rolldown in your project:
 
   ```bash
-  pnpm add -D esbuild
+  pnpm add -D rolldown
   ```
 
-  meander loads it dynamically. If esbuild isn't available, the
-  JS/CSS pass logs + skips rather than aborting the build.
+  meander loads it dynamically. If rolldown isn't available, the
+  JS pass logs + skips rather than aborting the build.
 
 ## GitHub Pages deploy
 

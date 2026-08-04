@@ -532,14 +532,14 @@ reloads.
 **Opt-in.** When enabled, meander runs a final minification
 pass against emitted assets:
 
-- **Inline `<script>`** bodies — esbuild, target es2022, strips
-  comments.
+- **Inline `<script>`** bodies + **`sw.js`** — rolldown's
+  minifier, strips comments.
 - **Inline `<svg>`** elements — SVGO with `preset-default`
   (cleanupIds + removeUnknownsAndDefaults overridden off so
   mermaid diagrams keep their edge-to-node links and the
   preserveAspectRatio variants browsers read).
-- **External `meander.css`** + **`sw.js`** — esbuild on
-  the file bytes before they're written.
+- **External `meander.css`** — csso on the file bytes before
+  they're written.
 
 Typical savings on the fixture:
 
@@ -581,11 +581,11 @@ touch content).
 
 ### Dep notes
 
-`svgo` ships as a direct dep — the SVG minify pass is always
-available. `esbuild` is loaded dynamically; if a consumer
-enables `config.minify.js` or `config.minify.css` without
-installing esbuild themselves, the pass logs + skips rather
-than aborting the build.
+`svgo` and `csso` ship as direct deps — the SVG and CSS minify
+passes are always available. `rolldown` is loaded dynamically;
+if a consumer enables `config.minify.js` without installing
+rolldown themselves, that pass logs + skips rather than
+aborting the build.
 
 ## Subresource Integrity (SRI)
 

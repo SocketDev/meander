@@ -351,9 +351,9 @@ export const MeanderConfigSchema = Type.Object({
   /* ---------------- build-time features ---------------- */
 
   /**
-   * Minify emitted assets — shrinks inline <script> bodies via
-   * esbuild, inline <svg> elements via SVGO, and the standalone
-   * meander.css + sw.js files.
+   * Minify emitted assets — shrinks inline <script> bodies +
+   * sw.js via rolldown's minifier, inline <svg> elements via
+   * SVGO, and the standalone meander.css via csso.
    *
    * Default: false.
    *
