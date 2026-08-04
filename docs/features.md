@@ -538,8 +538,8 @@ pass against emitted assets:
   (cleanupIds + removeUnknownsAndDefaults overridden off so
   mermaid diagrams keep their edge-to-node links and the
   preserveAspectRatio variants browsers read).
-- **External `meander.css`** — csso on the file bytes before
-  they're written.
+- **External `meander.css`** — lightningcss on the file bytes
+  before they're written.
 
 Typical savings on the fixture:
 
@@ -581,8 +581,8 @@ touch content).
 
 ### Dep notes
 
-`svgo` and `csso` ship as direct deps — the SVG and CSS minify
-passes are always available. `rolldown` is loaded dynamically;
+`svgo` and `lightningcss` ship as direct deps — the SVG and CSS
+minify passes are always available. `rolldown` is loaded dynamically;
 if a consumer enables `config.minify.js` without installing
 rolldown themselves, that pass logs + skips rather than
 aborting the build.

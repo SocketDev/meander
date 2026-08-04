@@ -77,7 +77,7 @@
   "dependencies": {
     "@sinclair/typebox": "catalog:",
     "@valtown/sdk": "1.14.0",
-    "csso": "5.0.5",
+    "lightningcss": "catalog:",
     "marked": "18.0.7",
     "node-html-parser": "7.1.0",
     "svgo": "4.0.2"
@@ -91,7 +91,6 @@
     "@socketsecurity/lib-stable": "catalog:",
     "@socketsecurity/sdk": "catalog:",
     "@socketsecurity/sdk-stable": "catalog:",
-    "@types/csso": "5.0.4",
     "@types/mdast": "catalog:",
     "@types/node": "catalog:",
     "@types/semver": "catalog:",

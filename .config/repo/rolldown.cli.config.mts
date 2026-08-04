@@ -7,12 +7,15 @@
  *   Externals:
  *
  *   - node built-ins (never bundled).
- *   - csso / mermaid / puppeteer / rolldown / svgo — loaded dynamically by opt-in
- *     features. Bundling them would drag in Chromium downloads (puppeteer) or
- *     force mermaid's DOM-heavy runtime into the CLI for everyone. Consumers
- *     install `rolldown` themselves only if they enable the JS minify pass;
- *     `csso` and `svgo` ship as direct meander deps but stay external so their
- *     (larger) parser code isn't duplicated into cli.mjs.
+ *   - lightningcss / mermaid / puppeteer / rolldown / svgo — loaded dynamically
+ *     by opt-in features. Bundling them would drag in Chromium downloads
+ *     (puppeteer) or force mermaid's DOM-heavy runtime into the CLI for
+ *     everyone. Consumers install `rolldown` themselves only if they enable the
+ *     JS minify pass; `lightningcss` and `svgo` ship as direct meander deps but
+ *     stay external so their (larger) parser code isn't duplicated into cli.mjs
+ *     — lightningcss is also a native napi module, so bundling it would break
+ *     its own binary resolution the same way a bundled `rolldown/experimental`
+ *     would.
  *   - @valtown/sdk — only used by deploy-val. Kept external so the CLI stays
  *     small for the 90% of users who only run generate / serve / publish.
  */
@@ -36,7 +39,7 @@ const nodeBuiltins = [
  */
 export const runtimeExternals = [
   '@valtown/sdk',
-  'csso',
+  'lightningcss',
   'mermaid',
   'puppeteer',
   'rolldown',

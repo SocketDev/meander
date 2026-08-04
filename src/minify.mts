@@ -12,12 +12,12 @@
  * a string that's always valid HTML / CSS / JS even on partial
  * failure.
  *
- * `rolldown`, `svgo`, and `csso` are loaded via dynamic import
- * so the generator still works when a consumer opts into minify
- * without installing rolldown. `svgo` and `csso` ship as direct
- * meander deps; `rolldown` is a meander devDep that consumers
- * add to their own project if they want inline-script / sw.js
- * minification.
+ * `rolldown`, `svgo`, and `lightningcss` are loaded via dynamic
+ * import so the generator still works when a consumer opts into
+ * minify without installing rolldown. `svgo` and `lightningcss`
+ * ship as direct meander deps; `rolldown` is a meander devDep
+ * that consumers add to their own project if they want
+ * inline-script / sw.js minification.
  */
 import type { HTMLElement } from 'node-html-parser'
 import { parse as parseHtml } from 'node-html-parser'
@@ -60,7 +60,7 @@ const svgoConfig = {
 
 /**
  * Minify a standalone JS or CSS source string via rolldown's
- * minifier (JS) or csso (CSS). Used for the external
+ * minifier (JS) or lightningcss (CSS). Used for the external
  * meander.css and sw.js. Returns the original string on
  * failure so callers don't ship an empty/broken asset.
  */
@@ -70,9 +70,18 @@ export async function minifyAsset(
 ): Promise<string> {
   try {
     if (kind === 'css') {
-      const { minify } = await import('csso')
-      const out = minify(code)
-      return out.css || code
+      /* lightningcss throws SyntaxError on malformed CSS (csso
+       * did not) — the outer try/catch below already treats any
+       * throw from this branch as a minify failure and falls
+       * back to the original source, so the malformed-CSS
+       * contract is unchanged. */
+      const { transform } = await import('lightningcss')
+      const out = transform({
+        code: Buffer.from(code),
+        filename: 'meander.css',
+        minify: true,
+      })
+      return out.code.toString() || code
     }
     const { minify } = await import('rolldown/experimental')
     const out = await minify(JS_MINIFY_FILENAME, code, {})

@@ -1,7 +1,7 @@
 /**
  * Diagnostic command: `meander doctor` reports system info +
  * resolves the optional peer deps that gate feature flags
- * (mermaid → puppeteer/mermaid/svgo; minify → rolldown/svgo/csso).
+ * (mermaid → puppeteer/mermaid/svgo; minify → rolldown/svgo/lightningcss).
  *
  * When a peer dep is missing, the feature it enables silently
  * no-ops at build time. `doctor` surfaces those gaps up front
@@ -44,8 +44,8 @@ export async function doctor(): Promise<void> {
       description: 'Shrink mermaid SVGs + inline <svg> in emitted HTML',
     },
     {
-      name: 'csso',
-      required: '>=5',
+      name: 'lightningcss',
+      required: '>=1',
       description: 'Shrink meander.css',
     },
     {

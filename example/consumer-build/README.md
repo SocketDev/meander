@@ -49,8 +49,8 @@ node --experimental-strip-types scripts/build-walkthrough.mts
 ## Option 3 — Minify your pages at emit time
 
 meander can run inline scripts through rolldown's minifier,
-inline SVGs through svgo, and `meander.css` through csso at
-emit time — enable via the config:
+inline SVGs through svgo, and `meander.css` through lightningcss
+at emit time — enable via the config:
 
 ```json
 {
@@ -64,8 +64,8 @@ emit time — enable via the config:
 
 Requirements:
 
-- `svgo` and `csso` are already installed as meander deps — no
-  action needed for `svg: true` or `css: true`.
+- `svgo` and `lightningcss` are already installed as meander
+  deps — no action needed for `svg: true` or `css: true`.
 - For `js: true`, install rolldown in your project:
 
   ```bash

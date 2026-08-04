@@ -353,7 +353,7 @@ export const MeanderConfigSchema = Type.Object({
   /**
    * Minify emitted assets — shrinks inline <script> bodies +
    * sw.js via rolldown's minifier, inline <svg> elements via
-   * SVGO, and the standalone meander.css via csso.
+   * SVGO, and the standalone meander.css via lightningcss.
    *
    * Default: false.
    *
