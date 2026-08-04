@@ -52,6 +52,11 @@ jobs:
 
       - name: Setup and install
         uses: ./.github/actions/fleet/setup-and-install
+        with:
+          # Full history: the commit-history checks (AI-attribution,
+          # release-boundary) read the default branch's history and refuse a
+          # shallow clone rather than false-green.
+          checkout-fetch-depth: '0'
 
       - name: Run checks
         run: pnpm run check --all
