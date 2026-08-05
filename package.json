@@ -72,7 +72,8 @@
     "mcp:reset": "node scripts/fleet/mcp-reset.mts",
     "setup:sfw-ca": "node scripts/fleet/setup/sfw-ca.mts",
     "get-green": "node scripts/fleet/get-green.mts",
-    "weekly-update:ci": "gh workflow run weekly-update.lock.yml"
+    "weekly-update:ci": "gh workflow run weekly-update.lock.yml",
+    "prune:backups": "node scripts/fleet/backup-branches.mts prune"
   },
   "dependencies": {
     "@sinclair/typebox": "catalog:",
@@ -83,7 +84,6 @@
     "svgo": "4.0.2"
   },
   "devDependencies": {
-    "@actions/cache": "catalog:",
     "@redwoodjs/agent-ci": "catalog:",
     "@shadscan/cli": "catalog:",
     "@socketregistry/packageurl-js": "catalog:",
@@ -125,6 +125,7 @@
     "shell-quote": "catalog:",
     "taze": "catalog:",
     "type-coverage": "2.29.7",
+    "typebox": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vitiate": "catalog:",
@@ -150,7 +151,7 @@
   },
   "engines": {
     "node": ">=24",
-    "npm": ">=12.0.1",
+    "npm": ">=12.0.2",
     "pnpm": ">=11.0.5"
   },
   "allowScripts": {
