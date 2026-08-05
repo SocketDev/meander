@@ -83,6 +83,7 @@
     "svgo": "4.0.2"
   },
   "devDependencies": {
+    "@actions/cache": "catalog:",
     "@redwoodjs/agent-ci": "catalog:",
     "@shadscan/cli": "catalog:",
     "@socketregistry/packageurl-js": "catalog:",
