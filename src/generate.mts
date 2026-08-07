@@ -732,7 +732,7 @@ export async function generate(
   let swRegisterJs = ''
   if (swEnabled) {
     const swSrc = readFileSync(path.join(bundledAssetsDir, 'sw.js'), 'utf-8')
-    let swOut = swSrc.replaceAll('__MEANDER_CACHE_VERSION__', swVersion)
+    let swOut = swSrc.replaceAll('__MEANDER_CACHE_VERSION__', () => swVersion)
     /* Minify the SW when the consumer opted in. Its Service-
      * Worker registration-gated bytes decide the install hash,
      * so shrinking here is strictly a bytes-over-the-wire win —

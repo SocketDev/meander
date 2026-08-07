@@ -110,7 +110,7 @@ export function enhanceRepoTrees(html: string): string {
           const merged = `${classMatch[1]} nohighlight`.trim()
           const updatedAttrs = (attrs ?? '').replace(
             /\sclass="[^"]*"/,
-            ` class="${merged}"`,
+            () => ` class="${merged}"`,
           )
           return `<code${updatedAttrs}>`
         }

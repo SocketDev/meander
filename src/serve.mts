@@ -222,7 +222,9 @@ export async function serve(
     }
 
     try {
-      // oxlint-disable-next-line socket/prefer-exists-sync -- need the metadata: stat() to reject directory targets via isDirectory(), not a bare existence check.
+      // stat() gives the metadata needed to reject directory targets via
+      // isDirectory(), not a bare existence check.
+      // oxlint-disable-next-line socket/prefer-exists-sync -- need metadata
       const stats = await fs.stat(target)
       if (stats.isDirectory()) {
         res.writeHead(404).end('not found')

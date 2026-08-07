@@ -17,13 +17,15 @@ import path from 'node:path'
 import { watch as fsWatch } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+// @socketsecurity/meander is not yet published; no -stable alias exists, so
+// the src/ imports below are required. Revisit after first publish.
+// oxlint-disable-next-line socket/prefer-stable-self-import -- no stable alias
 import { generate } from '../../src/generate.mts'
-// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+// oxlint-disable-next-line socket/prefer-stable-self-import -- no stable alias
 import type { GenerateOptions } from '../../src/generate.mts'
-// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+// oxlint-disable-next-line socket/prefer-stable-self-import -- no stable alias
 import { serve } from '../../src/serve.mts'
-// oxlint-disable-next-line socket/prefer-stable-self-import -- @socketsecurity/meander is not yet published; no -stable alias exists, so the src/ import is required. Revisit after first publish.
+// oxlint-disable-next-line socket/prefer-stable-self-import -- no stable alias
 import type { ServeOptions } from '../../src/serve.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 

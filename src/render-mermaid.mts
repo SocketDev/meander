@@ -268,7 +268,7 @@ export function inlineMermaidSvgs(
 ): string {
   let out = html
   for (const [token, svg] of svgByToken) {
-    out = out.replace(token, svg)
+    out = out.replace(token, () => svg)
   }
   return out
 }
@@ -330,7 +330,7 @@ export async function preRenderMermaidBlocks(
   }
   let out = markdown
   for (const { match, token } of tokens) {
-    out = out.replace(match, `<div class="mdr-mermaid">${token}</div>`)
+    out = out.replace(match, () => `<div class="mdr-mermaid">${token}</div>`)
   }
   return { markdown: out, svgByToken }
 }

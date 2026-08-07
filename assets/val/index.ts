@@ -437,5 +437,7 @@ registerAdminRoutes(app, {
 /*  Export                                                              */
 /* ------------------------------------------------------------------ */
 
-// oxlint-disable-next-line socket/no-default-export -- val-town runtime invokes the module's default export as the fetch handler.
+// The val-town runtime invokes the module's default export as the fetch
+// handler.
+// oxlint-disable-next-line socket/no-default-export -- val-town entry
 export default app.fetch
