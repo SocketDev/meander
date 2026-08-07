@@ -320,6 +320,8 @@ packages:
   - '.claude/hooks/fleet/*'
   - '.config/fleet/oxlint-plugin'
   - '.config/fleet/oxlint-plugin/fleet/*'
+  - '.claude/hooks/repo/*'
+  - '.config/repo/oxlint-plugin/*'
 trustPolicy: no-downgrade
 
 # Refuse transitive (sub-) deps declared via git/tarball/local-tarball
