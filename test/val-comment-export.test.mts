@@ -38,7 +38,8 @@ describe('GET /:slug/api/comments/export', () => {
     ]
     const real = await sessionFor('a@socket.dev')
     /* Same claims a real session carries, so the signature is the
-     * only thing wrong with it. */
+     * only thing wrong with it.
+     */
     const forged = await signJwt(
       {
         email: 'a@socket.dev',

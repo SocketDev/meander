@@ -53,7 +53,8 @@ describe('minifyEmittedHtml', () => {
   it('survives malformed inline JS (best-effort, logs + keeps original)', async () => {
     /* Intentionally invalid syntax — rolldown's minifier will
      * report a parse error. The minifier should log + move on
-     * without throwing. */
+     * without throwing.
+     */
     const html = '<html><head><script>const broken = ;</script></head></html>'
     const out = await minifyEmittedHtml(html, { js: true, svg: false })
     /* Original content preserved. */

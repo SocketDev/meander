@@ -29,7 +29,8 @@ const logger = getDefaultLogger()
  * Scope: every inline <code> inside .annotation-md or
  * .doc-content that isn't already inside a <pre>. Block code
  * (fenced code) is left alone — hljs already highlights those
- * at the block level. */
+ * at the block level.
+ */
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
   if (!ns) {
@@ -40,7 +41,8 @@ const logger = getDefaultLogger()
   /* Initialize the registry if this is the first module to
    * touch it. Consumers can register before OR after this file
    * loads — the symbol-keyed array is a stable handle either
-   * way. */
+   * way.
+   */
   const registry = (window[registryKey] ??= [])
 
   const tokenize = code => {
@@ -63,12 +65,14 @@ const logger = getDefaultLogger()
         }
       } catch (e) {
         /* A single bad tokenizer shouldn't kill the page —
-         * log and move on to the next candidate. */
+         * log and move on to the next candidate.
+         */
         logger.fail(`[meander:inline-tokenizers] ${entry.name}:`, e)
       }
     }
     /* Fallback: hljs TypeScript. Gated on hljs being present
-     * (may not be on doc-only pages). */
+     * (may not be on doc-only pages).
+     */
     if (window.hljs && typeof window.hljs.highlight === 'function') {
       try {
         const result = window.hljs.highlight(text, {
@@ -79,7 +83,8 @@ const logger = getDefaultLogger()
         code.setAttribute('data-mdr-tokenized', 'hljs')
       } catch {
         /* hljs can throw on unknown languages or malformed
-         * input — leave the plain text in place. */
+         * input — leave the plain text in place.
+         */
       }
     }
   }
@@ -95,6 +100,7 @@ const logger = getDefaultLogger()
   /* Run after hljs finishes its block-level pass so tokenizers
    * that delegate to hljs.highlight() work. onHljsReady is a
    * no-op when there's no hljs content on the page, so
-   * doc-only surfaces still get tokenized. */
+   * doc-only surfaces still get tokenized.
+   */
   ns.onHljsReady(pass)
 })()

@@ -100,6 +100,9 @@ MCP.
 Zizmor scans `.github/workflows/*.yml`. Top-severity rules you're
 most likely to see:
 
+<details>
+<summary>The zizmor rule catalog</summary>
+
 | Rule | What it flags | Default severity |
 |---|---|---|
 | `unpinned-action` | `uses: actions/checkout@v4` (tag - mutable) instead of `@<full-sha>` | HIGH |
@@ -134,6 +137,9 @@ config has silenced.
 ---
 
 <a id="false-positives"></a>
+
+</details>
+
 ## 3. Common false positives
 
 Some findings look alarming but are benign. Know these before
@@ -200,6 +206,9 @@ insists, or add a path-specific ignore.
 When triaging findings, use this tree to decide whether to treat a
 finding as its default severity or promote / demote.
 
+<details>
+<summary>The severity decision tree</summary>
+
 ```
  ┌─────────────────────────────────────────────────────────┐
  │ Does the finding expose a secret that's still valid?     │
@@ -233,6 +242,9 @@ Resulting severity caps the grade per `_shared/report-format.md`.
 ---
 
 <a id="fix-recipes"></a>
+
+</details>
+
 ## 5. Fix recipes
 
 Patterns for the most common findings.
@@ -375,6 +387,9 @@ a CI skip, fix the setup composite.
 
 The report follows `_shared/report-format.md`:
 
+<details>
+<summary>How to read each report section</summary>
+
 ```
 === HANDOFF: security-scan ===
 Status: fail
@@ -406,6 +421,9 @@ Read in this order:
 ---
 
 <a id="cross-references"></a>
+
+</details>
+
 ## 8. Cross-references
 
 - SKILL.md - the phased scan workflow.

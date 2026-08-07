@@ -8,7 +8,8 @@
    * lets us preserve overloads (same name, different lines in
    * one file) and cross-file duplicates (e.g. a `parse` func
    * in several ecosystem-specific files) instead of silently
-   * dropping them like the old singleton shape did. */
+   * dropping them like the old singleton shape did.
+   */
   const symbols = window[Symbol.for('meander:syms')]
   if (!symbols || typeof symbols !== 'object') {
     return
@@ -53,7 +54,8 @@
 
   /* True when the match is the name at its own definition
    * line/file — we don't wrap those (a symbol shouldn't link
-   * to itself). Checks against every location in `locs`. */
+   * to itself). Checks against every location in `locs`.
+   */
   function isSelfReference(textNode, locs) {
     let table = textNode.closest ? textNode.closest('.code-table') : undefined
     if (!table) {
@@ -140,7 +142,8 @@
         /* Stash locs on the span. Single-location uses flat
          * data-* attrs (cheaper to read than JSON.parse). Multi-
          * location packs into one JSON attr so click + tooltip
-         * handlers can route without re-reading `symbols`. */
+         * handlers can route without re-reading `symbols`.
+         */
         const span = document.createElement('span')
         span.className = 'def-ref'
         span.setAttribute('data-def-name', name)
@@ -278,7 +281,8 @@
   /* Minimal disambiguator: browser-native prompt picks the
    * location number. Keeps the asset script dep-free. Consumers
    * that want a fancier popup can override by listening to the
-   * click earlier and calling preventDefault(). */
+   * click earlier and calling preventDefault().
+   */
   function pickLocation(locs) {
     if (locs.length === 1) {
       return locs[0]

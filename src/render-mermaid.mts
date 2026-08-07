@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
 /* The dom lib reference exists for the page.evaluate() callbacks
  * below — they execute inside the puppeteer-controlled browser
- * page, where window/document/Element/FontFace are real globals. */
+ * page, where window/document/Element/FontFace are real globals.
+ */
 /**
  * Build-time Mermaid → SVG renderer.
  *
@@ -53,7 +54,8 @@ export type MermaidRendererConfig = {
  *     collapsing them breaks arrows.
  *   - removeUnknownsAndDefaults: mermaid emits preserveAspectRatio
  *     variants that the default list wants to strip, but browsers
- *     use them. */
+ *     use them.
+ */
 const svgoConfig = {
   multipass: true,
   plugins: [
@@ -111,7 +113,8 @@ export async function createMermaidRenderer(
 
   /* Dynamic imports so consumers without mermaid/puppeteer/svgo
    * don't fail to load meander itself — only fail when they
-   * actually try to render a diagram. */
+   * actually try to render a diagram.
+   */
   let puppeteerMod: { launch: typeof puppeteer.launch }
   try {
     puppeteerMod = await import('puppeteer')
@@ -130,7 +133,8 @@ export async function createMermaidRenderer(
   await fs.mkdir(cacheDir, { recursive: true })
 
   /* Lazy-launch — pay the Chromium boot cost (~1-2s) only when
-   * there's a cache miss. Unchanged diagrams are pure disk reads. */
+   * there's a cache miss. Unchanged diagrams are pure disk reads.
+   */
   let browser: puppeteer.Browser | undefined = undefined
   const ensureBrowser = async (): Promise<puppeteer.Browser> => {
     if (!browser) {
@@ -179,14 +183,16 @@ export async function createMermaidRenderer(
           }
           /* Wait for fonts so mermaid measures labels against the
            * font that will actually paint. Without this, mermaid
-           * uses fallback metrics and labels overflow their nodes. */
+           * uses fallback metrics and labels overflow their nodes.
+           */
           await document.fonts.ready
           await Promise.allSettled(
             [...document.fonts].map((f: FontFace) => f.load()),
           )
           /* Real DOM-attached container — getBBox() returns stale
            * or zero metrics on detached nodes. Hidden via max-height
-           * + opacity rather than unmounted. */
+           * + opacity rather than unmounted.
+           */
           const container = document.createElement('div')
           Object.assign(container.style, {
             maxHeight: '0',
@@ -203,7 +209,8 @@ export async function createMermaidRenderer(
              * flowchart.htmlLabels is deprecated; forces <foreignObject>
              * labels that hit a max-width:200px clipping bug
              * (mermaid #5785). Top-level htmlLabels:false forces
-             * pure SVG <text>. */
+             * pure SVG <text>.
+             */
             htmlLabels: false,
             flowchart: {
               curve: 'basis',
@@ -230,7 +237,8 @@ export async function createMermaidRenderer(
       )
       const rawSvg = await page.$eval('#out svg', el => el.outerHTML)
       /* SVGO pass — mermaid occasionally emits constructs SVGO's
-       * parser dislikes; raw SVG on failure is visually correct. */
+       * parser dislikes; raw SVG on failure is visually correct.
+       */
       let finalSvg: string
       try {
         const optimized = svgoMod.optimize(
@@ -317,7 +325,8 @@ export async function preRenderMermaidBlocks(
    * still emit placeholders for the diagrams that failed (the
    * token stays in the HTML and the SVG map just won't have
    * an entry for it — `inlineMermaidSvgs` leaves such tokens
-   * as-is). */
+   * as-is).
+   */
   const results = await Promise.allSettled(pending)
   for (const [i, result] of results.entries()) {
     if (result.status === 'rejected') {

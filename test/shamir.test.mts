@@ -50,7 +50,8 @@ describe('shamir split/combine', () => {
      * checking that combine() with K-1 shares throws (and that
      * the threshold check is actually what trips). A statistical
      * test for randomness is out of scope — the algorithm's
-     * correctness around this is what GF(2^8) buys us. */
+     * correctness around this is what GF(2^8) buys us.
+     */
     const secret = crypto.randomBytes(32)
     const shares = split(secret, 3, 5)
     expect(() => combine([shares[0], shares[1]])).toThrow(/need >= 3/)
@@ -145,7 +146,8 @@ describe('shamir GF(2^8) sanity', () => {
   /* Indirect sanity: split + combine being inverses across many
    * random inputs is a strong end-to-end check on the field
    * arithmetic. If the multiplication/division tables were wrong,
-   * combine() would return garbage, not the original secret. */
+   * combine() would return garbage, not the original secret.
+   */
   it('round-trips 100 random secrets', () => {
     for (let i = 0; i < 100; i++) {
       const secret = crypto.randomBytes(32)

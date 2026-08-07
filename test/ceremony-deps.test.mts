@@ -162,7 +162,8 @@ describe('printShares', () => {
     const shares = split(new Uint8Array(Buffer.alloc(32, 0xde)), 2, 3)
     printShares(io, shares, 2, 'comment-store')
     /* The output should contain "Share 1 of 3" before
-     * "Share 2 of 3" before "Share 3 of 3". */
+     * "Share 2 of 3" before "Share 3 of 3".
+     */
     const idx1 = io.text().indexOf('Share 1 of 3')
     const idx2 = io.text().indexOf('Share 2 of 3')
     const idx3 = io.text().indexOf('Share 3 of 3')
@@ -181,7 +182,8 @@ describe('createEnvClient', () => {
     /* Each interceptor pins the exact per-method URL under
      * /v2/vals/val-id-42/... and requires `Bearer tok-xyz`; nock
      * only matches when both hold, so scope.isDone() proves every
-     * call carried the bound token + valId. */
+     * call carried the bound token + valId.
+     */
     const envPath = '/v2/vals/val-id-42/environment_variables'
     const scope = nock(VAL_API)
       .matchHeader('authorization', 'Bearer tok-xyz')
@@ -210,7 +212,8 @@ describe('createAdminClient', () => {
   it('keyAudit GETs /admin/key-audit with Bearer token', async () => {
     /* The interceptor's path pins the URL and matchHeader pins the
      * Bearer token — nock only replies when both match, so a green
-     * result + isDone() proves the request shape. */
+     * result + isDone() proves the request shape.
+     */
     const scope = nock('https://my-val.web.val.run')
       .get('/admin/key-audit')
       .matchHeader('authorization', 'Bearer admin-tok')
@@ -234,7 +237,8 @@ describe('createAdminClient', () => {
 
   it('rewrap POSTs JSON with the request body', async () => {
     /* The body arg makes nock match only when the POST payload
-     * deep-equals it, so isDone() confirms method + body. */
+     * deep-equals it, so isDone() confirms method + body.
+     */
     const scope = nock('https://x.web.val.run')
       .post('/admin/rewrap', {
         fromGeneration: 1,
@@ -254,7 +258,8 @@ describe('createAdminClient', () => {
 
   it('rewrap defaults batchSize to 100 when not provided', async () => {
     /* batchSize omitted by the caller must be sent as 100 — the
-     * body matcher fails (request unmatched) if it isn't. */
+     * body matcher fails (request unmatched) if it isn't.
+     */
     const scope = nock('https://x.web.val.run')
       .post('/admin/rewrap', {
         fromGeneration: 1,
@@ -323,7 +328,8 @@ describe('createIoChannel', () => {
    * test file (test/ceremony-deps-readline.test.mts) that
    * vi.mock()s `node:readline/promises` at module scope. ESM
    * namespaces can't be patched after import, so the mock has
-   * to live in its own file with hoisted vi.mock(). */
+   * to live in its own file with hoisted vi.mock().
+   */
 })
 
 /* ------------------------------------------------------------------ */

@@ -76,7 +76,8 @@ describe('generate opt-outs', () => {
     expect(existsSync(path.join(pages, 'meander.css'))).toBe(false)
     const index = readFileSync(path.join(pages, 'index.html'), 'utf-8')
     /* No reference to meander.css anywhere in the rendered
-     * page — not as a <link>, not as a preload. */
+     * page — not as a <link>, not as a preload.
+     */
     expect(index).not.toContain('meander.css')
   })
 
@@ -88,7 +89,8 @@ describe('generate opt-outs', () => {
     )
     /* theme.js reads localStorage under `meander:pages:theme` —
      * a unique-enough token that only the inlined script has it.
-     * Its absence signals the script was dropped. */
+     * Its absence signals the script was dropped.
+     */
     expect(index).not.toContain('meander:pages:theme')
   })
 

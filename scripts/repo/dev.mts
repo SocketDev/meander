@@ -29,6 +29,8 @@ import { serve } from '../../src/serve.mts'
 import type { ServeOptions } from '../../src/serve.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 
+import { isMainModule } from '../fleet/_shared/is-main-module.mts'
+
 const logger = getDefaultLogger()
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -49,7 +51,8 @@ async function main(): Promise<void> {
      * forever on its HTTP listener, so this promise is a
      * long-running sidecar. Any error escaping regenerate() is
      * logged + swallowed so a single bad save doesn't kill the
-     * dev loop. */
+     * dev loop.
+     */
     void startWatcher()
   }
 
@@ -59,7 +62,8 @@ async function main(): Promise<void> {
 async function startWatcher(): Promise<void> {
   /* Debounce window. Save-on-format triggers a burst of events
    * within ~50ms; 150ms catches them all while still feeling
-   * live. Tune up if you see duplicate regens. */
+   * live. Tune up if you see duplicate regens.
+   */
   const DEBOUNCE_MS = 150
   let pending = false
   let timer: NodeJS.Timeout | undefined = undefined
@@ -91,7 +95,8 @@ async function startWatcher(): Promise<void> {
    * writes from our own generate() would otherwise trigger an
    * infinite regen loop. Using both names handles the case
    * where the fixture still has a stale walkthrough/ sitting
-   * around from before the outDir rename. */
+   * around from before the outDir rename.
+   */
   const ignoredOutDirs = new Set(['pages', 'walkthrough'])
   const watchOne = async (dir: string, reason: string): Promise<void> => {
     try {
@@ -112,14 +117,17 @@ async function startWatcher(): Promise<void> {
   logger.log('→ watch: fixture sources + meander.config.json + assets/')
   /* Watchers are long-running loops; if one throws we still
    * want the other polling, so settle rather than all. Errors
-   * are already logged inside watchOne. */
+   * are already logged inside watchOne.
+   */
   await Promise.allSettled([
     watchOne(fixtureDir, 'fixture'),
     watchOne(assetsDir, 'assets'),
   ])
 }
 
-void main().catch((e: unknown) => {
-  logger.fail(String(e))
-  process.exitCode = 1
-})
+if (isMainModule(import.meta.url)) {
+  void main().catch((e: unknown) => {
+    logger.fail(String(e))
+    process.exitCode = 1
+  })
+}

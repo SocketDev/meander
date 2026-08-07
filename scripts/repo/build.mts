@@ -22,6 +22,7 @@ import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 import { build } from 'rolldown'
 
 import { cliBuildConfig } from '../../.config/repo/rolldown.cli.config.mts'
+import { isMainModule } from '../fleet/_shared/is-main-module.mts'
 import { errorMessage } from './utils/error-message.mts'
 import { runCommand } from './utils/run-command.mts'
 
@@ -51,7 +52,9 @@ export async function main(): Promise<void> {
   logger.success('build complete')
 }
 
-main().catch(e => {
-  logger.error(`Build failed: ${errorMessage(e)}`)
-  process.exitCode = 1
-})
+if (isMainModule(import.meta.url)) {
+  main().catch(e => {
+    logger.error(`Build failed: ${errorMessage(e)}`)
+    process.exitCode = 1
+  })
+}

@@ -42,7 +42,8 @@ export function base64Decode(s: string): Uint8Array {
 /* Base64 helpers that don't blow the stack on large payloads.
  * `btoa(String.fromCharCode(...arr))` apply-spreads the array,
  * which hits the engine's argument-count limit somewhere around
- * 100KB. Walkthrough HTML can be larger than that. */
+ * 100KB. Walkthrough HTML can be larger than that.
+ */
 export function base64Encode(bytes: Uint8Array): string {
   let s = ''
   for (let i = 0; i < bytes.length; i++) {

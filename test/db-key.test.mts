@@ -72,7 +72,8 @@ describe('dbKeyInit', () => {
 
   it('emits shares that round-trip through Shamir combine', async () => {
     /* Capture the printed shares and reconstruct the key from the
-     * threshold-many; the result must equal the planted hex. */
+     * threshold-many; the result must equal the planted hex.
+     */
     const deps = makeDeps({ randomWrappingKey: fixedKey(0x42) })
     await dbKeyInit({ threshold: 2, shares: 3 }, deps)
 
@@ -85,7 +86,8 @@ describe('dbKeyInit', () => {
     }
     expect(shareBase58).toHaveLength(3)
     /* (We don't combine here — that's tested exhaustively in
-     *  test/shamir.test.mts. Just sanity-check the wire format.) */
+     *  test/shamir.test.mts. Just sanity-check the wire format.)
+     */
     for (let i = 0, { length } = shareBase58; i < length; i += 1) {
       const s = shareBase58[i]
       expect(s).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/)
@@ -125,7 +127,8 @@ describe('dbKeyRotate', () => {
     }
     /* Default: a single batch fully drains. Tests that exercise
      * multi-batch loop or the stall-detection path supply their
-     * own scripted sequence. */
+     * own scripted sequence.
+     */
     const batches = opts.rewrapBatches ?? [{ rewrapped: 0, remaining: 0 }]
     let cursor = 0
     return makeDeps({
@@ -182,7 +185,8 @@ describe('dbKeyRotate', () => {
 
   it('refuses when reconstructed shares do not match the env key', async () => {
     /* Env says key is 0xaa, but we feed it shares of a different
-     * key (0xbb). Verification must reject. */
+     * key (0xbb). Verification must reject.
+     */
     const env = {
       MEANDER_DB_KEY_1: HEX_OF_BYTE(0xaa),
       MEANDER_DB_KEY_CURRENT: '1',
@@ -217,7 +221,8 @@ describe('dbKeyRotate', () => {
   it('refuses when current-generation key is missing on val (post-snapshot race)', async () => {
     /* Snapshot reports CURRENT=1 but the actual MEANDER_DB_KEY_1
      * env var was deleted between calls. Surfaces a clear error
-     * rather than calling rewrap with garbage. */
+     * rather than calling rewrap with garbage.
+     */
     const env: Record<string, string> = {
       MEANDER_DB_KEY_CURRENT: '1',
       /* Note: no MEANDER_DB_KEY_1 — but listEnvVarNames must
@@ -229,13 +234,15 @@ describe('dbKeyRotate', () => {
        * not in store; the snapshot still parses CURRENT and finds
        * generations from the store. Result: no entry for that
        * generation in env, getEnvVar(MEANDER_DB_KEY_1) returns
-       * undefined, the rotate path throws "not set on val". */
+       * undefined, the rotate path throws "not set on val".
+       */
       MEANDER_DB_KEY_2: HEX_OF_BYTE(0x22),
     }
     /* Snapshot will see [2] in generations and CURRENT=1 → it
      * believes the current generation is 1, but listEnvVarNames
      * doesn't include MEANDER_DB_KEY_1, so getEnvVar returns
-     * undefined. */
+     * undefined.
+     */
     const validShares = split(new Uint8Array(KEY_OF_BYTE(0x99)), 2, 3)
       .slice(0, 2)
       .map(encodeShare)
@@ -284,7 +291,8 @@ describe('dbKeyRestore', () => {
   it('refuses and leaves env untouched when shares match no existing generation', async () => {
     /* Env has gen 1 + 2 with two different keys; the operator's
      * shares reconstruct a *third* key. The drill must report the
-     * mismatch, not silently plant a generation on production. */
+     * mismatch, not silently plant a generation on production.
+     */
     const deps = makeDeps({
       envInitial: {
         MEANDER_DB_KEY_1: HEX_OF_BYTE(0x11),
@@ -439,7 +447,8 @@ describe('dbKeyRetire', () => {
   it('handles deleteEnvVar reporting "not present" gracefully', async () => {
     /* The pre-flight checks pass (audit says 0 rows) but the env
      * var was already deleted out-of-band. The CLI should report
-     * a no-op rather than throwing. */
+     * a no-op rather than throwing.
+     */
     const deps = makeDeps({
       envInitial: {
         MEANDER_DB_KEY_2: HEX_OF_BYTE(0x22),
@@ -447,12 +456,14 @@ describe('dbKeyRetire', () => {
         /* MEANDER_DB_KEY_1 listed via the snapshot, but
          * deleted between snapshot + delete by another caller.
          * We simulate that by NOT including it in store but
-         * making the snapshot find it via a custom env. */
+         * making the snapshot find it via a custom env.
+         */
       },
     })
     /* We can't easily simulate the race with FakeEnv. Instead,
      * bypass the snapshot guard by pre-seeding gen 1 then
-     * deleting it just before the call. */
+     * deleting it just before the call.
+     */
     deps.env.store.set('MEANDER_DB_KEY_1', HEX_OF_BYTE(0x11))
     deps.admin.audit = {
       visibleGenerations: [1, 2],
@@ -468,7 +479,8 @@ describe('dbKeyRetire', () => {
      * deletion returns false — that's a contrived situation
      * (Val Town's API would always 404 on a key that doesn't
      * exist). We test it by overriding deleteEnvVar to return
-     * false. */
+     * false.
+     */
     const realDelete = deps.env.deleteEnvVar.bind(deps.env)
     deps.env.deleteEnvVar = async (key: string) => {
       await realDelete(key) // actually delete

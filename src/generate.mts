@@ -2,7 +2,8 @@
  * (parse walkthrough comments -> sections -> symbol table -> per-page HTML
  * render -> post-process -> manifest). The render helpers share the
  * module-level asset/CDN/marked state and run only through generate(), so
- * the stages form one build unit rather than independently useful modules. */
+ * the stages form one build unit rather than independently useful modules.
+ */
 import {
   copyFileSync,
   existsSync,
@@ -76,7 +77,8 @@ const FILE_LANG: Record<string, string> = {
  * TypeScript grammar is loaded alongside the core bundle so
  * fenced ```typescript blocks in annotations (JSDoc @example)
  * highlight correctly — without it, hljs auto-detect often
- * mis-classes TS as JavaScript and loses generic syntax. */
+ * mis-classes TS as JavaScript and loses generic syntax.
+ */
 const HLJS_CDN = {
   css: 'https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css',
   cssSri:
@@ -104,7 +106,8 @@ const HLJS_SCRIPT_JS =
  * preload tells the UA "fetch this with high priority" so the
  * core bundle and the TypeScript grammar download in parallel
  * with the stylesheet rather than after it. SRI must match the
- * eventual <script>/<link> use, so the hashes are repeated. */
+ * eventual <script>/<link> use, so the hashes are repeated.
+ */
 const HLJS_PRELOAD_HINTS = [
   `<link rel="preconnect" href="https://unpkg.com" crossorigin="anonymous" />`,
   `<link rel="preload" as="style" href="${HLJS_CDN.css}" ` +
@@ -167,7 +170,8 @@ const JSDOC_TAGS = new Set([
  */
 /* Dedicated marked instance for annotation rendering. Setup
  * happens once (module-load side effect) so each render call
- * doesn't re-install hooks. */
+ * doesn't re-install hooks.
+ */
 const annotationMarked = new Marked({
   gfm: true,
   breaks: false,
@@ -175,7 +179,8 @@ const annotationMarked = new Marked({
    * an email — e.g. `core@7.0.0`, `name@1.2.3` get wrongly
    * classified by GFM's email tokenizer. Real emails
    * (`alice@example.com`) keep their mailto. The email
-   * classifier's shape check does the distinguishing. */
+   * classifier's shape check does the distinguishing.
+   */
   walkTokens(token: Tokens.Generic) {
     const href = token['href']
     if (
@@ -195,7 +200,8 @@ const annotationMarked = new Marked({
  * classifier (purl / email / scoped-package / url). Whichever
  * kind matches gets a semantically-classed chip; plain code
  * falls through to marked's default (returning false from the
- * renderer hook signals "use the default"). */
+ * renderer hook signals "use the default").
+ */
 annotationMarked.use({
   renderer: {
     codespan(token: Tokens.Codespan): string | false {
@@ -276,7 +282,8 @@ export type ResolvedDocRef = {
  * meander serves both. All end "…with meander" so the brand
  * sits at the end of the eye's path. JS picks one per page
  * load via the data-taglines attr; the first entry is the
- * no-JS fallback. */
+ * no-JS fallback.
+ */
 const DEFAULT_TAGLINES: readonly string[] = [
   'Begin your journey with meander',
   'Chart your course with meander',
@@ -455,7 +462,8 @@ export function buildSymbols(
      * overload signatures on separate lines) flow through
      * unchanged — the array shape preserves every location so
      * consumers can disambiguate instead of silently losing
-     * them. */
+     * them.
+     */
     if (name.length < 3) {
       continue
     }
@@ -520,7 +528,8 @@ export function extractSymbols(source: string): ExtractedSymbol[] {
 export function firstSignificantWord(title: string): string {
   /* Articles, conjunctions, short prepositions, and verb-particle
    * tails (`Setting *Up*`, `Rolling *Out*`) never carry the
-   * title's meaning — always skip. */
+   * title's meaning — always skip.
+   */
   const stop = new Set([
     '&',
     'a',
@@ -544,7 +553,8 @@ export function firstSignificantWord(title: string): string {
    * "Setting Up Y") read as connective tissue, not the topic.
    * When one of these leads AND a meaningful word follows, the
    * follower is the better label. When the gerund stands alone
-   * ("Getting") it's all we've got, so we keep it. */
+   * ("Getting") it's all we've got, so we keep it.
+   */
   const weakLead = new Set([
     'becoming',
     'building',
@@ -590,12 +600,14 @@ export async function generate(
    * ("path/to/file.md") and full objects ({ source, filename?,
    * title?, summary? }). Everything downstream works against the
    * normalized shape. Call sites that just need the source path
-   * can read `.source`. */
+   * can read `.source`.
+   */
   const documents = normalizeDocs(config.documents)
   const basePath = normaliseBasePath(options.basePath)
   const assetDir = normaliseAssetDir(options.assetDir)
   /* URL prefix for asset <href>/<src>: `{basePath}/{assetDir}/`.
-   * Both parts are optional. Empty → assets at site root, flat. */
+   * Both parts are optional. Empty → assets at site root, flat.
+   */
   const assetHref = (filename: string): string => {
     const segments = [basePath, assetDir, filename]
       // Trim leading/trailing slashes per segment: ^\/+ slashes at the
@@ -607,7 +619,8 @@ export async function generate(
 
   /* Resolve paths against the directory containing
    * .meander.config.json, not the caller's cwd. Lets `meander
-   * generate /any/path/.meander.config.json` work from any cwd. */
+   * generate /any/path/.meander.config.json` work from any cwd.
+   */
   const rootDir = path.resolve(configPath, '..')
 
   // Validate documents if present
@@ -632,7 +645,8 @@ export async function generate(
    * .meander.config.json doesn't set outDir. The resolved value
    * is used locally here and is the source of truth for the
    * Val Town blob prefix on publish — deploy-val injects it as
-   * MEANDER_OUT_DIR on the val so the serving side agrees. */
+   * MEANDER_OUT_DIR on the val so the serving side agrees.
+   */
   const outDirName = resolved.outDir
   const outDir = path.join(rootDir, outDirName)
   mkdirSync(outDir, { recursive: true })
@@ -645,7 +659,8 @@ export async function generate(
   const bundledAssetsDir = getAssetsDir()
   /* Non-comment scripts — always inlined (line-select is nav-ish
    * UX, sref is the symbol-reference link feature, doc-tabs/doc-toc
-   * power the documents page layout). */
+   * power the documents page layout).
+   */
   const lineSelectJs = readFileSync(
     path.join(bundledAssetsDir, 'line-select.js'),
     'utf-8',
@@ -669,7 +684,8 @@ export async function generate(
    * page never flashes light on a dark-preferring system.
    * theme.js only loads when theme is enabled — when the
    * consumer pinned to a single palette, we skip the toggle JS
-   * entirely rather than ship dead code. */
+   * entirely rather than ship dead code.
+   */
   const bootJs = readFileSync(path.join(bundledAssetsDir, 'boot.js'), 'utf-8')
   const themeJs = resolved.theme.enabled
     ? readFileSync(path.join(bundledAssetsDir, 'theme.js'), 'utf-8')
@@ -692,7 +708,8 @@ export async function generate(
   )
   /* Footer tagline rotator runs on every page (footer is global)
    * so it lives in headJs alongside boot + theme. ~30 lines of
-   * inlined JS — cheaper than a separate <script> request. */
+   * inlined JS — cheaper than a separate <script> request.
+   */
   const footerTaglineJs =
     config.footer === false
       ? ''
@@ -723,7 +740,8 @@ export async function generate(
   /* Service worker — emit sw.js with the consumer's version
    * token replacing __MEANDER_CACHE_VERSION__, plus an inline
    * registration script gated on non-localhost (dev servers
-   * shouldn't cache between reloads). */
+   * shouldn't cache between reloads).
+   */
   const swEnabled = !!config.serviceWorker
   const swOpts =
     typeof config.serviceWorker === 'object' ? config.serviceWorker : undefined
@@ -736,7 +754,8 @@ export async function generate(
     /* Minify the SW when the consumer opted in. Its Service-
      * Worker registration-gated bytes decide the install hash,
      * so shrinking here is strictly a bytes-over-the-wire win —
-     * no correctness impact. */
+     * no correctness impact.
+     */
     const minifyJsHere =
       !!config.minify &&
       (typeof config.minify === 'object' ? config.minify.js !== false : true)
@@ -745,7 +764,8 @@ export async function generate(
       swOut = await m.minifyAsset(swOut, 'js')
     }
     /* sw.js must land at origin root (or basePath root) so its
-     * scope covers the whole site. */
+     * scope covers the whole site.
+     */
     writeFileSync(path.join(outDir, 'sw.js'), swOut)
     swRegisterJs = `
 if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
@@ -760,7 +780,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * enabled. Consumers shipping their own system (e.g. encrypted
    * or SSO-gated) can set `comments: false` in
    * .meander.config.json to drop the default client + its
-   * API-endpoint assumptions. */
+   * API-endpoint assumptions.
+   */
   const commentsEnabled = resolved.comments.enabled
   const commentClientJs = commentsEnabled
     ? readFileSync(path.join(bundledAssetsDir, 'comment-client.js'), 'utf-8')
@@ -823,7 +844,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * Skipped entirely when `styles: false` (the consumer is
    * shipping their own stylesheet via headExtra or equivalent).
    * The template still has a <link> tag — gated below — so when
-   * styles are off, no CSS file lands AND no link points at it. */
+   * styles are off, no CSS file lands AND no link points at it.
+   */
   const emitStyles = resolved.styles.base
   if (emitStyles) {
     let css = readFileSync(path.join(bundledAssetsDir, 'meander.css'), 'utf-8')
@@ -844,7 +866,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * can override individual sizes via meander.config.json's
    * `favicon` key, or set `favicon: false` to skip entirely.
    * Assets land at the output-dir root so <link href="/..."> +
-   * basePath rewrites work uniformly. */
+   * basePath rewrites work uniformly.
+   */
   const faviconOpt = config.favicon
   const faviconEnabled = faviconOpt !== false
   type FaviconAssets = {
@@ -863,7 +886,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     /* For each slot, prefer the consumer's override path
      * (resolved relative to meander.config.json's dir), falling
      * back to the bundled default if the override isn't
-     * provided or doesn't exist. */
+     * provided or doesn't exist.
+     */
     const resolveOverride = (p?: string | undefined): string | undefined => {
       if (!p) {
         return undefined
@@ -892,7 +916,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
 
   /* Assemble the <link> + <meta> tags injected into every
    * rendered page's <head>. Uses assetHref so basePath /
-   * assetDir rewrites apply. */
+   * assetDir rewrites apply.
+   */
   const faviconTags = faviconEnabled
     ? [
         faviconAssets.svg &&
@@ -913,7 +938,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   /* theme-color meta — either a single color or per-scheme
    * light/dark variants. Emitted as zero, one, or two meta tags.
    * Consumers that didn't opt in get no theme-color (browsers
-   * use their default). */
+   * use their default).
+   */
   const themeColor =
     faviconOpt && typeof faviconOpt === 'object'
       ? faviconOpt.themeColor
@@ -933,7 +959,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
 
   /* headJs is injected synchronously in <head> so theme.js can
    * write <html data-theme> before first paint — no flash of
-   * light theme on dark-preferring systems. */
+   * light theme on dark-preferring systems.
+   */
   const headJsTag = `<script>${headJs}</script>`
   const headExtra = [faviconTags, themeColorTags, headJsTag]
     .filter(Boolean)
@@ -946,17 +973,20 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * <body>; comment-client.js reads it (if present) and
    * prefixes its fetch URLs. Omit when same-origin hosting
    * (Val Town itself) is in play — comments route to
-   * /<slug>/api/comments alongside the HTML. */
+   * /<slug>/api/comments alongside the HTML.
+   */
   /* Body-level attributes emitted on every page. commentBackend
    * steers the comment client at an off-origin val; demoMode
    * toggles the read-only banner + composer disable in the
    * client. Both appear on part pages, documents pages, AND the
-   * index so the banner shows up everywhere the reader lands. */
+   * index so the banner shows up everywhere the reader lands.
+   */
   /* Map of part-id → title, surfaced to client-side modules
    * (unresolved-comments group headers, etc.) so they can render
    * the title alongside the number without an extra fetch. Keyed
    * by id (not array index) so out-of-order or sparsely-numbered
-   * parts still resolve. */
+   * parts still resolve.
+   */
   const partTitlesById = JSON.stringify(
     Object.fromEntries(parts.map(p => [String(p.id), p.title])),
   )
@@ -977,7 +1007,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    *      post-minify) and injects a <meta> tag with sha256
    *      hashes.
    *   3. SRI — attribute-only; adds integrity= to <script src>
-   *      and <link>. Doesn't touch inline content. */
+   *      and <link>. Doesn't touch inline content.
+   */
   const minifyCfg = config.minify
   const minifyEnabled = !!minifyCfg
   const minifyOpts = typeof minifyCfg === 'object' ? minifyCfg : undefined
@@ -1000,7 +1031,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   }
   /* Lazy-loaded URL rewriter for user-authored root-relative
    * links that bypassed the build-time assetHref/partUrl
-   * helpers. Only imported when basePath is non-empty. */
+   * helpers. Only imported when basePath is non-empty.
+   */
   let urlRewriteMod: {
     applyBasePathToHtml: typeof applyBasePathToHtml
   } | null = null
@@ -1043,7 +1075,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     /* Total code lines across every section in this part — the
      * signal sizeTier() consumes. Counts code lines, not
      * annotation lines, since the reading effort scales with
-     * code volume more than prose. */
+     * code volume more than prose.
+     */
     let lineTotal = 0
     for (const s of partSections) {
       lineTotal += s.code.split('\n').length
@@ -1071,7 +1104,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   /* Build a part-id → kind map. Default is 'code' (most parts
    * are code walkthroughs); per-part `kind` in the config wins
    * when set. The row layout uses this to render the leading
-   * kind glyph and to decide whether the trail is mixed-kind. */
+   * kind glyph and to decide whether the trail is mixed-kind.
+   */
   const partKinds = new Map<number, 'code' | 'article'>()
   for (const part of parts) {
     partKinds.set(part.id, part.kind ?? 'code')
@@ -1102,7 +1136,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
      * shared across every doc's pre-pass so the Chromium boot
      * cost is paid at most once. `config.mermaid` can be `true`
      * (defaults), `false` / missing (disabled), or an object
-     * with theme + cacheDir overrides. */
+     * with theme + cacheDir overrides.
+     */
     let mermaidRenderer: MermaidRenderer | null = null
     if (config.mermaid) {
       const { createMermaidRenderer } = await import('./render-mermaid.mts')
@@ -1163,7 +1198,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     /* manifest.documents keeps the legacy string[] shape (paths
      * only) so consumers parsing the manifest aren't broken by
      * the schema expansion. Extended metadata is available via
-     * the richer meander.config.json they already have. */
+     * the richer meander.config.json they already have.
+     */
     documents: documents.map(d => d.source),
     parts: parts.map(part => {
       const partSections = sectionsByPart.get(part.id) ?? []
@@ -1176,7 +1212,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
         /* Per-section metadata for consumers that want to reshape
          * the tour without reparsing emitted HTML. Additive to
          * the earlier shape — `sections: <count>` stays for
-         * backwards compat; full records live under `sectionList`. */
+         * backwards compat; full records live under `sectionList`.
+         */
         sectionList: partSections.map(s => ({
           id: s.id,
           file: s.file,
@@ -1195,7 +1232,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * following the llmstxt.org convention. llms.txt is a
    * linked index; llms-full.txt is the index + the markdown
    * source of every referenced doc concatenated so an agent
-   * can ingest the whole walkthrough in one pass. */
+   * can ingest the whole walkthrough in one pass.
+   */
   if (config.llmsIndex) {
     const llmsOpts =
       typeof config.llmsIndex === 'object' ? config.llmsIndex : undefined
@@ -1211,7 +1249,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     const docLines = documents.map(d => {
       /* Prefer the clean /slug/docs/<filename> URL when the
        * consumer set a filename; fall back to the legacy
-       * #anchor form on the combined documents page. */
+       * #anchor form on the combined documents page.
+       */
       const url = d.filename
         ? abs(`${basePath}/${slug}/docs/${d.filename}`)
         : abs(`${basePath}/${slug}/documents#${encodeURIComponent(d.source)}`)
@@ -1229,7 +1268,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
     /* llms-full.txt — the index plus every doc's raw markdown
      * body, separated by `---`. Parts only have source code
      * annotations (no standalone markdown), so they're
-     * surfaced by URL reference only. */
+     * surfaced by URL reference only.
+     */
     const fullChunks: string[] = [llmsTxt]
     for (const d of documents) {
       const fullDocPath = path.join(rootDir, d.source)
@@ -1247,7 +1287,8 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * source file referenced from another file's prose or code
    * jumps to its walkthrough location). One file may have many
    * sections; the first one's id is the "entry point" anchor,
-   * same as what downstream consumers typically pick. */
+   * same as what downstream consumers typically pick.
+   */
   const fileAnchors: Record<string, string> = {}
   for (const section of sections) {
     if (!(section.file in fileAnchors)) {
@@ -1439,7 +1480,8 @@ export function renderAnnotationMarkdown(markdown: string): string {
   }
   /* Preamble becomes a synthetic @description when no explicit
    * one exists. Keeps the "description leads the card stack"
-   * ordering while still surfacing free-floating prose. */
+   * ordering while still surfacing free-floating prose.
+   */
   if (preamble !== null && !hasExplicitDescription) {
     const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
     blocks.push({
@@ -1452,7 +1494,8 @@ export function renderAnnotationMarkdown(markdown: string): string {
     })
   } else if (preamble !== null) {
     /* Explicit @description exists — keep the preamble as plain
-     * prose above the cards so nothing is silently dropped. */
+     * prose above the cards so nothing is silently dropped.
+     */
     const bodyHtml = polishProse(annotationMarked.parse(preamble) as string)
     blocks.unshift({
       html: `<div class="annotation-prose">${bodyHtml}</div>`,
@@ -1627,7 +1670,8 @@ export function renderFooter(
    */
   if (cfg.text) {
     /* Custom text: render as a single linked phrase. Consumer
-     * picks the entire copy; we don't tease apart "meander". */
+     * picks the entire copy; we don't tease apart "meander".
+     */
     return `<footer class="mdr-footer">
     <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.text)}</a>
   </footer>`
@@ -1639,7 +1683,8 @@ export function renderFooter(
    * the literal word "meander"; the prefix is plain text and
    * the rotator only swaps the prefix span. If a consumer's
    * pool breaks the convention, fall back to the legacy
-   * whole-string-as-link behavior. */
+   * whole-string-as-link behavior.
+   */
   const split = pool.map(splitTagline)
   const allStandard = split.every(s => s.isStandard)
   if (!allStandard) {
@@ -1686,7 +1731,8 @@ export function renderIndexHtml(
 ): string {
   /* Document rows merge into the trail at row layout — count them
    * for the auto-promote threshold. Card layout keeps the legacy
-   * "Docs" tile so the threshold ignores them there. */
+   * "Docs" tile so the threshold ignores them there.
+   */
   const effectiveLayout = resolveIndexLayout(
     layout,
     parts.length + (layout === 'cards' ? 0 : documents.length),
@@ -1703,7 +1749,8 @@ export function renderIndexHtml(
    * Hero description runs through polishProse like every other
    * prose surface — number highlighting + parenthetical italics
    * stay consistent across pages. The description markdown is
-   * inline (no headings), so anchorifyHeadings is a no-op here. */
+   * inline (no headings), so anchorifyHeadings is a no-op here.
+   */
   const heroHtml = hero
     ? `<section class="mdr-hero">
     ${hero.subtitle ? `<p class="mdr-hero-subtitle">${escapeHtml(hero.subtitle)}</p>` : ''}
@@ -1776,7 +1823,8 @@ export async function renderMarkdownDocument(
   /* Pre-pass: swap ```mermaid fences for opaque tokens so marked
    * doesn't try to highlight them. SVGs are inlined after
    * marked.parse + polishers so we don't run the HTML transforms
-   * over every diagram's <text>/<path>. */
+   * over every diagram's <text>/<path>.
+   */
   let mermaidSvgs: Map<string, string> | null = null
   if (mermaidRenderer) {
     const { preRenderMermaidBlocks } = await import('./render-mermaid.mts')
@@ -1878,7 +1926,8 @@ export async function renderMarkdownDocument(
    *   - italicize parentheticals.
    * Runs before wrapBlocks so block-wrapping logic sees the
    * transformed markup — headings carry their new ids when they
-   * become anchor targets, tree blocks carry their classes. */
+   * become anchor targets, tree blocks carry their classes.
+   */
   let polishedHtml = polishProse(rawHtml)
 
   if (mermaidSvgs && mermaidSvgs.size > 0) {
@@ -1923,7 +1972,8 @@ export function renderPartHtml(
   const orderedFiles = part.files.filter(file => sectionsByFile.has(file))
 
   /* Stable anchor ID per file — for jump-to-file menu links and
-   * IntersectionObserver-driven "current file" highlighting. */
+   * IntersectionObserver-driven "current file" highlighting.
+   */
   const fileAnchor = (file: string): string =>
     // Trim hyphens left by the replaceAll: ^-+ one or more hyphens at
     // the start, or (|) -+$ one or more hyphens at the end.
@@ -1941,7 +1991,8 @@ export function renderPartHtml(
       /* Section row labels used by both the file-head sections
        * menu AND every per-chunk chip that clones from it. The
        * section's id is the anchor target (matches what each
-       * .code-section emits as its DOM id). */
+       * .code-section emits as its DOM id).
+       */
       const sectionRows = fileSections
         .map((section, i) => {
           const label = `Section ${i + 1}`
@@ -1970,7 +2021,8 @@ export function renderPartHtml(
            * nav-menus.js and marks this chunk's anchor active.
            * Empty panel on disk saves repeat markup when a file
            * has many sections. Suppressed on single-section
-           * files — nothing to navigate to. */
+           * files — nothing to navigate to.
+           */
           const chip =
             fileSections.length > 1
               ? `  <details class="mdr-sections-menu mdr-section-chip" data-sections-for="${thisAnchor}" data-active-id="${section.id}">
@@ -1989,7 +2041,8 @@ ${chip}  <pre><table class="code-table" data-file="${escapeHtml(section.file)}">
         .join('\n')
 
       /* Only render the jump-to-file menu when there are at least
-       * two files — a dropdown with one row is noise. */
+       * two files — a dropdown with one row is noise.
+       */
       const pathCell =
         fileEntries.length > 1
           ? `<details class="mdr-files-menu">
@@ -2006,7 +2059,8 @@ ${fileEntries
           : `<span class="path">${escapeHtml(file)}</span>`
 
       /* Same rule: ≥2 sections → dropdown, single section →
-       * plain count text (no useless menu). */
+       * plain count text (no useless menu).
+       */
       const countCell =
         fileSections.length > 1
           ? `<details class="mdr-sections-menu">
@@ -2032,7 +2086,8 @@ ${sectionRows}
   /* hotlinks.js reads this to resolve `./foo.js` quoted paths
    * inside code back to a .file-block anchor on this page.
    * Tuple form keeps the JSON small when a part has many
-   * files. */
+   * files.
+   */
   const fileAnchorData = JSON.stringify(
     fileEntries.map(f => [f.path, f.anchor]),
   )
@@ -2084,7 +2139,8 @@ export function renderPartNav(
   /* Three-zone pill strip: label, part pills (with compact
    * one-word titles via firstSignificantWord), then docs pill
    * (when present). Label + docs are styled separately so the
-   * eye reads "Topics: A B C | Docs" as one nav block. */
+   * eye reads "Topics: A B C | Docs" as one nav block.
+   */
   const label = `<span class="mdr-parts-label">Topics:</span>`
   const partLinks = parts
     .map(part => {
@@ -2167,7 +2223,8 @@ export function renderTrailList(
 
   /* Hide the kind glyph when every row is the same kind — at that
    * point the column reads as visual noise. The class on .mdr-trail
-   * lets the CSS suppress display without re-rendering. */
+   * lets the CSS suppress display without re-rendering.
+   */
   const kinds = new Set(allRows.map(r => r.kind))
   const mixedKinds = kinds.size > 1
   const trailClasses =
@@ -2175,7 +2232,8 @@ export function renderTrailList(
 
   /* Filter input only when the list is long enough to warrant
    * one. Below 24 rows the user can scan; above, search earns
-   * its keep. */
+   * its keep.
+   */
   const filterUi =
     totalCount >= 24
       ? `<div class="mdr-trail-toolbar">
@@ -2352,7 +2410,8 @@ export function slugifyHeading(text: string): string {
  * style them per-kind. Helpers return a full HTML string on
  * match or `null` to fall through to marked's default. The
  * codespan renderer tries them in decreasing specificity so a
- * PURL (which could also pass isUrl broadly) is caught first. */
+ * PURL (which could also pass isUrl broadly) is caught first.
+ */
 
 export function span(cls: string, content: string) {
   return `<span class="${cls}">${escapeHtml(content)}</span>`
@@ -2432,7 +2491,8 @@ export function splitAnnotationByTags(markdown: string): Array<
  * prefix as plain text and the brand word as the actual link.
  * Taglines that don't end with " meander" round-trip unchanged
  * (consumer override) and the rotator falls back to wrapping
- * the whole string. */
+ * the whole string.
+ */
 export function splitTagline(tagline: string): {
   prefix: string
   isStandard: boolean

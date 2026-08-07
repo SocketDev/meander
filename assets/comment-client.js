@@ -18,7 +18,8 @@ const logger = getDefaultLogger()
    * is hosted off-origin (GH Pages, Cloudflare Pages, etc.) and
    * the comment API lives on a Val Town val at the given URL.
    * Without the attribute we assume same-origin (Val Town
-   * serving both HTML + API) and hit /<slug>/api/comments. */
+   * serving both HTML + API) and hit /<slug>/api/comments.
+   */
   const backendBase = (
     document.body.getAttribute('data-comment-backend') || ''
   ).replace(/\/+$/, '')
@@ -34,13 +35,15 @@ const logger = getDefaultLogger()
   /* ------------------------------------------------------------------ */
 
   /* localStorage keys. Versioned so a schema change can force all
-   * sessions to re-sign-in by bumping the suffix. */
+   * sessions to re-sign-in by bumping the suffix.
+   */
   const TOKEN_KEY = 'meander:auth:v1:token'
   const EMAIL_KEY = 'meander:auth:v1:email'
   const authBase = backendBase ? backendBase + '/api/auth' : '/api/auth'
   /* Demo-mode flag is set at runtime from GET /api/auth/me. When
    * true, writes fail server-side with 403 — we show a banner +
-   * visually dim the composer rather than hiding it. */
+   * visually dim the composer rather than hiding it.
+   */
   const demoMode = document.body.getAttribute('data-demo-mode') === 'true'
 
   const FETCH_TIMEOUT_MS = 10_000
@@ -116,7 +119,8 @@ const logger = getDefaultLogger()
   /* Publish the session to sibling scripts in the inlined bundle
    * (export-comments.js) so the bearer token has exactly one owner
    * and one localStorage key. Sibling scripts are concatenated
-   * after this one, so `ns.auth` is set before they run. */
+   * after this one, so `ns.auth` is set before they run.
+   */
   const ns = (window[Symbol.for('meander:pages')] ??= {})
   ns.auth = {
     fetch: authFetch,
@@ -303,7 +307,8 @@ const logger = getDefaultLogger()
   /* Lazy auth widget — only renders when the user is signed in
    * (showing their email + a sign-out affordance). When signed
    * out the widget is absent; the sign-in prompt fires lazily
-   * from "+ Comment" / Reply / Resolve actions instead. */
+   * from "+ Comment" / Reply / Resolve actions instead.
+   */
   function renderAuthUi() {
     const existing = document.querySelector('.mdr-auth')
     if (existing) {
@@ -671,7 +676,8 @@ const logger = getDefaultLogger()
          * sighted users still see the same dot. tabindex=0 makes
          * it focusable, role=button announces it correctly, and
          * aria-expanded reflects the panel state (toggled below
-         * by the click handler). */
+         * by the click handler).
+         */
         dot.setAttribute('role', 'button')
         dot.setAttribute('tabindex', '0')
         dot.setAttribute('aria-label', indicatorLabel)

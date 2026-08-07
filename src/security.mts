@@ -220,7 +220,8 @@ export async function injectSriIntegrity(
       return (remoteHosts ?? []).some(h => parsed.host === h)
       /* v8 ignore next 3 -- any `https://` prefix is parseable by
        * URL(); the catch is only reached for pathological Unicode
-       * input we don't exercise. */
+       * input we don't exercise.
+       */
     } catch {
       return false
     }
@@ -285,7 +286,8 @@ export async function injectSriIntegrity(
    * other tags. Failures are logged inside resolveIntegrity;
    * the integrityByRef map just won't have a hash for the
    * failing ref, and the later write loop skips tags with
-   * no hash. */
+   * no hash.
+   */
   await Promise.allSettled(
     candidates.map(el => {
       const ref = getRef(el)

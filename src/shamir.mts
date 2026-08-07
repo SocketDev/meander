@@ -28,7 +28,8 @@ const VERSION = 0x01
 /* GF(2^8) tables, AES-style: irreducible polynomial 0x11b. The exp
  * table indexes powers of the generator g = 0x03 (primitive root in
  * GF(2^8) under this polynomial); log is its inverse. Building once
- * at module load keeps multiply / divide constant-time table lookups. */
+ * at module load keeps multiply / divide constant-time table lookups.
+ */
 const EXP = new Uint8Array(512)
 const LOG = new Uint8Array(256)
 {
@@ -37,7 +38,8 @@ const LOG = new Uint8Array(256)
     EXP[i] = x
     LOG[x] = i
     /* Multiply by g = 0x03 in GF(2^8) under x^8 + x^4 + x^3 + x + 1.
-     * 0x03 * x = (x << 1) ^ x; reduce mod 0x11b when bit 8 sets. */
+     * 0x03 * x = (x << 1) ^ x; reduce mod 0x11b when bit 8 sets.
+     */
     let next = (x << 1) ^ x
     if (next & 0x1_00) {
       next ^= 0x1_1b
@@ -69,7 +71,8 @@ export function combine(shares: Uint8Array[]): Uint8Array {
   }
   /* Validate header consistency. All shares must carry the same
    * version + threshold and have matching length, and their
-   * x-coordinates must be distinct + nonzero. */
+   * x-coordinates must be distinct + nonzero.
+   */
   const first = shares[0]!
   if (first.length < 4) {
     throw new Error('shamir.combine: share too short')
@@ -107,7 +110,8 @@ export function combine(shares: Uint8Array[]): Uint8Array {
 
   /* Lagrange interpolation at x = 0. We only need the threshold
    * shares; extras are ignored (taking exactly `threshold` keeps
-   * the math the same and the output identical). */
+   * the math the same and the output identical).
+   */
   const used = shares.slice(0, threshold)
   const out = new Uint8Array(bodyLen)
   for (let byteIdx = 0; byteIdx < bodyLen; byteIdx++) {
@@ -116,7 +120,8 @@ export function combine(shares: Uint8Array[]): Uint8Array {
       const xi = used[i]![2]!
       const yi = used[i]![3 + byteIdx]!
       /* Lagrange basis: prod_{j != i} (0 - xj) / (xi - xj).
-       * In GF(2^8) subtraction is XOR, so 0 - xj = xj. */
+       * In GF(2^8) subtraction is XOR, so 0 - xj = xj.
+       */
       let num = 1
       let den = 1
       for (let j = 0; j < used.length; j++) {
@@ -177,7 +182,8 @@ export function encodeShare(share: Uint8Array): string {
    * Without this, a share starting with 0x00 would lose a byte on
    * round-trip. Our shares start with the version byte (0x01) so
    * this never fires today, but it would silently break if the
-   * format ever evolved. */
+   * format ever evolved.
+   */
   for (const b of share) {
     if (b === 0) {
       out = '1' + out
@@ -243,7 +249,8 @@ export function split(
   const out: Uint8Array[] = []
   for (let s = 1; s <= shares; s++) {
     /* 3-byte header: version, threshold, x. Body is `secret.length`
-     * y-bytes, one per byte of the secret. */
+     * y-bytes, one per byte of the secret.
+     */
     const buf = new Uint8Array(3 + secret.length)
     buf[0] = VERSION
     buf[1] = threshold
@@ -254,7 +261,8 @@ export function split(
   /* For each byte of the secret, build a fresh random polynomial
    * with that byte as the constant term, then evaluate at every
    * share's x-coordinate. Random coefficients come from the OS
-   * CSPRNG — this is the line that makes Shamir actually secure. */
+   * CSPRNG — this is the line that makes Shamir actually secure.
+   */
   for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
     const coeffs = new Uint8Array(threshold)
     coeffs[0] = secret[byteIdx]!

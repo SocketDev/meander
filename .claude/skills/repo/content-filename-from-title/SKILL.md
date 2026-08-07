@@ -167,6 +167,9 @@ outweighs individually-optimal word choice.
 These titles are hypothetical meander walkthrough parts. Each
 example shows the rule that produced the filename.
 
+<details>
+<summary>The worked examples, start to finish</summary>
+
 <example id="1">
 <title>Anatomy of a Walkthrough</title>
 <filename>anatomy</filename>
@@ -227,7 +230,12 @@ Title is already a single content noun. Step 5: lowercase it.
 </reasoning>
 </example>
 
+</details>
+
 ## Counter-examples - choices the procedure rejects
+
+<details>
+<summary>The counter-examples and why each is rejected</summary>
 
 <example id="bad-1">
 <title>Building & Emitting Pages</title>
@@ -283,6 +291,9 @@ walkthrough is about (e.g. `integration`, `webhooks`,
 </examples>
 
 <checklist>
+
+</details>
+
 ## Checklist before adding a filename to `meander.config.json`
 
 ```

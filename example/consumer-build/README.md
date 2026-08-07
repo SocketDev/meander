@@ -80,6 +80,9 @@ Requirements:
 The simplest zero-cost hosting path. meander emits static HTML;
 GitHub Pages serves it.
 
+<details>
+<summary>The GitHub Pages deploy steps</summary>
+
 ```yaml
 # .github/workflows/pages.yml
 jobs:
@@ -108,3 +111,5 @@ project-level Pages deploy at the root, drop the option.
 See meander's own
 [`.github/workflows/pages.yml`](../../.github/workflows/pages.yml)
 for a working reference.
+
+</details>

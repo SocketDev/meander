@@ -49,7 +49,8 @@ describe('applyBasePathToHtml', () => {
 
   it('handles the basePath-exact-match edge', () => {
     /* href="/meander" (no trailing slash) should stay as-is, not
-     * become "/meander/meander". */
+     * become "/meander/meander".
+     */
     const html = '<a href="/meander">home</a>'
     const out = applyBasePathToHtml(html, '/meander')
     expect(out).toContain('href="/meander"')

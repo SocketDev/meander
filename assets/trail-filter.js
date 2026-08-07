@@ -6,7 +6,8 @@
  * Match is case-insensitive substring across the row's title +
  * summary text + data-keywords (which carries the part's
  * config-declared keywords as a space-joined string). The count
- * pill updates on every keystroke for live feedback. */
+ * pill updates on every keystroke for live feedback.
+ */
 ;(function () {
   'use strict'
 
@@ -29,7 +30,8 @@
 
     /* Pre-tokenise each row's haystack once so every keystroke
      * compares strings, not DOM. Keywords live on a data attr;
-     * title + summary come from the rendered text content. */
+     * title + summary come from the rendered text content.
+     */
     const haystacks = rows.map(row => {
       const titleEl = row.querySelector('.mdr-trail-title')
       const summaryEl = row.querySelector('.mdr-trail-summary')
@@ -64,7 +66,8 @@
     input.addEventListener('input', applyFilter)
     /* Esc clears the field — common a11y pattern for type-ahead
      * filters; keeps the input focused so the user can keep
-     * typing without re-clicking. */
+     * typing without re-clicking.
+     */
     input.addEventListener('keydown', e => {
       if (e.key === 'Escape' && input.value !== '') {
         input.value = ''

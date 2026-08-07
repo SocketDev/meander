@@ -10,7 +10,8 @@
  *
  * The DOM-building bit (topbar toggle button) is registered as a
  * boot phase so it runs after DOMContentLoaded — that's when
- * `.topbar` exists to host the button. */
+ * `.topbar` exists to host the button.
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -62,7 +63,8 @@
   }
   /* storageSet removes the key on `null` only — passing `undefined`
    * stores the literal string "undefined", which leaves a stale key
-   * behind instead of returning the reader to OS-following. */
+   * behind instead of returning the reader to OS-following.
+   */
   const persistTheme = theme =>
     // oxlint-disable-next-line socket/prefer-undefined-over-null -- storageSet's contract is `null ⇒ removeItem`; `undefined` takes the setItem branch and stores the string "undefined".
     storageSet(THEME_KEY, theme === 'system' ? null : theme)
@@ -76,7 +78,8 @@
   }
 
   /* Apply stored or system-preferred theme synchronously to avoid a
-   * flash of light theme on dark-preferring systems. */
+   * flash of light theme on dark-preferring systems.
+   */
   applyTheme(resolveTheme(readStoredTheme()))
 
   if (window.matchMedia) {
@@ -115,7 +118,8 @@
     /* The button always offers the opposite of what is on screen,
      * so both the icon and the label are derived from the RESOLVED
      * theme rather than from the stored preference — with nothing
-     * stored, the stored value ("system") names no icon. */
+     * stored, the stored value ("system") names no icon.
+     */
     const render = () => {
       const resolved = resolveTheme(readStoredTheme())
       const label = `Switch to ${resolved === 'dark' ? 'light' : 'dark'} theme`
@@ -133,7 +137,8 @@
        * returns the reader to OS-following without a third control.
        * It also keeps the button live when the OS flipped underneath
        * a stored override: the target still differs from what is on
-       * screen, so the press always visibly changes something. */
+       * screen, so the press always visibly changes something.
+       */
       persistTheme(target === systemTheme() ? 'system' : target)
       applyTheme(target)
       render()

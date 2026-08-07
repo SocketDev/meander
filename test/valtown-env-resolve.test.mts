@@ -13,7 +13,8 @@ const aliasMock = vi.fn()
 
 vi.mock(import('@valtown/sdk'), () => {
   /* The real export is a class — `new ValTown({...})` in production.
-   * Provide a stub class whose instances expose the same shape. */
+   * Provide a stub class whose instances expose the same shape.
+   */
   class FakeValTown {
     me = { profile: { retrieve: profileMock } }
     alias = { username: { valName: { retrieve: aliasMock } } }

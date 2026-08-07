@@ -89,7 +89,8 @@ export async function publish(
    * keys use. Default "pages"; consumer can override via
    * meander.config.json. Must match what deploy-val set as the
    * val's MEANDER_OUT_DIR env var — otherwise the val looks in
-   * the wrong prefix and serves 404s. */
+   * the wrong prefix and serves 404s.
+   */
   const outDirName =
     typeof config.outDir === 'string' &&
     /^[a-z0-9][a-z0-9-]*$/.test(config.outDir)
@@ -115,7 +116,8 @@ export async function publish(
    * the walkthrough is public. Publishing plaintext skips this and
    * relaxes the record only after the last upload, below — either
    * way the recorded flag is the more restrictive of the old and new
-   * states for the whole of the transition. */
+   * states for the whole of the transition.
+   */
   if (encryptBlobsEnabled) {
     await recordPublishedVisibility(token, { slug, isPrivate: true })
   }
@@ -157,7 +159,8 @@ export async function publish(
   await uploadBlob(token, `${outDirName}/${slug}/manifest.json`, manifest)
 
   /* Settle the record once every blob is up. This is what opens a
-   * walkthrough that was private and is now published in plaintext. */
+   * walkthrough that was private and is now published in plaintext.
+   */
   await recordPublishedVisibility(token, {
     slug,
     isPrivate: encryptBlobsEnabled,

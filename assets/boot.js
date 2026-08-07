@@ -10,7 +10,8 @@ const logger = getDefaultLogger()
  * Primitives:
  *   - ns.storageGet(key)        guarded localStorage read
  *   - ns.storageSet(key, value) guarded write (null ⇒ remove)
- *   - ns.onReady(fn)            run after DOMContentLoaded */
+ *   - ns.onReady(fn)            run after DOMContentLoaded
+ */
 ;(() => {
   const ns = (window[Symbol.for('meander:pages')] ??= {})
 
@@ -19,7 +20,8 @@ const logger = getDefaultLogger()
    * html[data-ua="safari"] lets CSS gate features that have
    * known Safari quirks — e.g. content-visibility: auto still
    * has :target + find-in-page glitches in Safari 18+. No-op
-   * on every other browser. */
+   * on every other browser.
+   */
   const ua = navigator.userAgent
   if (
     ua.includes('Safari/') &&
@@ -118,7 +120,8 @@ const logger = getDefaultLogger()
    *
    * The `itemSelector` query runs at every keystroke so dropdowns
    * with async-loaded items (e.g. unresolved-comments fetch) keep
-   * working as the list materialises. */
+   * working as the list materialises.
+   */
   ns.popovers.bindKeyboard = ({
     trigger,
     panel,
@@ -157,7 +160,8 @@ const logger = getDefaultLogger()
     }
 
     /* Trigger keys — ArrowDown opens + focuses first item; ArrowUp
-     * opens + focuses last (matches macOS menu convention). */
+     * opens + focuses last (matches macOS menu convention).
+     */
     trigger.addEventListener('keydown', e => {
       switch (e.key) {
         case 'ArrowDown':
@@ -189,7 +193,8 @@ const logger = getDefaultLogger()
     })
 
     /* Panel keys — only fire when the panel has focus (i.e. an
-     * item inside it is the active element). */
+     * item inside it is the active element).
+     */
     panel.addEventListener('keydown', e => {
       if (!isOpen()) {
         return
@@ -223,7 +228,8 @@ const logger = getDefaultLogger()
           /* APG menu pattern: Tab closes the menu and lets focus
            * fall through to the next focusable element after the
            * trigger. Don't preventDefault — the browser's natural
-           * tab order takes over. */
+           * tab order takes over.
+           */
           close()
           break
         default:
@@ -233,7 +239,8 @@ const logger = getDefaultLogger()
   }
 
   /* Helper for callers to keep the trigger's aria-expanded in
-   * sync without re-implementing the toggle dance. */
+   * sync without re-implementing the toggle dance.
+   */
   ns.popovers.setExpanded = (trigger, value) => {
     if (trigger) {
       trigger.setAttribute('aria-expanded', value ? 'true' : 'false')
@@ -246,7 +253,8 @@ const logger = getDefaultLogger()
    * has to wait or its <a>/<span> wraps get blown away. 1.5s cap
    * + once-guard so a slow CDN can't stall work, and the observer
    * + timeout can't both fire. Resolves immediately if there are
-   * no code blocks or hljs already ran. */
+   * no code blocks or hljs already ran.
+   */
   ns.onHljsReady = fn => {
     ns.onReady(() => {
       const codes = document.querySelectorAll('.line-code code')

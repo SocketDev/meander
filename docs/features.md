@@ -54,6 +54,9 @@ means "follow the OS". A stored value resolves synchronously in
 `<head>` before first paint, so dark-preferring systems never
 flash the light theme.
 
+<details>
+<summary>How the theme toggle works</summary>
+
 Each press targets the opposite of the currently _resolved_
 theme. What gets stored depends on how that target compares to
 the OS preference - not to the stored value:
@@ -78,6 +81,8 @@ shows the theme currently in effect and its `aria-label` names
 the action ("Switch to dark theme").
 
 No configuration - always on.
+
+</details>
 
 ## Cmd/Ctrl-click links in code
 
@@ -233,6 +238,9 @@ Push entries into the array at
 script on the page (before or after meander's bundle - the
 array is a stable symbol-keyed handle either way):
 
+<details>
+<summary>The tokenizer registration steps</summary>
+
 ```js
 const reg = (window[Symbol.for('meander:inline-tokenizers')] ??= [])
 reg.push({
@@ -256,6 +264,8 @@ Each entry:
   span.
 - `tokenize(text)`: returns HTML string. Assigned via
   `innerHTML` - escape untrusted content yourself.
+
+</details>
 
 ### Scope
 
@@ -389,6 +399,9 @@ re-theme them.
 Docs can be either a plain path string (shorthand) or an object
 with extra metadata:
 
+<details>
+<summary>The rich doc entry form and its fields</summary>
+
 ```json
 {
   "documents": [
@@ -419,6 +432,8 @@ Fields:
 
 String shorthand (`"docs/foo.md"`) remains supported and
 equivalent to `{ source: "docs/foo.md" }`.
+
+</details>
 
 ## Clean part URLs via `filename`
 

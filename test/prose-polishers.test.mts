@@ -69,7 +69,8 @@ describe('italicizeParentheticals', () => {
   it('wraps the innermost paren group when parens nest', () => {
     /* The regex `/\([^()…]{2,}\)/` can't span nested parens, so
      * the *inner* `(deep)` gets wrapped and the outer pair
-     * remains untouched as literal text. */
+     * remains untouched as literal text.
+     */
     const html = '<p>Something (nested (deep) aside).</p>'
     const out = italicizeParentheticals(html)
     expect(out).toContain('(<em>deep</em>)')
@@ -127,7 +128,8 @@ describe('anchorifyHeadings', () => {
 
   it('skips headings whose text slug-reduces to empty (punctuation-only)', () => {
     /* Distinct branch from above — text is non-empty but the
-     * non-letter/number filter strips it down to nothing. */
+     * non-letter/number filter strips it down to nothing.
+     */
     const html = '<h2>!!!</h2><h3>Real</h3>'
     const out = anchorifyHeadings(html)
     expect(out).toContain('id="real"')

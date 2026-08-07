@@ -14,7 +14,8 @@ import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
  *
  * Must run after hljs has tokenized — hljs splits text nodes
  * when it runs, so any <a> wraps made before hljs would get
- * blown away. Uses ns.onHljsReady to gate. */
+ * blown away. Uses ns.onHljsReady to gate.
+ */
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
   if (!ns) {
@@ -32,13 +33,15 @@ import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
         }
       } catch {
         /* Malformed data — skip cross-file wiring, keep URL
-         * wrapping working. */
+         * wrapping working.
+         */
       }
     }
 
     /* Basename-swap fallback: a source ref like `./compare.js`
      * should resolve to `compare.ts` if the .ts version is what
-     * we emitted. Keyed by `<dir>/<basename>` without extension. */
+     * we emitted. Keyed by `<dir>/<basename>` without extension.
+     */
     const anchorByStem = new Map()
     for (const [p, anchor] of anchorByPath) {
       const stem = p.replace(/\.[a-z0-9]+$/i, '')
@@ -166,7 +169,8 @@ import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
 
     /* Modifier-key tracking — toggle body.mdr-mod-pressed while
      * Cmd (macOS) / Ctrl (others) is held. Dedupe because
-     * auto-repeat keydown fires continuously. */
+     * auto-repeat keydown fires continuously.
+     */
     let modState = false
     const setMod = pressed => {
       if (modState === pressed) {

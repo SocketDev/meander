@@ -109,6 +109,9 @@ can `meander publish` with envelope-encrypted blobs.
 When you've configured `encryptBlobs: true` in `meander.config.json`
 and minted `MEANDER_BLOB_KEY`:
 
+<details>
+<summary>The Val Town blob publish loop steps</summary>
+
 ```bash
 meander generate meander.config.json
 meander publish meander.config.json
@@ -149,6 +152,8 @@ Re-run `generate` + `publish` whenever the source files or
 annotations change. The val itself only needs `deploy-val` again
 when you want to ship a new server version or change non-key
 config.
+
+</details>
 
 ## GitHub Pages publish
 

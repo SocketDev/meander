@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /* The mock has to live at module scope (vi.mock is hoisted), and
  * `answers` has to be reachable from inside the mock factory. Each
  * test resets the queue in beforeEach so a failing test can't
- * smuggle leftover state into the next one. */
+ * smuggle leftover state into the next one.
+ */
 const answers: string[] = []
 
 vi.mock(import('node:readline/promises'), () => ({

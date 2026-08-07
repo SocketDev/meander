@@ -21,7 +21,8 @@ describe('isEmail', () => {
   it('rejects purl-shaped package@version', () => {
     /* Regression: `core@7.0.0` has the email shape but a
      * numeric-only TLD. Without the `[A-Za-z]{2,}` guard the
-     * classifier used to paint every `foo@x.y` pill as email. */
+     * classifier used to paint every `foo@x.y` pill as email.
+     */
     expect(isEmail('core@7.0.0')).toBe(false)
     expect(isEmail('lodash@4.17.21')).toBe(false)
   })
@@ -116,7 +117,8 @@ describe('isPurl', () => {
     /* Group 3 is the full path; because `@` is a pchar, the
      * version token gets absorbed here when it appears inside
      * a path segment. Consumers slice on '@' if they need the
-     * base-name split. */
+     * base-name split.
+     */
     expect(m![3]).toContain('/lodash')
     expect(m![5]).toBe('?q=x')
     expect(m![6]).toBe('#frag')

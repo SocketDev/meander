@@ -12,7 +12,8 @@
  *     leftover prose, and orders as:
  *       [@fileoverview?, @description?, others…]
  *
- * Exposes ns.groupJsdocBlocks(container). */
+ * Exposes ns.groupJsdocBlocks(container).
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -41,7 +42,8 @@
      * reaches <p>-level siblings, so the <pre> is orphaned
      * below the description. Climb to the enclosing block-level
      * ancestor of `block` inside .annotation-md and absorb any
-     * immediately-following <pre> siblings into the body. */
+     * immediately-following <pre> siblings into the body.
+     */
     if (tagEl.textContent?.toLowerCase() !== '@example') {
       return
     }
@@ -76,7 +78,8 @@
      * which arrives in the body as text starting "a - First…".
      * Render the name as an inline code pill next to the @PARAM
      * tag. Separator required so plain prose (`@param Builder
-     * instance…`) doesn't mis-grab "Builder". */
+     * instance…`) doesn't mis-grab "Builder".
+     */
     if (tagEl.dataset.tag !== 'param') {
       return
     }
@@ -109,7 +112,8 @@
      * <code class="mdr-jsdoc-type-inline"> that sits as an early
      * child of the body. Pull it up next to the tag on the top
      * strip so the header reads "[THROWS] `{Error}`" with the
-     * description on the next line. */
+     * description on the next line.
+     */
     const typeChild = firstMeaningfulChild(body)
     if (
       typeChild &&
@@ -124,7 +128,8 @@
       typeChild.classList.add('mdr-jsdoc-type')
       tagEl.insertAdjacentElement('afterend', typeChild)
       /* Strip leading whitespace / separator from the next text
-       * node so the description starts clean. */
+       * node so the description starts clean.
+       */
       const nextTextNode =
         body.firstChild && body.firstChild.nodeType === 3
           ? body.firstChild
@@ -144,7 +149,8 @@
   const buildBlocks = container => {
     /* Group each .mdr-jsdoc-tag + its following siblings into a
      * <span class="mdr-jsdoc-block">. Walk forward; reverse-walk
-     * nests cards inside each other. */
+     * nests cards inside each other.
+     */
     const tags = [...container.querySelectorAll('.mdr-jsdoc-tag')]
     for (let i = 0, { length } = tags; i < length; i += 1) {
       const tagEl = tags[i]
@@ -188,7 +194,8 @@
     /* Final order:
      *   [@fileoverview?, explicit @description?, synthetic
      *    @description from leftover prose?, others in source
-     *    order]. */
+     *    order].
+     */
     const allBlocks = [...container.querySelectorAll('.mdr-jsdoc-block')]
     const emptyDescs = allBlocks.filter(b => {
       const isDesc = b.querySelector(
@@ -213,7 +220,8 @@
       explicitDesc.classList.add('mdr-jsdoc-block-desc')
     }
     /* Lift every tag block out of its markdown-wrapper parent
-     * so the synthesis below only sees true leftover prose. */
+     * so the synthesis below only sees true leftover prose.
+     */
     for (let i = 0, { length } = liveBlocks; i < length; i += 1) {
       const b = liveBlocks[i]
       if (b.parentElement !== container) {
@@ -221,7 +229,8 @@
       }
     }
     /* Synthesize a @DESCRIPTION card from leftover prose when
-     * no explicit one exists. */
+     * no explicit one exists.
+     */
     let syntheticDesc = undefined
     if (!explicitDesc) {
       const descBlock = document.createElement('span')

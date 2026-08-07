@@ -291,6 +291,9 @@ the optional `filename` to make the URL human-readable.
 Cross-check via `loadMeanderConfig` →
 `checkFilenameUniqueness` (`src/config.mts` line 541+):
 
+<details>
+<summary>The uniqueness rules and collision handling</summary>
+
 ```ts
 function checkFilenameUniqueness(
   configPath: string,
@@ -338,6 +341,9 @@ problem without running the full pipeline.
 ---
 
 <a id="cross-references"></a>
+
+</details>
+
 ## 7. Cross-references
 
 - **SKILL.md** - this skill's main file: the decision

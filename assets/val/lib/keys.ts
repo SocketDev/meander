@@ -47,7 +47,8 @@ const BLOB_KEY_VAR = 'MEANDER_BLOB_KEY'
 
 /* Blob-key cache. The sentinel symbol distinguishes "first call,
  * not yet computed" from "computed, result was undefined" — which a
- * plain undefined-valued slot can't. */
+ * plain undefined-valued slot can't.
+ */
 const NOT_LOADED = Symbol('blob-key-not-loaded')
 let blobKeyCache: Promise<CryptoKey> | undefined | typeof NOT_LOADED =
   NOT_LOADED
@@ -56,7 +57,8 @@ let blobKeyCache: Promise<CryptoKey> | undefined | typeof NOT_LOADED =
 export function listGenerations(): number[] {
   const out: number[] = []
   /* Deno exposes Deno.env.toObject() — the val runs on Deno so this
-   * is the right shape. */
+   * is the right shape.
+   */
   const env = Deno.env.toObject()
   const names = Object.keys(env)
   for (let i = 0, { length } = names; i < length; i += 1) {

@@ -56,7 +56,8 @@ describe('routeToFile', () => {
       routeToFile(slug, `/${slug}/documents`, partIds, { hasDocuments: true }),
     ).toBe('documents.html')
     /* When documents are absent, the route-through treats it as
-     * an asset path. Not an error — the asset handler then 404s. */
+     * an asset path. Not an error — the asset handler then 404s.
+     */
     const fallback = routeToFile(slug, `/${slug}/documents`, partIds, {
       hasDocuments: false,
     })
@@ -278,7 +279,8 @@ describe('serve (HTTP handler)', () => {
   it('honors basePath prefix for /prefix/ and /prefix/<slug>/part/<n>', async () => {
     const { baseUrl } = await start({ basePath: '/prefix' })
     /* Trailing-slash form hits the `startsWith(basePath + '/')`
-     * strip branch. */
+     * strip branch.
+     */
     const rootRes = await httpRequest(`${baseUrl}/`)
     expect(rootRes.status).toBe(200)
     expect(rootRes.text()).toContain('<title>index</title>')
@@ -293,7 +295,8 @@ describe('serve (HTTP handler)', () => {
     /* baseUrl is already trimmed to end in `/prefix`. Fetch it
      * directly (no trailing slash). fetch() follows redirects
      * but we're not redirecting — the handler rewrites decoded
-     * to `/` and serves index.html. */
+     * to `/` and serves index.html.
+     */
     const res = await httpRequest(baseUrl)
     expect(res.status).toBe(200)
     expect(res.text()).toContain('<title>index</title>')
@@ -308,7 +311,8 @@ describe('serve (HTTP handler)', () => {
   it('returns 400 for undecodable URL path', async () => {
     const { baseUrl } = await start()
     /* `%` without a valid hex pair makes decodeURIComponent
-     * throw; serve() should catch it and return 400. */
+     * throw; serve() should catch it and return 400.
+     */
     const res = await httpRequest(`${baseUrl}/bad%`)
     expect(res.status).toBe(400)
   })
@@ -319,7 +323,8 @@ describe('serve (HTTP handler)', () => {
     const res = await httpRequest(`${baseUrl}/demo/%2e%2e/etc/passwd`)
     /* Either 400 (traversal guard rejected) or 404 (resolved
      * path wasn't found after normalization). Both are safe —
-     * we must not 200 with arbitrary file content. */
+     * we must not 200 with arbitrary file content.
+     */
     expect([400, 404]).toContain(res.status)
   })
 
@@ -340,7 +345,8 @@ describe('serve (HTTP handler)', () => {
     /* `/demo/part/` with a part id matches routeToFile → `part-`;
      * that file doesn't exist so we fall through to asset path.
      * To trigger the directory branch: request the pages dir
-     * itself via `/pages`, which routes through as an asset ref. */
+     * itself via `/pages`, which routes through as an asset ref.
+     */
     mkdirSync(path.join(tmpDir, 'pages', 'adir'), { recursive: true })
     const res = await httpRequest(`${baseUrl}/adir`)
     expect(res.status).toBe(404)
@@ -421,7 +427,8 @@ describe('serve (config + fallback resolution)', () => {
     )
     /* Suppress the console.error that serve() writes when the
      * emit dir is missing — this is expected output for this
-     * test, not a real failure. */
+     * test, not a real failure.
+     */
     const original = console.error
     console.error = () => {}
     try {
@@ -443,7 +450,8 @@ describe('serve (config + fallback resolution)', () => {
       'utf-8',
     )
     /* Write a meander.config.json that's not valid JSON. serve()
-     * should swallow the parse error and use the pages default. */
+     * should swallow the parse error and use the pages default.
+     */
     writeFileSync(
       path.join(tmpDir, 'meander.config.json'),
       '{ not json at all',

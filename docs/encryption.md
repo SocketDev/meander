@@ -22,6 +22,9 @@ have different recoverability properties.
 
 What the encryption defends against:
 
+<details>
+<summary>What the threat model covers and excludes</summary>
+
 - **Cold storage leak**: someone obtains a SQLite dump or a blob
   snapshot independent of the val process. Without the wrapping
   key, they get ciphertext only.
@@ -50,9 +53,14 @@ What it does _not_ defend against:
   share-holders are compromised, the wrapping key is recoverable
   by an attacker.
 
+</details>
+
 ## Envelope encryption - how the two layers fit
 
 Both encryption stories use the same construction:
+
+<details>
+<summary>The envelope encryption layer walkthrough</summary>
 
 1. **Data Encryption Key (DEK)** - 32 random bytes. Encrypts the
    payload, a comment body or a walkthrough blob, with AES-256-GCM.
@@ -81,6 +89,8 @@ can introduce new layouts without breaking older readers' version
 checks. The blob envelope's `ENVELOPE:1:` prefix is a literal text
 sentinel - the val recognizes it without parsing, and falls back
 to "serve as plaintext" when the prefix is absent.
+
+</details>
 
 ## Comment store - `MEANDER_DB_KEY_<n>` + `MEANDER_DB_KEY_CURRENT`
 
@@ -117,6 +127,9 @@ GitHub's own access controls and at-rest encryption are sufficient
 and Val Town blob storage isn't involved. For those projects,
 walkthrough HTML encryption is irrelevant and not engaged.
 
+<details>
+<summary>The walkthrough blob key setup and flow</summary>
+
 Projects publishing to **Val Town blob storage** (`meander
 publish`) opt in via `meander.config.json`:
 
@@ -146,12 +159,17 @@ walkthrough private at serve time, so the two cannot drift apart:
 the val decides on the blob it holds, not on a config value it was
 told about.
 
+</details>
+
 ### What a private walkthrough asks of a reader
 
 A reader who opens `/:slug/` on an encrypted walkthrough gets a
 sign-in page instead of the prose. Signing in emails them a
 six-digit code (the same magic-code flow the comment composer
 uses) and sets a reader cookie:
+
+<details>
+<summary>The reader-side requirements for a private walkthrough</summary>
 
 ```text
 meander_read=<jwt>; Path=/<slug>/; Max-Age=604800; HttpOnly; Secure; SameSite=Lax
@@ -177,6 +195,8 @@ once.
 `MEANDER_ALLOWED_EMAIL_DOMAINS` gates reads as well as writes. A
 deployment with an empty allowlist serves its public walkthroughs
 and refuses every private one, including to the operator.
+
+</details>
 
 ### What stays visible without signing in
 
@@ -214,6 +234,9 @@ is already in the bytes the val fetched to serve. A comment read has
 no such luxury - it touches no blob, and fetching a whole encrypted
 document to look at nine bytes would put a full blob GET behind
 every poll of a comment thread.
+
+<details>
+<summary>The private-walkthrough record keeping steps</summary>
 
 So the val keeps a `walkthrough_visibility` table: one row per slug,
 `slug` as the primary key, holding whether that walkthrough is
@@ -263,11 +286,16 @@ There's no rewrap dance for blobs because blobs are regenerable
 from source. Rotation = re-publish, which the CLI prompts
 explicitly.
 
+</details>
+
 ## Custodial recovery - Shamir's Secret Sharing
 
 Both ceremonies split their wrapping key with **Shamir's Secret
 Sharing** before printing it. The operator distributes shares to
 distinct custodians; reconstruction needs `threshold` of them.
+
+<details>
+<summary>The Shamir secret-sharing recovery procedure</summary>
 
 Defaults: **2-of-3** (operator's password manager, paper printout
 in a safe, second person's password manager). Tune via flags:
@@ -300,7 +328,12 @@ _leak_. Custodian count should match real custodian independence -
 five entries in the same password manager is one custodian, not
 five.
 
+</details>
+
 ## Recovery scenarios
+
+<details>
+<summary>The recovery scenarios, one by one</summary>
 
 **Lost the local copy of `MEANDER_DB_KEY_<n>`, but the val still
 has it.** Nothing to recover - the val is the source of truth.
@@ -332,6 +365,8 @@ The old generation stays in the val's env until you confirm via
 audit + retire that no rows reference it anymore. After retire,
 the old key is gone from the val and from local memory; only
 shares remain, in custodian hands.
+
+</details>
 
 ## Operator workflow
 

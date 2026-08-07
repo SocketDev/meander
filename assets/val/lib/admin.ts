@@ -215,5 +215,6 @@ export function registerAdminRoutes(app: Hono, deps: AdminDeps): Hono {
 }
 
 /* Re-export the crypto helpers admin tests are likely to need
- * alongside this module — keeps the test imports tidy. */
+ * alongside this module — keeps the test imports tidy.
+ */
 export { importKey, unwrapKey, wrapKey }

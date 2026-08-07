@@ -4,7 +4,8 @@
  * on :root. Pointer Events work for mouse + touch + pen.
  * Reads DOM geometry once at pointerdown; pointermove only
  * queues values into dragState and rAF coalesces writes so
- * multiple pointer frames per refresh collapse into one write. */
+ * multiple pointer frames per refresh collapse into one write.
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -54,7 +55,8 @@
 
   const attachHandle = block => {
     /* Attach to the inner grid (not the outer file-block) so
-     * the rail only spans the prose+code region. */
+     * the rail only spans the prose+code region.
+     */
     const grid = block.querySelector('.pair-grid, .file-grid')
     if (!grid) {
       return
@@ -81,7 +83,8 @@
     /* Hot-path state captured at pointerdown so onMove never
      * reads the DOM (getBoundingClientRect after a style write
      * forces synchronous layout). Writes go to rAF-coalesced
-     * property sets. */
+     * property sets.
+     */
     let dragState = undefined
     let rafId = 0
     const flush = () => {

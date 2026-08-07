@@ -13,7 +13,8 @@
  *   3. installFileTracking / installSectionTracking —
  *      IntersectionObserver picks the topmost-visible
  *      .file-block / .annotation-card and marks the matching
- *      row active in every open panel. */
+ *      row active in every open panel.
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -64,7 +65,8 @@
           hydrateChip(menu)
         }
         /* Scroll the active row into the panel's visible area
-         * so the current file/section isn't offscreen. */
+         * so the current file/section isn't offscreen.
+         */
         const panel = menu.querySelector(
           '.mdr-files-panel, .mdr-sections-panel',
         )
@@ -249,7 +251,8 @@
         /* Scroll-driven tracking applies only to the file-head's
          * sections menu — NOT the chip panels (they have their
          * active row baked in at hydration time from
-         * data-active-id). */
+         * data-active-id).
+         */
         for (const panel of document.querySelectorAll('.mdr-sections-panel')) {
           if (panel.closest('.mdr-section-chip')) {
             continue

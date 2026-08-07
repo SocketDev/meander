@@ -44,7 +44,8 @@ describe('sriForUrl cache', () => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-sri-'))
     /* @socketsecurity/lib 6.x drives httpRequest through Node's
      * http/https modules, so we intercept with nock (a globalThis.fetch
-     * stub would never be reached). */
+     * stub would never be reached).
+     */
     nock.disableNetConnect()
   })
 
@@ -72,7 +73,8 @@ describe('sriForUrl cache', () => {
     const first = await sriForUrl(url, { cacheDir: tmpDir })
     expect(fetched.isDone()).toBe(true)
     /* A second interceptor that must NOT be consumed: a cache hit
-     * means no network, so this stays pending. */
+     * means no network, so this stays pending.
+     */
     const shouldNotFetch = nock('https://unpkg.com')
       .get('/foo@1/index.js')
       .reply(200, 'different payload')
@@ -116,7 +118,8 @@ describe('injectSriIntegrity', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'meander-sri-inject-'))
     /* Block real network; remote-ref tests register their own nock
-     * interceptor. Local-file + skip cases make no request. */
+     * interceptor. Local-file + skip cases make no request.
+     */
     nock.disableNetConnect()
   })
 
@@ -285,7 +288,8 @@ describe('buildCspContent', () => {
   it('skips elements with an empty style="" attribute', () => {
     /* An element with `style=""` will be picked up by the
      * [style] selector, but the empty value should not produce
-     * a hash. Reading via getAttribute returns the empty string. */
+     * a hash. Reading via getAttribute returns the empty string.
+     */
     const html = '<html><body><div style="">x</div></body></html>'
     const content = buildCspContent(html)
     expect(content).not.toContain("'sha256-")
@@ -316,7 +320,8 @@ describe('injectCspMeta', () => {
 
   it('quote-escapes embedded double quotes in the content attr', () => {
     /* Inline <style> can legitimately contain double quotes in
-     * attribute selectors. We shouldn't break the <meta> tag. */
+     * attribute selectors. We shouldn't break the <meta> tag.
+     */
     const html =
       '<html><head><style>a[href="#"]{color:red}</style></head></html>'
     const out = injectCspMeta(html)

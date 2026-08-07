@@ -181,7 +181,8 @@ describe('generate index trail layout', () => {
     })
     const index = readIndex()
     /* At minimum the smallest tier — 1-line `src/app.ts` content
-     * lands in x-small. */
+     * lands in x-small.
+     */
     expect(index).toMatch(/mdr-trail-size-x-small/)
   })
 

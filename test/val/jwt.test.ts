@@ -78,7 +78,8 @@ test('verifyJwt: rejects malformed token (wrong segment count)', async () => {
 
 test('verifyJwt: rejects non-JSON body', async () => {
   /* Craft header.body.sig where body isn't valid JSON but the
-   * signature matches — tests the JSON.parse catch. */
+   * signature matches — tests the JSON.parse catch.
+   */
   const head = b64urlEncode(
     new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })),
   )

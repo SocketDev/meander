@@ -58,7 +58,8 @@ export function renderLoginPage(config: LoginPageConfig): string {
   /* JSON.stringify produces a safe JS string literal, and the
    * closing-tag split keeps a slug containing "</script" from
    * ending the element early. Slugs are [a-z0-9-] today; the
-   * escaping does not depend on that staying true. */
+   * escaping does not depend on that staying true.
+   */
   const slugLiteral = JSON.stringify(cfg.slug).replaceAll('</', '<\\/')
   return `<!doctype html>
 <html lang="en">
@@ -156,7 +157,8 @@ export function renderLoginPage(config: LoginPageConfig): string {
         localStorage.setItem(${JSON.stringify(EMAIL_STORAGE_KEY)}, result.body.email || email)
       } catch (e) {
         /* A browser with storage disabled still gets the cookie —
-         * only the comment composer's pre-fill is lost. */
+         * only the comment composer's pre-fill is lost.
+         */
       }
       say('Signed in. Loading the walkthrough…')
       location.reload()

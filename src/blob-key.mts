@@ -190,6 +190,7 @@ export async function blobKeyShow(deps: CeremonyDeps): Promise<void> {
     )
   }
   /* Print only — no labels — so callers can pipe into pbcopy/etc.
-   * `meander blob key show <name> | pbcopy` works without trimming. */
+   * `meander blob key show <name> | pbcopy` works without trimming.
+   */
   deps.io.printLine(existing)
 }

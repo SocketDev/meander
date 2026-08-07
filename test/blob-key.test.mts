@@ -72,7 +72,8 @@ describe('blobKeyRotate', () => {
     await blobKeyRotate({ threshold: 2, shares: 3 }, deps)
     expect(deps.env.store.get('MEANDER_BLOB_KEY')).toBe(HEX_OF_BYTE(0xee))
     /* Output prompts the operator to re-publish — without that
-     * step the val's blobs become unreadable. */
+     * step the val's blobs become unreadable.
+     */
     expect(deps.io.text()).toContain('meander publish')
     expect(deps.io.text()).toContain(
       'every existing encrypted blob is unreadable',
@@ -157,7 +158,8 @@ describe('blobKeyShow', () => {
     })
     await blobKeyShow(deps)
     /* Single line, just the hex. The "no labels" property is what
-     * makes pipe-to-pbcopy work. */
+     * makes pipe-to-pbcopy work.
+     */
     expect(deps.io.output).toEqual([HEX_OF_BYTE(0xab)])
   })
 

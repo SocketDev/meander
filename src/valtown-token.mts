@@ -53,7 +53,8 @@ export function resolveValTownToken(
   /* If caller didn't pass an explicit name, consult the
    * meta-var. Fall back to `VALTOWN_TOKEN` — matches the
    * convention used by the Val Town CLI and every fleet repo
-   * before meander gained configurability. */
+   * before meander gained configurability.
+   */
   const resolvedName =
     envName ?? process.env['MEANDER_VALTOWN_TOKEN_ENV'] ?? 'VALTOWN_TOKEN'
   const token = process.env[resolvedName] ?? undefined

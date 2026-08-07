@@ -68,7 +68,8 @@ export async function decryptRows(
 ): Promise<ApiComment[]> {
   /* Per-row: unwrap the DEK with that row's generation key, then
    * decrypt body + author. Multiple rows may share a generation, so
-   * the imported CryptoKey for each generation is cached in `ctx`. */
+   * the imported CryptoKey for each generation is cached in `ctx`.
+   */
   return Promise.all(
     rows.map(async raw => {
       const row = raw as EncryptedCommentRow

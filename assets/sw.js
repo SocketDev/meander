@@ -11,14 +11,16 @@
  *
  *   Fallback literal 'dev' keeps file-serve working in dev mode
  *   before the build step runs.
- * ------------------------------------------------------------------ */
+ * ------------------------------------------------------------------
+ */
 
 const CACHE_VERSION = '__MEANDER_CACHE_VERSION__'
 const CACHE_NAME = `mdr-cache-${CACHE_VERSION}`
 
 /* Derive base path from the SW's own scope so the same file works
  * at the origin root (/) or under any subdirectory (e.g. GitHub
- * Pages' /<repo>/). */
+ * Pages' /<repo>/).
+ */
 const BASE_PATH = self.location.pathname.replace(/\/[^/]*$/, '')
 
 /* Minimal precache — the walkthrough stylesheet (loads on every
@@ -28,7 +30,8 @@ const BASE_PATH = self.location.pathname.replace(/\/[^/]*$/, '')
  * Asset entries that 404 (consumer disabled favicons, customized
  * the asset-dir, etc.) are silently swallowed by the install
  * handler's per-URL catch — keeps first-install cost small while
- * still giving offline-replay of visited pages. */
+ * still giving offline-replay of visited pages.
+ */
 const PRECACHE = [`${BASE_PATH}/favicon.svg`, `${BASE_PATH}/meander.css`]
 
 self.addEventListener('install', event => {
@@ -36,12 +39,14 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME).then(cache =>
       /* Individual `add` with catch so a missing asset doesn't
        * abort the whole install. Atomic `addAll` would roll back
-       * the entire cache on a single 404. */
+       * the entire cache on a single 404.
+       */
       Promise.all(PRECACHE.map(url => cache.add(url).catch(() => undefined))),
     ),
   )
   /* Activate immediately so the new worker starts serving without
-   * waiting for all clients to navigate away. */
+   * waiting for all clients to navigate away.
+   */
   self.skipWaiting()
 })
 
@@ -59,21 +64,24 @@ self.addEventListener('activate', event => {
   )
   /* Take over uncontrolled pages — on first install there's no
    * prior SW, so this is the only way existing tabs opt into
-   * caching. */
+   * caching.
+   */
   self.clients.claim()
 })
 
 self.addEventListener('fetch', event => {
   const { request } = event
   /* Only cache GETs; POST/PUT/DELETE bypass the SW so mutations
-   * hit the network. */
+   * hit the network.
+   */
   if (request.method !== 'GET') {
     return
   }
   const url = new URL(request.url)
   /* Same-origin only. Cross-origin (hljs CDN, any API backend)
    * goes straight to the network — we don't want to cache API
-   * responses behind our version key. */
+   * responses behind our version key.
+   */
   if (url.origin !== self.location.origin) {
     return
   }
@@ -85,7 +93,8 @@ self.addEventListener('fetch', event => {
   /* Navigations (top-level HTML) are network-first. Stale HTML
    * is the worst cache-miss mode — the page ships pointing at
    * asset URLs that may have moved between deploys. Fall back
-   * to cache only on offline. */
+   * to cache only on offline.
+   */
   if (request.mode === 'navigate') {
     event.respondWith(networkFirst(request))
     return
@@ -102,7 +111,8 @@ export async function cacheFirst(request) {
     .then(response => {
       /* Only cache 2xx — don't poison the cache with 500s / 404s
        * from a transient backend glitch. Fire-and-forget `put`
-       * with a catch so quota errors don't surface. */
+       * with a catch so quota errors don't surface.
+       */
       if (response.ok) {
         cache.put(request, response.clone()).catch(() => {})
       }

@@ -27,7 +27,8 @@ const logger = getDefaultLogger()
 
 /* Synthetic filename handed to rolldown's minifier so oxc parses the
  * source as plain JS (never TS/JSX) regardless of what the real emitted
- * asset is named. */
+ * asset is named.
+ */
 const JS_MINIFY_FILENAME = 'meander-inline.js'
 
 export type MinifyHtmlOptions = {
@@ -74,7 +75,8 @@ export async function minifyAsset(
        * did not) — the outer try/catch below already treats any
        * throw from this branch as a minify failure and falls
        * back to the original source, so the malformed-CSS
-       * contract is unchanged. */
+       * contract is unchanged.
+       */
       const { transform } = await import('lightningcss')
       const out = transform({
         code: Buffer.from(code),
@@ -113,7 +115,8 @@ export async function minifyEmittedHtml(
   if (js) {
     /* rolldown isn't installed — skip the JS pass rather than
      * erroring. Consumers enable minify.js by installing it
-     * alongside mermaid + puppeteer. */
+     * alongside mermaid + puppeteer.
+     */
     const rolldownMod = await import('rolldown/experimental').catch(
       /* v8 ignore next -- optional-dep absence; rolldown is a meander devDep so this branch never fires in tests. */
       () => undefined,
@@ -123,7 +126,8 @@ export async function minifyEmittedHtml(
       const scripts = root.querySelectorAll('script')
       /* Inline <script> only — tags with a `src` attribute fetch
        * their body over the network and are minified (if at all)
-       * at the file-emission step, not inside the HTML. */
+       * at the file-emission step, not inside the HTML.
+       */
       const inlineScripts: HTMLElement[] = []
       for (const s of scripts) {
         if (s.getAttribute('src')) {
@@ -141,7 +145,8 @@ export async function minifyEmittedHtml(
         /* rolldown's minify() resolves even on a parse error — it
          * never rejects — so a failure shows up as a fulfilled
          * result carrying a non-empty `errors` array, not a
-         * rejection. Both shapes are treated as failure here. */
+         * rejection. Both shapes are treated as failure here.
+         */
         if (r.status !== 'fulfilled' || r.value.errors.length > 0) {
           const reason =
             r.status === 'fulfilled'
@@ -153,7 +158,8 @@ export async function minifyEmittedHtml(
         const el = inlineScripts[i]!
         /* Replace the text node inside the <script>. node-html-
          * parser exposes `set_content` for this exact case — a
-         * direct textContent assignment would HTML-escape the JS. */
+         * direct textContent assignment would HTML-escape the JS.
+         */
         el.set_content(r.value.code)
         changed = true
       }
@@ -162,7 +168,8 @@ export async function minifyEmittedHtml(
 
   if (svg) {
     /* svgo isn't installed — skip the SVG pass rather than
-     * erroring. Consumers who want it install it as a peer. */
+     * erroring. Consumers who want it install it as a peer.
+     */
     const svgoMod = await import('svgo').catch(
       /* v8 ignore next -- optional-dep absence; svgo is a direct dep here so this branch never fires in tests. */
       () => undefined,

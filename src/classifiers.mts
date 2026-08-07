@@ -17,12 +17,14 @@
 
 /* RFC 3986 unreserved + pct-encoded + sub-delims + ":" + "@" — the
  * `pchar` character class PURLs lean on. Factored out so the
- * purl regex doesn't restate it. Matches for one character. */
+ * purl regex doesn't restate it. Matches for one character.
+ */
 const PCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%"
 
 /* Reused by isPurl. Query chars are pchar minus '&' and '#',
  * which delimit pairs and fragments; version chars are pchar
- * minus '?' and '#' (these open query / fragment). */
+ * minus '?' and '#' (these open query / fragment).
+ */
 const PURL_QCHAR = "A-Za-z0-9\\-._~!$'()*+,;=:@%"
 const PURL_VCHAR = "A-Za-z0-9\\-._~!$&'()*+,;=:@%"
 
@@ -43,19 +45,22 @@ export const PURL_RE = new RegExp(
  * (TLD `0` is one alphanumeric char) but obviously isn't an
  * email. Requiring `[A-Za-z]{2,}` in the final dotted segment
  * distinguishes `alice@example.com` (real) from `core@7.0.0`
- * (package identifier). */
+ * (package identifier).
+ */
 const EMAIL_RE =
   /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/
 
 /* Scoped npm / jsr package shape: `@scope/name`. Scope and
  * name use the npm package-name character class (minus leading
- * `.` / `_`). */
+ * `.` / `_`).
+ */
 const SCOPED_PACKAGE_RE = /^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i
 
 /* Absolute URL with a scheme. Sub-delims + '%' allow encoded
  * chars; `?` / `#` open query / fragment. Permissive on path/
  * query/fragment chars since the regex is a shape check, not a
- * spec validator. */
+ * spec validator.
+ */
 const URL_RE = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s"'<>`]+$/
 
 export function isEmail(text: string): boolean {

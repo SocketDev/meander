@@ -128,7 +128,8 @@ export function registerPageRoutes(app: Hono, deps: PageDeps): Hono {
    * That is the intended trade — a private walkthrough is reached
    * by its URL, and the deployment-wide index stays a public
    * surface. An API client presenting a session token or the admin
-   * token on `Authorization` sees the full list. */
+   * token on `Authorization` sees the full list.
+   */
   app.get('/', async c => {
     let slugs: string[]
     try {
@@ -138,7 +139,8 @@ export function registerPageRoutes(app: Hono, deps: PageDeps): Hono {
     }
     /* No blob key means nothing on this deployment decrypts, so
      * every slug is public and the per-slug probe below is skipped
-     * — the index costs one blob listing, as it always did. */
+     * — the index costs one blob listing, as it always did.
+     */
     const blobKey = await deps.blobKey()
     const visible: string[] = []
     for (let i = 0, { length } = slugs; i < length; i += 1) {
@@ -194,7 +196,8 @@ export function registerPageRoutes(app: Hono, deps: PageDeps): Hono {
   /* Trade a magic code for the slug's reader cookie. The code
    * itself comes from POST /api/auth/request, which is
    * deployment-wide: the code proves an email, and the slug in
-   * this route's path is what the resulting cookie is bound to. */
+   * this route's path is what the resulting cookie is bound to.
+   */
   app.post('/:slug/api/auth/session', async c => {
     const slug = c.req.param('slug')
     if (!deps.jwtSecret) {
@@ -207,7 +210,8 @@ export function registerPageRoutes(app: Hono, deps: PageDeps): Hono {
       return c.json({ error: 'email + code required' }, 400)
     }
     /* Check the allowlist before the code, so an email that could
-     * never be granted access does not burn its own code. */
+     * never be granted access does not burn its own code.
+     */
     const denied = identityGate(
       email,
       deps.allowedDomains,
@@ -229,7 +233,8 @@ export function registerPageRoutes(app: Hono, deps: PageDeps): Hono {
 
   /* Sign out of one walkthrough. The cookie is HttpOnly, so
    * clearing it is a server round trip rather than something the
-   * page can do on its own. */
+   * page can do on its own.
+   */
   app.delete('/:slug/api/auth/session', async c => {
     const slug = c.req.param('slug')
     c.header('Set-Cookie', clearedReaderCookie(slug))

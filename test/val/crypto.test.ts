@@ -57,7 +57,8 @@ test('encrypt/decrypt: round-trip unicode + multi-line', async () => {
 
 test('encrypt/decrypt: round-trip large payload (>100KB)', async () => {
   /* Walkthrough HTML can exceed the spread-arg limit that broke
-   * the previous base64 helper. This is the regression guard. */
+   * the previous base64 helper. This is the regression guard.
+   */
   const key = await importKey(FRESH_BYTES())
   const plain = 'x'.repeat(150_000)
   const ct = await encrypt(plain, key)

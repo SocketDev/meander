@@ -31,7 +31,8 @@ const ChecksumSchema = Type.Object({
  * win-arm64, sfw skips win-arm64, etc.). TypeBox's Record with
  * a union-of-literal keys treats every literal as required,
  * which doesn't match our "subset is fine" semantics — use an
- * explicit Object with each platform as Optional instead. */
+ * explicit Object with each platform as Optional instead.
+ */
 const ChecksumMapSchema = Type.Object({
   'linux-x64': Type.Optional(ChecksumSchema),
   'linux-arm64': Type.Optional(ChecksumSchema),
@@ -61,7 +62,8 @@ const ExternalToolsSchema = Type.Record(
 /* The fleet container shape (scripts/fleet/lib/external-tools-schema.mts):
  * `{ $schema?, description?, tools: { <name>: ToolEntry } }`. This repo
  * schema narrows the fleet ToolEntry to the fields meander's entries
- * require at runtime. */
+ * require at runtime.
+ */
 const ExternalToolsFileSchema = Type.Object({
   $schema: Type.Optional(Type.String()),
   description: Type.Optional(Type.String()),
@@ -90,7 +92,8 @@ export function validateExternalTools(filePath: string): ExternalTools {
 
 /* Allow running as a standalone script: `node --experimental-
  * strip-types validate-tools.mts`. Prints a ✓ on success,
- * exits non-zero on validation failure. */
+ * exits non-zero on validation failure.
+ */
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url))

@@ -28,6 +28,9 @@ formatted.
 Always prioritize simplicity - the simpler the code, the fewer
 bugs it will have.
 
+<details>
+<summary>The KISS review checklist</summary>
+
 Common violations to flag:
 
 - **Over-abstraction** - utilities, helpers, or wrappers for a
@@ -62,7 +65,13 @@ assume.
 ---
 
 <a id="critical-scan"></a>
+
+</details>
+
 ## 2. Critical scan agent
+
+<details>
+<summary>The critical scan agent prompt</summary>
 
 **Mission**: identify critical bugs that could cause crashes, data
 corruption, or security vulnerabilities.
@@ -229,7 +238,13 @@ Scan systematically and report all critical bugs. If none, state that explicitly
 ---
 
 <a id="logic-scan"></a>
+
+</details>
+
 ## 3. Logic scan agent
+
+<details>
+<summary>The logic scan agent prompt</summary>
 
 **Mission**: detect logic errors in algorithms, data processing, and business logic that produce incorrect output or behavior.
 
@@ -347,7 +362,13 @@ Analyze systematically and report all logic errors. If none, state that explicit
 ---
 
 <a id="workflow-scan"></a>
+
+</details>
+
 ## 4. Workflow scan agent
+
+<details>
+<summary>The workflow scan agent prompt</summary>
 
 **Mission**: detect issues in build scripts, CI configuration, git hooks, and developer workflows.
 
@@ -492,7 +513,13 @@ Analyze workflow files systematically. If they're well-configured, state that ex
 ---
 
 <a id="security-scan"></a>
+
+</details>
+
 ## 5. Security scan agent (zizmor)
+
+<details>
+<summary>The zizmor security scan agent prompt</summary>
 
 **Mission**: scan GitHub Actions workflows for security vulnerabilities using zizmor.
 
@@ -595,7 +622,13 @@ Group findings by severity (Error → High → Medium → Low → Info).
 ---
 
 <a id="documentation-scan"></a>
+
+</details>
+
 ## 6. Documentation scan agent
+
+<details>
+<summary>The documentation scan agent prompt</summary>
 
 **Mission**: verify documentation accuracy by checking README files, code comments, and examples against the actual codebase.
 
@@ -763,6 +796,9 @@ Scan all markdown documentation and report all inaccuracies. If the documentatio
 ---
 
 <a id="severity-levels"></a>
+
+</details>
+
 ## 7. Severity levels
 
 | Level | Description | Action |
@@ -794,6 +830,9 @@ Scan all markdown documentation and report all inaccuracies. If the documentatio
 ## 8. Report template
 
 Use this format for the Phase 8 report:
+
+<details>
+<summary>The full report template</summary>
 
 ```markdown
 # Quality Scan Report
@@ -856,6 +895,8 @@ Use this format for the Phase 8 report:
 4. Low-priority items can wait for the next refactor.
 ```
 
+</details>
+
 ### Structured finding shape
 
 When emitting findings programmatically:
@@ -878,6 +919,9 @@ When emitting findings programmatically:
 ## 9. Completion summary
 
 Report these final metrics when Phase 9 emits the completion signal:
+
+<details>
+<summary>The completion summary template</summary>
 
 ```
 Quality Scan Complete
@@ -905,6 +949,9 @@ Next steps:
 ---
 
 <a id="edge-cases"></a>
+
+</details>
+
 ## 10. Edge cases
 
 ### No findings

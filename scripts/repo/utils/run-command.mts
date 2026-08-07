@@ -142,7 +142,8 @@ export async function runCommandQuiet(
     ) {
       /* The three `in` checks above only narrow `e` to a Record
        * intersection; the cast names the concrete spawn-error shape
-       * (spawn with stdioString: true rejects with string output). */
+       * (spawn with stdioString: true rejects with string output).
+       */
       const spawnError = e as SpawnErrorWithOutputString
       return {
         exitCode: spawnError.code,

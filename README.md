@@ -62,6 +62,9 @@ Prose inside the comment supports full Markdown.
 
 Create `meander.config.json` at the root of your project:
 
+<details>
+<summary>The full walkthrough config example</summary>
+
 ```json
 {
   "slug": "my-project",
@@ -84,6 +87,8 @@ Create `meander.config.json` at the root of your project:
   ]
 }
 ```
+
+</details>
 
 ### 3. Build + preview
 
@@ -124,6 +129,9 @@ pages/
 
 ### Config reference
 
+<details>
+<summary>The full config reference</summary>
+
 #### Top-level fields
 
 | Field       | Type       | Required | Description                                                               |
@@ -157,6 +165,8 @@ terms.
 The full schema - comments / theme / styles opt-outs, favicon
 overrides, CSP, SRI, mermaid, minify, service worker - lives in
 [`docs/features.md`](docs/features.md).
+
+</details>
 
 ### Publishing with comments
 

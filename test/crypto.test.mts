@@ -87,7 +87,8 @@ describe('decrypt rejects malformed input', () => {
 
   it('throws on wrong body version byte', () => {
     /* The body version is 0x10. A valid-shape buffer with a wrong
-     * version byte must trip the version check before AES-GCM runs. */
+     * version byte must trip the version check before AES-GCM runs.
+     */
     const buf = Buffer.alloc(1 + 12 + 16, 0)
     buf[0] = 0x99
     expect(() => decrypt(buf.toString('base64'), key)).toThrow(
@@ -105,7 +106,8 @@ describe('decrypt rejects malformed input', () => {
     const ct = encrypt('integrity check', key)
     const bytes = Buffer.from(ct, 'base64')
     /* Flip a bit in the payload region (after version + IV).
-     * AES-GCM's auth tag must reject. */
+     * AES-GCM's auth tag must reject.
+     */
     bytes[bytes.length - 20] ^= 0xff
     expect(() => decrypt(bytes.toString('base64'), key)).toThrow()
   })
@@ -125,7 +127,8 @@ describe('wrapKey / unwrapKey round-trip', () => {
     const wrappingKey = randomWrappingKey()
     const wrapped = wrapKey(dataKey, wrappingKey)
     /* 1 (version) + 12 (IV) + 32 (ct) + 16 (tag) = 61 bytes raw,
-     * which base64-encodes to 84 chars (with padding). */
+     * which base64-encodes to 84 chars (with padding).
+     */
     expect(Buffer.from(wrapped, 'base64').length).toBe(61)
     expect(wrapped.length).toBe(84)
   })
@@ -144,7 +147,8 @@ describe('wrapKey / unwrapKey round-trip', () => {
   it('rotation pattern: rewrap under a new key without touching ciphertext', () => {
     /* This is the headline use case: rotate the wrapping key
      * without re-encrypting the body. The ciphertext stays
-     * byte-identical; only the wrapped DEK changes. */
+     * byte-identical; only the wrapped DEK changes.
+     */
     const wrappingKey1 = randomWrappingKey()
     const wrappingKey2 = randomWrappingKey()
     const dataKey = randomDataKey()

@@ -14,6 +14,9 @@ The Shamir shares printed by `db key init` and `blob key init`
 are the **only** recoverable copies of the wrapping keys. Each
 custodian must:
 
+<details>
+<summary>The custodian responsibility list</summary>
+
 1. **Store their share durably** in a place independent of every
    other custodian. Examples that count as independent:
    - Personal password manager (1Password, Bitwarden, etc.)
@@ -40,6 +43,8 @@ custodian must:
    state - it reports match or mismatch and stops, so it's safe to
    run as a drill (see "Restoration drill" below).
 
+</details>
+
 ## Rotation cadence
 
 Rotate the comment-store wrapping key on:
@@ -59,6 +64,9 @@ Rotate the blob wrapping key on:
   rotating + re-publishing is cheap.
 
 ## Comment-store rotation runbook
+
+<details>
+<summary>The comment-store rotation runbook steps</summary>
 
 ```bash
 # 0. Make sure custodians can produce `threshold` shares NOW. Don't
@@ -108,6 +116,8 @@ If step 2 fails the share-verification check ("reconstructed key
 does not match"), you've supplied wrong shares. Nothing on the
 val has changed. Double-check share provenance and try again.
 
+</details>
+
 ## Blob wrapping key rotation runbook
 
 ```bash
@@ -139,6 +149,9 @@ key is whatever's last planted on the val.
 Practice once per quarter. No state changes: against a val that
 holds at least one generation, `restore` reports whether the
 shares match and stops either way.
+
+<details>
+<summary>The restoration drill steps</summary>
 
 ```bash
 # Pick `threshold` custodians. Each one extracts their share
@@ -173,6 +186,8 @@ meander db key restore walkthrough --threshold 2 --plant-new-generation
 
 The flag exists so no drill can plant a generation by accident.
 
+</details>
+
 ## Recovery from env-var loss
 
 The val's env was wiped (Val Town incident, accidental delete,
@@ -202,6 +217,9 @@ export MEANDER_BLOB_KEY=$(meander blob key show walkthrough)
 
 ## Failure modes
 
+<details>
+<summary>The failure modes and their remedies</summary>
+
 **Comments stop decrypting (500 errors on /api/comments/...).**
 Check the val's env first:
 
@@ -230,6 +248,8 @@ restore the missing generation if shares are available.
 includes a trailing newline; the env var picked up the newline.
 Use `$(meander blob key show ...)` (command substitution strips
 trailing newlines) instead of pasting raw.
+
+</details>
 
 ## Backup strategy
 

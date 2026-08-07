@@ -19,7 +19,8 @@
    * <a href> download is a top-level navigation, which cannot
    * carry that header, so request the JSON through the shared
    * session client and hand the response to a synthetic
-   * object-URL anchor instead. */
+   * object-URL anchor instead.
+   */
   function download(url, filename) {
     const auth = ns?.auth
     if (!auth) {
@@ -170,7 +171,8 @@
 
   /* Kept as an anchor with a real href: it stays keyboard-focusable
    * for the menu pattern and the URL is copyable. Activation is
-   * intercepted so the request carries the session token. */
+   * intercepted so the request carries the session token.
+   */
   function createOption(label, url, filename) {
     const option = document.createElement('a')
     option.className = 'export-option'
@@ -274,7 +276,8 @@
 
     /* Bind keyboard once — pre-create the dropdown so the panel
      * exists for the keydown listener (binding to a null panel
-     * would no-op the menu keys until first click). */
+     * would no-op the menu keys until first click).
+     */
     if (ns?.popovers && ns.popovers.bindKeyboard) {
       if (!dropdown) {
         dropdown = createDropdown()

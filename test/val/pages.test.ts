@@ -115,7 +115,8 @@ describe('an encrypted walkthrough refuses an unproven caller', () => {
   it('refuses a cookie whose signature does not verify', async () => {
     const h = await privateHarness()
     /* Same claims a real reader cookie carries, so the signature
-     * is the only thing wrong with it. */
+     * is the only thing wrong with it.
+     */
     const forged = await signJwt(
       {
         email: 'a@socket.dev',

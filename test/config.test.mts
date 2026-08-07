@@ -56,7 +56,8 @@ describe('resolveOptOuts', () => {
     expect(r.comments.styles).toBe(false)
     /* When comments are fully disabled, backend + email gating +
      * seeds should also reset — no partial state that a consumer
-     * could accidentally rely on. */
+     * could accidentally rely on.
+     */
     expect(r.comments.backend).toBeUndefined()
     expect(r.comments.allowedEmailDomains).toEqual([])
     expect(r.comments.seedPath).toBeUndefined()
@@ -65,7 +66,8 @@ describe('resolveOptOuts', () => {
   /* `comments: true` is a separate input branch from absent
    * (shorthand literal vs the `obj ?? true` path). Both produce
    * defaults, but testing `true` explicitly guards against a
-   * future refactor accidentally making them diverge. */
+   * future refactor accidentally making them diverge.
+   */
   it('`comments: true` hits the true-shorthand branch', () => {
     const r = resolveOptOuts(minimalConfig({ comments: true }))
     expect(r.comments.enabled).toBe(true)

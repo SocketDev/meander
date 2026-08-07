@@ -18,7 +18,8 @@ const logger = getDefaultLogger()
    * data-part-titles map (emitted by generate.mts). Falls back
    * to "Marker N" when the title is missing — the bare number
    * is meaningless context-free, so the prefix is required.
-   * "Documents" is part 0 by convention. */
+   * "Documents" is part 0 by convention.
+   */
   const partTitlesById = (function () {
     try {
       const raw = document.body.getAttribute('data-part-titles')
@@ -388,7 +389,8 @@ const logger = getDefaultLogger()
     /* Lazily wire keyboard once the dropdown DOM exists. The
      * panel is created on first open, so we bind on the next
      * tick after the click handler creates it. The trigger key
-     * bindings live on the button regardless. */
+     * bindings live on the button regardless.
+     */
     if (ns?.popovers && ns.popovers.bindKeyboard) {
       const lazyBind = () => {
         if (!dropdown) {

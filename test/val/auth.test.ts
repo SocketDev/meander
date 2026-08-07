@@ -64,7 +64,8 @@ test('sixDigitCode: varies across calls', () => {
     seen.add(sixDigitCode())
   }
   /* 20 draws from 1e6 should give well under 1% collision odds
-   * — if we're seeing only 1 unique value, the RNG is broken. */
+   * — if we're seeing only 1 unique value, the RNG is broken.
+   */
   assert.ok(
     seen.size > 10,
     `sixDigitCode not random enough: ${seen.size} unique`,

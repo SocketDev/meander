@@ -115,7 +115,8 @@ export function getMeanderVersion(): string {
         version?: string | undefined
       }
       /* Only trust the result when the name matches — a parent
-       * package.json in a monorepo checkout would still parse. */
+       * package.json in a monorepo checkout would still parse.
+       */
       if (meta.name === '@socketsecurity/meander' && meta.version) {
         return meta.version
       }
@@ -156,7 +157,8 @@ export async function resolvePeer(name: string): Promise<string | undefined> {
     /* Walk up directories from the resolved entry until we hit
      * a package.json whose `name` matches. Handles nested
      * node_modules + workspace links without depending on the
-     * package's own `exports`. */
+     * package's own `exports`.
+     */
     let dir = path.dirname(entryPath)
     while (dir !== path.dirname(dir)) {
       const candidate = path.join(dir, 'package.json')

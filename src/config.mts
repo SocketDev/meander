@@ -202,7 +202,8 @@ export function resolveStyles(
     theme: obj.theme ?? true,
     ui: obj.ui ?? true,
     /* Comments CSS auto-follows comments.enabled unless the
-     * consumer explicitly overrides. */
+     * consumer explicitly overrides.
+     */
     comments: obj.comments ?? commentsEnabled,
     prose: obj.prose ?? true,
   }

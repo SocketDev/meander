@@ -59,7 +59,8 @@ export async function dbKeyAudit(deps: CeremonyDeps): Promise<void> {
     deps.io.printLine(`  generation ${gen}: ${n} row(s)${marker}`)
   }
   /* Also surface generations in env that don't appear in counts —
-   * those are decommissionable via retire. */
+   * those are decommissionable via retire.
+   */
   for (const gen of body.visibleGenerations) {
     if (gen !== body.currentGeneration && !(String(gen) in body.rowCounts)) {
       deps.io.printLine(
@@ -116,7 +117,8 @@ export async function dbKeyRestore(
   /* Find which generation these shares correspond to. Each
    * MEANDER_DB_KEY_<n> in env is checked — if the operator
    * supplied shares of a generation that was wiped, no match
-   * means we plant a new generation slot. */
+   * means we plant a new generation slot.
+   */
   let matchedGen: number | undefined
   for (const gen of snapshot.generations) {
     const existing = await deps.env.getEnvVar(`${DB_KEY_PREFIX}${gen}`)
@@ -142,7 +144,8 @@ export async function dbKeyRestore(
    *   reconstruct. That is a mismatch report, not a restore, so the
    *   drill stays read-only unless the operator explicitly asks for
    *   a new generation. Mirrors blobKeyRestore, which refuses when
-   *   MEANDER_BLOB_KEY is set to a different value. */
+   *   MEANDER_BLOB_KEY is set to a different value.
+   */
   const planTarget =
     snapshot.generations.length > 0 ? Math.max(...snapshot.generations) + 1 : 1
   if (snapshot.generations.length > 0 && cfg.plantNewGeneration !== true) {
@@ -228,7 +231,8 @@ export async function dbKeyRotate(
 
   /* Quick check: the reconstructed key must match the current
    * MEANDER_DB_KEY_<fromGen> on the val. If not, the operator
-   * supplied bad shares — bail before changing anything. */
+   * supplied bad shares — bail before changing anything.
+   */
   const currentHex = await deps.env.getEnvVar(`${DB_KEY_PREFIX}${fromGen}`)
   if (!currentHex) {
     throw new Error(
@@ -246,7 +250,8 @@ export async function dbKeyRotate(
 
   /* Plant the new generation. Don't flip CURRENT yet — the val
    * needs to be able to decrypt the old generation's rows during
-   * rewrap. CURRENT moves AFTER rewrap finishes. */
+   * rewrap. CURRENT moves AFTER rewrap finishes.
+   */
   await deps.env.setEnvVar(`${DB_KEY_PREFIX}${toGen}`, bytesToHex(newKey))
   deps.io.printLine(`  Set ${DB_KEY_PREFIX}${toGen}`)
 
@@ -277,7 +282,8 @@ export async function dbKeyRotate(
   deps.io.printLine(`  Rewrapped ${totalRewrapped} rows total`)
 
   /* Atomic flip: now point CURRENT at the new generation. New
-   * writes from this point use the new key. */
+   * writes from this point use the new key.
+   */
   await deps.env.setEnvVar(DB_KEY_CURRENT, String(toGen))
   deps.io.printLine(`  Set ${DB_KEY_CURRENT}=${toGen}`)
 

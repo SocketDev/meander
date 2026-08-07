@@ -129,7 +129,8 @@ const DEMO_MODE = Deno.env.get('MEANDER_DEMO_MODE') === 'true'
  * is missing or malformed, loadDbKeyContext throws. Catch it and
  * keep the val process alive — we'd rather fail per-request with a
  * descriptive 500 than 502 every reader because of a bad pointer.
- * The error message becomes the body for any /api/comments/* call. */
+ * The error message becomes the body for any /api/comments/* call.
+ */
 let dbKeyContext: WrappingKeyContext | undefined
 let dbKeyContextError: string | undefined
 try {
@@ -214,7 +215,8 @@ export async function ensureDb() {
   `)
   /* `meander publish` creates this table too, with the identical
    * statement, because it records a slug's privacy before the val
-   * has necessarily served its first request. */
+   * has necessarily served its first request.
+   */
   await sqlite.execute(WALKTHROUGH_VISIBILITY_TABLE_SQL)
   dbInitialized = true
 }
@@ -240,7 +242,8 @@ export async function listSlugs(): Promise<string[]> {
   for (const b of blobs) {
     /* Keys look like <OUT_DIR>/<slug>/index.html. The shared
      * CSS file lives at <OUT_DIR>/meander.css — its key has
-     * only two segments, so the slug branch skips it. */
+     * only two segments, so the slug branch skips it.
+     */
     const parts = b.key.split('/')
     if (parts.length >= 3 && parts[0] === OUT_DIR) {
       slugs.add(parts[1])
@@ -398,7 +401,8 @@ app.get('/meander.css', async c => serveBlobText(c, 'meander.css', 'text/css'))
 /* Routes are registered from `lib/pages.ts`, `lib/comments.ts`, and
  * `lib/admin.ts` so tests can drive them with a stub blob store,
  * sqlite client, and key context, without pulling in val.town's
- * `https://esm.town/...` imports at test time. */
+ * `https://esm.town/...` imports at test time.
+ */
 registerPageRoutes(app, {
   adminToken: ADMIN_TOKEN,
   allowedDomains: ALLOWED_EMAIL_DOMAINS,

@@ -11,7 +11,8 @@
  *
  * Exposes ns.wrapJsdocTags(container) so the group pass
  * (jsdoc-group.js) can call it. Kept separate so each file
- * handles one concern. */
+ * handles one concern.
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -72,7 +73,8 @@
       if (!hasLang) {
         /* Default @example fences without an explicit language to
          * JavaScript. Auto-detect is unreliable for short
-         * snippets; JSDoc @example is always JS/TS. */
+         * snippets; JSDoc @example is always JS/TS.
+         */
         code.classList.add('language-javascript')
       }
       window.hljs.highlightElement(code)
@@ -86,7 +88,8 @@
     while (n) {
       /* Skip text inside nodes we've already processed (the tag
        * span itself) or inside code/pre (a `@foo` in user code
-       * is not a JSDoc tag). */
+       * is not a JSDoc tag).
+       */
       const parent = n.parentElement
       if (parent && !parent.closest('.mdr-jsdoc-tag, code, pre')) {
         textNodes.push(n)
@@ -96,7 +99,8 @@
     /* Match the @tag token plus an optional trailing `{…}` type
      * annotation. Tag itself becomes a muted `.mdr-jsdoc-tag`
      * span; `{Type}` becomes a separate inline <code>. Any
-     * whitespace between is preserved as a text node. */
+     * whitespace between is preserved as a text node.
+     */
     const tagPattern = /@([A-Za-z]+)\b(\s*)(\{[^}]*\})?/g
     for (let i = 0, { length } = textNodes; i < length; i += 1) {
       const node = textNodes[i]
@@ -117,7 +121,8 @@
           parts.push(document.createTextNode(text.slice(cursor, m.index)))
         }
         /* Break before so the pill never inlines after preceding
-         * prose. Skip if nothing precedes it in this fragment. */
+         * prose. Skip if nothing precedes it in this fragment.
+         */
         if (parts.length > 0 || cursor > 0) {
           parts.push(document.createElement('br'))
         }

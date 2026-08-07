@@ -6,7 +6,8 @@
  * in the same tick.
  *
  * Gated on ns.onHljsReady so @example block highlighting has
- * the hljs grammar loaded. No-op on pages without hljs. */
+ * the hljs grammar loaded. No-op on pages without hljs.
+ */
 'use strict'
 ;(() => {
   const ns = window[Symbol.for('meander:pages')]
@@ -25,7 +26,8 @@
        * rendered as plain text for one frame before pills land).
        * Setting the class at the START of the pass lets the
        * browser composite the cleaned DOM in the same paint as
-       * this function's mutations. */
+       * this function's mutations.
+       */
       container.classList.add('mdr-annotation-md-ready')
       ns.wrapJsdocTags(container)
       ns.groupJsdocBlocks(container)

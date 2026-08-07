@@ -23,6 +23,7 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { isMainModule } from '../fleet/_shared/is-main-module.mts'
 import { validateExternalToolsFile } from './validate-tools.mts'
 import type { ExternalTools } from './validate-tools.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
@@ -42,7 +43,8 @@ async function fetchLatestRelease(repoGithub: string): Promise<Release> {
   /* `repoGithub` is "github:owner/name"; strip the prefix and
    * hit the GitHub API directly via fetch + a GH_TOKEN header
    * if one's available. `gh api` would work too but shelling out
-   * is extra moving parts when we already have fetch. */
+   * is extra moving parts when we already have fetch.
+   */
   const owner = repoGithub.replace(/^github:/, '')
   const token = process.env['GH_TOKEN'] ?? process.env['GITHUB_TOKEN']
   const headers: Record<string, string> = {
@@ -68,7 +70,8 @@ async function sha256OfUrl(url: string): Promise<string> {
 
 function normalizeVersion(tagName: string): string {
   /* Releases are typically tagged v1.2.3 or 1.2.3 — strip the
-   * leading v so the JSON stores the bare version number. */
+   * leading v so the JSON stores the bare version number.
+   */
   return tagName.replace(/^v/, '')
 }
 
@@ -130,7 +133,8 @@ async function refreshOne(
    * marked as latest in the UI, which isn't always the highest
    * semver (rc / canary / security-backport releases can push
    * an older tag to "latest"). Semver-compare and no-op on
-   * equal-or-lower. */
+   * equal-or-lower.
+   */
   if (compareVersions(latest, entry.version) <= 0) {
     logger.log(
       `  ${name}: upstream "latest" is ${latest}, pinned is ${entry.version} — keeping pin`,
@@ -143,7 +147,8 @@ async function refreshOne(
    * new release, download it, and compute its sha256. If an
    * asset is missing (rare — a release might drop a platform),
    * keep the old entry so we don't break a platform we still
-   * support. */
+   * support.
+   */
   const nextChecksums: ExternalTools[string]['checksums'] = {
     __proto__: null,
   } as ExternalTools[string]['checksums']
@@ -186,13 +191,15 @@ async function main(): Promise<void> {
       /* Keep going — a single failed lookup shouldn't block the
        * other tools. Exit code reflects whether the process as a
        * whole succeeded; per-tool failures are logged and the
-       * reviewer decides whether to re-run or investigate. */
+       * reviewer decides whether to re-run or investigate.
+       */
     }
   }
   if (anyChanged) {
     writeFileSync(toolsPath, JSON.stringify(config, null, 2) + '\n')
     /* Re-validate — catches any weird shape that slipped through
-     * a partially-refreshed entry. Throws on schema violation. */
+     * a partially-refreshed entry. Throws on schema violation.
+     */
     validateExternalToolsFile(toolsPath)
     logger.log('✓ external-tools.json updated')
   } else {
@@ -200,7 +207,9 @@ async function main(): Promise<void> {
   }
 }
 
-void main().catch((e: unknown) => {
-  logger.fail(String(e))
-  process.exitCode = 1
-})
+if (isMainModule(import.meta.url)) {
+  void main().catch((e: unknown) => {
+    logger.fail(String(e))
+    process.exitCode = 1
+  })
+}

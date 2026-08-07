@@ -262,7 +262,8 @@ test('admin: rewrap rejects out-of-range batchSize', async () => {
 
 test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching ciphertext', async () => {
   /* Build realistic seed data: 5 rows under generation 1, each
-   * with a real wrapped DEK we can validate after rewrap. */
+   * with a real wrapped DEK we can validate after rewrap.
+   */
   const ctx = await makeKeyContext([1, 2], 1)
   const wrapping1 = await ctx.getKey(1)
   const wrapping2 = await ctx.getKey(2)
@@ -332,7 +333,8 @@ test('admin: rewrap re-wraps DEKs from gen 1 → gen 2 without touching cipherte
   assert.equal(secondBody.remaining, 0)
 
   /* All rows now tagged generation 2; their wrapped DEKs unwrap
-   * correctly under wrapping2 and recover the original DEK bytes. */
+   * correctly under wrapping2 and recover the original DEK bytes.
+   */
   for (const row of sqlite.rows()) {
     assert.equal(row.key_generation, 2)
     const recovered = await unwrapKey(row.dek_wrapped, wrapping2)
@@ -367,7 +369,8 @@ test('admin: rewrap is idempotent — calling with no rows in the from generatio
 
 test('admin: rewrap propagates getKey failure when generation key is missing', async () => {
   /* Seeded with rows at gen 1, but the key context only has gen 2 +
-   * gen 3. Calling rewrap from 1 → 2 should fail (gen 1 key absent). */
+   * gen 3. Calling rewrap from 1 → 2 should fail (gen 1 key absent).
+   */
   const ctx = await makeKeyContext([2, 3], 2)
   const sqlite = makeSqlite([
     { id: 'orphan', dek_wrapped: 'doesnt-matter', key_generation: 1 },

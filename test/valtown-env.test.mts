@@ -53,7 +53,8 @@ describe('getEnvVar', () => {
 
   it('returns undefined when response body lacks a `value` field', async () => {
     /* Defensive: shape mismatch from the API shouldn't blow up
-     * the ceremony — undefined is the safe interpretation. */
+     * the ceremony — undefined is the safe interpretation.
+     */
     nock(API_BASE)
       .get('/v2/vals/val-id/environment_variables/MY_KEY')
       .reply(200, { something_else: 'x' })
@@ -77,13 +78,15 @@ describe('setEnvVar', () => {
       .reply(200, '')
     await setEnvVar('tok', 'val-id', 'MY_KEY', 'val')
     /* isDone() is true only if the single PUT — with the matched
-     * method, URL, auth, content-type, and body — actually fired. */
+     * method, URL, auth, content-type, and body — actually fired.
+     */
     expect(scope.isDone()).toBe(true)
   })
 
   it('falls back to POST when PUT fails (key does not yet exist)', async () => {
     /* The POST goes to the collection endpoint, not the keyed one,
-     * and carries `{ key, value }`. */
+     * and carries `{ key, value }`.
+     */
     const scope = nock(API_BASE)
       .put('/v2/vals/val-id/environment_variables/NEW_KEY', { value: 'val' })
       .reply(404, 'not found')
@@ -155,7 +158,8 @@ describe('listEnvVarNames', () => {
 
   it('skips entries without a string `key` field', async () => {
     /* Shape variance from the API shouldn't crash the ceremony —
-     * just drop the malformed entries. */
+     * just drop the malformed entries.
+     */
     nock(API_BASE)
       .get('/v2/vals/val-id/environment_variables')
       .reply(200, {

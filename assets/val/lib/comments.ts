@@ -261,7 +261,8 @@ export function registerCommentRoutes(app: Hono, deps: CommentDeps): Hono {
     /* Envelope encryption: random per-row DEK, body + author both
      * encrypted under the DEK, DEK wrapped under the current
      * generation's wrapping key. The wrapped DEK + generation are
-     * stored on the row so a future read knows which key to use. */
+     * stored on the row so a future read knows which key to use.
+     */
     const dekBytes = randomDataKeyBytes()
     const dekImported = await importKey(dekBytes)
     const wrappingKey = await deps.keyContext.getCurrentKey()
@@ -346,7 +347,8 @@ export function registerCommentRoutes(app: Hono, deps: CommentDeps): Hono {
    * reach: the export walks roots and skips them, and the thread UI
    * has no anchor to hang them under. A thread is the unit a reader
    * sees, so it is the unit that goes. Deleting a reply removes
-   * only that reply. */
+   * only that reply.
+   */
   app.delete('/:slug/api/comments/:id', async c => {
     await deps.ensureDb()
     const caller = await resolveCaller(c, deps, 'writes')
@@ -382,7 +384,8 @@ export function registerCommentRoutes(app: Hono, deps: CommentDeps): Hono {
   /* The export decrypts every body + author for a slug and streams
    * them as plaintext, so it is gated exactly like a write: a
    * session on an allowed domain, or the val's admin token for a
-   * headless backup job. */
+   * headless backup job.
+   */
   app.get('/:slug/api/comments/export', async c => {
     await deps.ensureDb()
     const caller = await resolveCaller(c, deps, 'export')

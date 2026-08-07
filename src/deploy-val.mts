@@ -139,7 +139,8 @@ export async function deployVal(
    * MEANDER_BLOB_KEY) are *not* set here: those are managed by
    * the `meander db key` and `meander blob key` ceremonies, which
    * control share distribution and the generation pointer.
-   * deploy-val only handles the val's non-key configuration. */
+   * deploy-val only handles the val's non-key configuration.
+   */
   const envVars: Array<{
     key: string
     value: string

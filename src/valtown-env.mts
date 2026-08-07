@@ -51,7 +51,8 @@ export async function deleteEnvVar(
 export function generateSecret(bytes = 32): string {
   /* Lazy node:crypto import keeps this module pure for code paths
    * that only do val-API calls — useful when the same module is
-   * pulled in by both Node + tests. */
+   * pulled in by both Node + tests.
+   */
   const buf = new Uint8Array(bytes)
   crypto.getRandomValues(buf)
   let s = ''

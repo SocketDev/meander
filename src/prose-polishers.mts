@@ -34,7 +34,8 @@ export function anchorifyHeadings(html: string): string {
   for (const h of headings) {
     /* Idempotency: skip if a permalink anchor was already
      * inserted (double-polishing a page shouldn't produce two
-     * `#` links per heading). */
+     * `#` links per heading).
+     */
     if (h.querySelector('.mdr-heading-anchor')) {
       continue
     }
@@ -88,7 +89,8 @@ export function enhanceRepoTrees(html: string): string {
     }
     const existingClass = pre.getAttribute('class') ?? ''
     /* Idempotency: don't stack `mdr-repo-tree` if a prior pass
-     * already marked this pre. */
+     * already marked this pre.
+     */
     if (!/\bmdr-repo-tree\b/.test(existingClass)) {
       pre.setAttribute('class', `${existingClass} mdr-repo-tree`.trim())
     }
@@ -97,7 +99,8 @@ export function enhanceRepoTrees(html: string): string {
      * rewrite the inner HTML directly to add `nohighlight` on
      * the first inner <code>. Regex-based because the DOM
      * walker can't reach it. Idempotent: matches a code tag
-     * that doesn't already carry nohighlight. */
+     * that doesn't already carry nohighlight.
+     */
     const innerHtml = pre.innerHTML
     const rewritten = innerHtml.replace(
       /<code(\s[^>]*)?>/,
@@ -158,7 +161,8 @@ export function highlightProseNumbers(html: string): string {
     const tag = node.tagName
     /* Inside <strong> at the start of an <li>, the number is a
      * manually-bolded list marker ("**1.** Branch"). Don't
-     * re-colorize. */
+     * re-colorize.
+     */
     const parent = node.parentNode as HTMLElement | null
     const isLiStartMarker =
       tag === 'STRONG' &&

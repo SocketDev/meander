@@ -75,7 +75,8 @@ export async function buildCeremonyDeps(args: CeremonyParsedArgs) {
   }
   const val = await resolveVal(token, args.valName)
   /* The admin token lives on the val itself — fetch it via the env
-   * API so the ceremony can authenticate to /admin/* endpoints. */
+   * API so the ceremony can authenticate to /admin/* endpoints.
+   */
   const env = createEnvClient(token, val.id)
   const adminToken = await env.getEnvVar('MEANDER_ADMIN_TOKEN')
   if (!adminToken) {
@@ -390,7 +391,8 @@ async function main() {
     case 'serve': {
       /* Local preview server. Generates first so the output
        * reflects the latest source, then serves. --port 0 picks
-       * a free port; --base-path matches the generator's. */
+       * a free port; --base-path matches the generator's.
+       */
       const { values, positionals } = parseArgs({
         args: commandArgs,
         options: {

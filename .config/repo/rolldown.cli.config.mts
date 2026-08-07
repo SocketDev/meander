@@ -52,7 +52,8 @@ export const runtimeExternals = [
  * loader into cli.mjs, where its binary-lookup paths (resolved relative to
  * rolldown's own package dir) no longer point anywhere real. The regex
  * externalizes every 'rolldown' + 'rolldown/<subpath>' specifier so the
- * whole package stays a real runtime import. */
+ * whole package stays a real runtime import.
+ */
 const rolldownSpecifier = /^rolldown(?:\/|$)/
 
 export const cliBuildConfig: BuildOptions = {

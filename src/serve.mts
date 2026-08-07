@@ -150,14 +150,16 @@ export async function serve(
   /* Treat the directory that HOLDS meander.config.json as the
    * project root, not the caller's cwd. Matches `generate`'s
    * resolution so `pnpm dev` and `meander serve foo/bar.json`
-   * both work from any cwd without cd-ing. */
+   * both work from any cwd without cd-ing.
+   */
   const rootDir = path.resolve(configPath, '..')
   /* Resolve the emit dir from meander.config.json's `outDir` field
    * (default "pages"). Reading just this one field — we don't
    * want to run the full schema validation here; serve should
    * work even when fields tangential to the emit dir are
    * invalid or in flux. Fallback handles missing/malformed
-   * configs by using the default. */
+   * configs by using the default.
+   */
   let outDirName = 'pages'
   try {
     const raw = JSON.parse(readFileSync(configPath, 'utf-8')) as {

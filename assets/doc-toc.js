@@ -279,7 +279,8 @@
     /* Pre-create the dropdown so keyboard binding has a panel to
      * attach to before the user's first click. populateToc()
      * still runs lazily on each open so heading lists stay
-     * fresh across tab changes. */
+     * fresh across tab changes.
+     */
     if (ns?.popovers && ns.popovers.bindKeyboard) {
       if (!dropdown) {
         dropdown = createTocDropdown()
