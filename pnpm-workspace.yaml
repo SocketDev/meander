@@ -523,8 +523,6 @@ minimumReleaseAgeExclude:
   # rolldown release; the per-platform bindings share its pin.
   # Listed explicitly per the fleet "no scope globs in soak excludes" rule.
   - '@rolldown/pluginutils'
-  # published: 2026-07-30 | removable: 2026-08-06
-  - 'brace-expansion@5.0.9'
 patchedDependencies:
   # default-export interop (managed by socket-wheelhouse sync; do not edit):
   # 5.0.7 dropped the default export from BOTH builds. The CJS half breaks
