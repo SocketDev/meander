@@ -46,6 +46,9 @@ jobs:
 
       - name: Setup and install
         uses: ./.github/actions/fleet/setup-and-install
+        with:
+          payload-token-client-id: ${{ vars.SOCKET_PAYLOAD_CLIENT_ID }}
+          payload-token-private-key: ${{ secrets.SOCKET_PAYLOAD_APP_PRIVATE_KEY }}
 
       # Generate the fixture into its own dir so the emit output
       # is what we upload. --base-path=/meander matches the GH

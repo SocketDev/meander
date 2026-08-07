@@ -57,6 +57,8 @@ jobs:
           # release-boundary) read the default branch's history and refuse a
           # shallow clone rather than false-green.
           checkout-fetch-depth: '0'
+          payload-token-client-id: ${{ vars.SOCKET_PAYLOAD_CLIENT_ID }}
+          payload-token-private-key: ${{ secrets.SOCKET_PAYLOAD_APP_PRIVATE_KEY }}
 
       - name: Run checks
         run: pnpm run check --all
@@ -99,6 +101,9 @@ jobs:
 
       - name: Setup and install
         uses: ./.github/actions/fleet/setup-and-install
+        with:
+          payload-token-client-id: ${{ vars.SOCKET_PAYLOAD_CLIENT_ID }}
+          payload-token-private-key: ${{ secrets.SOCKET_PAYLOAD_APP_PRIVATE_KEY }}
 
       - name: Run tests (meander CLI + val helpers)
         run: pnpm run test --all

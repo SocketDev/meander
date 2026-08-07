@@ -97,6 +97,9 @@ jobs:
 
       - name: Setup and install
         uses: ./.github/actions/fleet/setup-and-install
+        with:
+          payload-token-client-id: ${{ vars.SOCKET_PAYLOAD_CLIENT_ID }}
+          payload-token-private-key: ${{ secrets.SOCKET_PAYLOAD_APP_PRIVATE_KEY }}
 
       - name: Build (emits dist/cli.mjs)
         run: pnpm run build
