@@ -14,7 +14,7 @@ jump to 20% / 80%). The ratio persists to `localStorage` under
 `meander:pages:col-split`. Hidden on viewports narrower than
 1100px (layout collapses to a single column, nothing to split).
 
-No configuration — always on.
+No configuration - always on.
 
 ## Jump-to-file menu
 
@@ -27,13 +27,13 @@ An `IntersectionObserver` tracks which `.file-block` is topmost
 in the viewport and updates the active row across all open
 menus as the reader scrolls.
 
-No configuration — always on when ≥2 files per part.
+No configuration - always on when ≥2 files per part.
 
 ## Per-file sections menu + per-chunk chips
 
 When a file has two or more sections, the "N sections" count in
 the `.file-head` becomes a second `<details>` dropdown listing
-every section ("Section 1 — Lines 6–9", …) so readers can jump
+every section ("Section 1 - Lines 6–9", …) so readers can jump
 directly to a chunk without scrolling.
 
 Each `.code-section` also carries a small chip at top-right
@@ -42,7 +42,7 @@ open clones the file-head's full menu into it client-side and
 pre-marks the current chunk active. This saves repeated markup
 on files with many sections.
 
-No configuration — always on when ≥2 sections per file.
+No configuration - always on when ≥2 sections per file.
 
 ## Theme toggle (light / dark)
 
@@ -56,7 +56,7 @@ flash the light theme.
 
 Each press targets the opposite of the currently _resolved_
 theme. What gets stored depends on how that target compares to
-the OS preference — not to the stored value:
+the OS preference - not to the stored value:
 
 - target matches the OS preference → the key is **removed**, so
   the page goes back to following the OS
@@ -65,7 +65,7 @@ the OS preference — not to the stored value:
 That comparison is what lets a second press return the reader to
 OS-following without needing a third control, and what keeps the
 button from going dead when the OS flips underneath a stored
-override — the target still differs from what is on screen, so
+override - the target still differs from what is on screen, so
 every press visibly changes something.
 
 While nothing is stored, a `matchMedia` observer re-applies the
@@ -73,11 +73,11 @@ theme when the OS preference changes.
 
 The two SVG icons stack on top of each other via
 `position: absolute; inset: 0; margin: auto`, so switching
-themes only flips opacity — the button never reflows. The button
+themes only flips opacity - the button never reflows. The button
 shows the theme currently in effect and its `aria-label` names
 the action ("Switch to dark theme").
 
-No configuration — always on.
+No configuration - always on.
 
 ## Cmd/Ctrl-click links in code
 
@@ -91,13 +91,13 @@ Inside every `.line-code` cell:
   there. Falls back to basename match (so `./foo.js` resolves
   to `foo.ts` if that's what meander emitted).
 
-Both are invisible at rest — no underline, no pointer, same
+Both are invisible at rest - no underline, no pointer, same
 color as surrounding code. Holding Cmd (macOS) or Ctrl
 (elsewhere) flips `body.mdr-mod-pressed`; CSS reveals a dotted
 underline + pointer. Plain clicks are blocked so code selection
 still works.
 
-No configuration — always on. Runs after hljs has tokenized
+No configuration - always on. Runs after hljs has tokenized
 code (hljs splits text nodes; wrapping before it would get
 blown away).
 
@@ -133,29 +133,29 @@ Five pure string transforms applied to every rendered doc and
 every annotation body on the server side. Idempotent; safe to
 run multiple times.
 
-- **`highlightProseNumbers`** — wraps digit tokens and version
+- **`highlightProseNumbers`** - wraps digit tokens and version
   strings (`1.2.3`, `95%`, `23+`, `~42`) in
   `<span class="mdr-num">` for accent-color styling. Allow-
   listed to prose elements (p, li, td, blockquote, h1–h4); skips
   code/pre/a/kbd/samp. Declines to re-color bold list markers
   (`**1.** Branch`).
-- **`italicizeParentheticals`** — wraps `(aside)` in `<em>` so
+- **`italicizeParentheticals`** - wraps `(aside)` in `<em>` so
   parentheticals read quieter than inline copy. 2+-char contents,
   no nested parens/tags/quotes.
-- **`anchorifyHeadings`** — appends a GitHub-style `#` permalink
+- **`anchorifyHeadings`** - appends a GitHub-style `#` permalink
   to every h2/h3/h4. The anchor is `opacity: 0` at rest and
   fades in on heading hover. Slugs dedupe with `-2`, `-3`, …
   suffixes.
-- **`enhanceRepoTrees`** — detects ASCII directory trees
+- **`enhanceRepoTrees`** - detects ASCII directory trees
   (contain `├──` / `└──` / `│`) and tags the `<pre>` with
   `.mdr-repo-tree` + the inner `<code>` with `nohighlight` so
   hljs doesn't paint the drawing glyphs as random tokens.
-- **`stripFurtherReading`** — removes the
+- **`stripFurtherReading`** - removes the
   `<h2>Further reading</h2>` section + every sibling until the
   next `<h2>`. README-style cross-reference lists become dead
   links once docs are split into separate walkthrough pages.
 
-No configuration — always on for doc and annotation renders.
+No configuration - always on for doc and annotation renders.
 
 ## Mermaid diagram pre-rendering
 
@@ -185,14 +185,14 @@ Or customize:
 }
 ```
 
-- `theme`: `"default" | "dark" | "neutral" | "forest"` —
+- `theme`: `"default" | "dark" | "neutral" | "forest"` -
   mermaid's built-in themes. Default: `"default"`.
 - `cacheDir`: path (relative to `meander.config.json`'s dir) where
   rendered SVGs are cached. Default: `.cache/mermaid`.
 
 ### Optional runtime deps
 
-`mermaid` and `puppeteer` aren't installed by default — meander
+`mermaid` and `puppeteer` aren't installed by default - meander
 loads them dynamically only when you enable this feature. Add
 them to your project when you're ready:
 
@@ -205,7 +205,7 @@ available.
 
 ### How it works
 
-1. Shared puppeteer browser per build — Chromium boot cost paid
+1. Shared puppeteer browser per build - Chromium boot cost paid
    at most once.
 2. SHA-256 cache keyed on `mermaid version + theme + source`.
    Unchanged diagrams are a pure disk read.
@@ -230,7 +230,7 @@ language: "typescript" })` as the default fallback.
 
 Push entries into the array at
 `window[Symbol.for("meander:inline-tokenizers")]` from any
-script on the page (before or after meander's bundle — the
+script on the page (before or after meander's bundle - the
 array is a stable symbol-keyed handle either way):
 
 ```js
@@ -255,14 +255,14 @@ Each entry:
 - `classify(text)`: returns truthy if this tokenizer owns the
   span.
 - `tokenize(text)`: returns HTML string. Assigned via
-  `innerHTML` — escape untrusted content yourself.
+  `innerHTML` - escape untrusted content yourself.
 
 ### Scope
 
 The pass runs against every inline `<code>` inside
 `.annotation-md`, `.doc-content`, or `.mdr-hero-desc` that
 isn't already inside a `<pre>`. Block code (fenced code) is
-left alone — hljs already highlights those at the block
+left alone - hljs already highlights those at the block
 level.
 
 ### Idempotency
@@ -290,7 +290,7 @@ file watcher that re-runs `generate()` on change. Scoped to:
 
 Events are debounced (150ms) so multi-file saves trigger a
 single regen. The emitted `walkthrough/` subdir is explicitly
-ignored — writes from `generate()` itself would otherwise
+ignored - writes from `generate()` itself would otherwise
 infinite-loop.
 
 Without `--watch`, `pnpm dev` runs a single `generate()` and
@@ -320,7 +320,7 @@ footer at the bottom ("Built with meander" → upstream repo).
 }
 ```
 
-## Index page — hero panel + TOC card grid
+## Index page - hero panel + TOC card grid
 
 The index page now renders as a card grid of parts rather than
 a plain `<ul>`. Each card shows:
@@ -384,7 +384,7 @@ Each badge gets both a generic `.mdr-size-tier` class and a
 tier-specific `.mdr-size-tier-<tier>` class so consumers can
 re-theme them.
 
-## Doc entries — rich form with `filename`, `title`, `summary`
+## Doc entries - rich form with `filename`, `title`, `summary`
 
 Docs can be either a plain path string (shorthand) or an object
 with extra metadata:
@@ -452,7 +452,7 @@ Rendered as `/test-docs/parts/setup` instead of
 - Filenames must match `[a-z0-9][a-z0-9-]*`.
 - Filenames must be unique within a walkthrough.
 - Parts without a `filename` keep the legacy numeric URL form
-  (back-compat — existing consumers see no change).
+  (back-compat - existing consumers see no change).
 
 ## llms.txt / llms-full.txt
 
@@ -460,9 +460,9 @@ Rendered as `/test-docs/parts/setup` instead of
 the output dir for LLM agents following the
 [llmstxt.org](https://llmstxt.org) convention:
 
-- **llms.txt** — title + parts + docs as a linked markdown
+- **llms.txt** - title + parts + docs as a linked markdown
   index. URLs are root-relative by default.
-- **llms-full.txt** — the index plus every document's full
+- **llms-full.txt** - the index plus every document's full
   markdown body, separated by `---`. Agents can ingest the
   whole walkthrough in one pass.
 
@@ -521,7 +521,7 @@ Or pin a version string to force all cached clients to upgrade:
   (CSS, JS, icons, fonts). Readers get an instant response;
   the background fetch refreshes the cache for next time.
 - **Network-first** for HTML navigations. Stale HTML is the
-  worst cache-miss mode — the page ships pointing at asset
+  worst cache-miss mode - the page ships pointing at asset
   URLs that may have moved. Falls back to cache only on
   offline.
 - **Bypass** on POST/PUT/DELETE, cross-origin, and `/api/*`
@@ -536,13 +536,13 @@ reloads.
 **Opt-in.** When enabled, meander runs a final minification
 pass against emitted assets:
 
-- **Inline `<script>`** bodies + **`sw.js`** — rolldown's
+- **Inline `<script>`** bodies + **`sw.js`** - rolldown's
   minifier, strips comments.
-- **Inline `<svg>`** elements — SVGO with `preset-default`
+- **Inline `<svg>`** elements - SVGO with `preset-default`
   (cleanupIds + removeUnknownsAndDefaults overridden off so
   mermaid diagrams keep their edge-to-node links and the
   preserveAspectRatio variants browsers read).
-- **External `meander.css`** — lightningcss on the file bytes
+- **External `meander.css`** - lightningcss on the file bytes
   before they're written.
 
 Typical savings on the fixture:
@@ -585,7 +585,7 @@ touch content).
 
 ### Dep notes
 
-`svgo` and `lightningcss` ship as direct deps — the SVG and CSS
+`svgo` and `lightningcss` ship as direct deps - the SVG and CSS
 minify passes are always available. `rolldown` is loaded dynamically;
 if a consumer enables `config.minify.js` without installing
 rolldown themselves, that pass logs + skips rather than
@@ -686,13 +686,13 @@ A page that already has a CSP meta tag is left unchanged.
 All client-side modules attach to `window[Symbol.for("meander:pages")]`
 (via `assets/boot.js`). Primitives exposed:
 
-- `ns.storageGet(key)` / `ns.storageSet(key, value)` —
+- `ns.storageGet(key)` / `ns.storageSet(key, value)` -
   guarded localStorage (no-ops on quota / private mode).
-- `ns.onReady(fn)` — run after DOMContentLoaded.
-- `ns.onHljsReady(fn)` — run after hljs finishes tokenizing
+- `ns.onReady(fn)` - run after DOMContentLoaded.
+- `ns.onHljsReady(fn)` - run after hljs finishes tokenizing
   the first `.line-code` block.
 - `ns.wrapJsdocTags(container)` /
-  `ns.groupJsdocBlocks(container)` — exported by the JSDoc
+  `ns.groupJsdocBlocks(container)` - exported by the JSDoc
   pipeline modules so custom orchestrators can call them.
 
 ## CSS class prefix

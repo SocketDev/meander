@@ -32,7 +32,7 @@ Follow `_shared/env-check.md`. Run `git status` (warn but continue if dirty). Co
 
 ### Phase 2: Update dependencies
 
-Run `pnpm run update` for the meander checkout. The script honors the 7-day maturity period from `.config/taze.config.mts` and the `min-release-age=7` setting in `.npmrc` — don't add flags that bypass them. Report the number of packages updated. Continue with the scan even if the update step fails.
+Run `pnpm run update` for the meander checkout. The script honors the 7-day maturity period from `.config/taze.config.mts` and the `min-release-age=7` setting in `.npmrc` - don't add flags that bypass them. Report the number of packages updated. Continue with the scan even if the update step fails.
 
 ---
 
@@ -61,13 +61,13 @@ Ask the user which scan types to run. Default is all of them.
 
 **Scan types:**
 
-1. **critical** — crashes, prototype-pollution risk, resource leaks, data corruption, unhandled promise rejections.
-2. **logic** — algorithm errors, edge cases, type guards, off-by-one, malformed-input handling, classifier predicate bugs (`src/classifiers.mts`).
-3. **workflow** — `scripts/`, `package.json`, `.github/workflows/`, `.git-hooks/`, cross-platform compatibility, CLAUDE.md convention drift.
-4. **security** — GitHub Actions workflow security via zizmor (delegate to the existing `security-scan` skill if scope is broader than this scan needs).
-5. **documentation** — `README.md`, `docs/contributing.md`, CLAUDE.md accuracy against the actual code in `src/` and `scripts/`.
+1. **critical** - crashes, prototype-pollution risk, resource leaks, data corruption, unhandled promise rejections.
+2. **logic** - algorithm errors, edge cases, type guards, off-by-one, malformed-input handling, classifier predicate bugs (`src/classifiers.mts`).
+3. **workflow** - `scripts/`, `package.json`, `.github/workflows/`, `.git-hooks/`, cross-platform compatibility, CLAUDE.md convention drift.
+4. **security** - GitHub Actions workflow security via zizmor (delegate to the existing `security-scan` skill if scope is broader than this scan needs).
+5. **documentation** - `README.md`, `docs/contributing.md`, CLAUDE.md accuracy against the actual code in `src/` and `scripts/`.
 
-There's no separate `cache` scan in meander — content caching lives in `src/crypto.mts` (AES-256-GCM at-rest encryption) and is covered by the critical + logic scans.
+There's no separate `cache` scan in meander - content caching lives in `src/crypto.mts` (AES-256-GCM at-rest encryption) and is covered by the critical + logic scans.
 
 ---
 
@@ -91,7 +91,7 @@ Collect all findings. Deduplicate (same `file:line` and same issue across scans,
 
 Generate a structured report using the "Report Template" section in `reference.md`. The report includes: scan metadata, dependency-update status, structural-validation results, findings grouped by severity, scan coverage, and prioritized recommendations.
 
-Display the report to console. Optionally save it to a path the user picks (meander has no `reports/` convention — ask before writing one).
+Display the report to console. Optionally save it to a path the user picks (meander has no `reports/` convention - ask before writing one).
 
 ---
 
@@ -120,8 +120,8 @@ Report final metrics: dependency-update count, structural-validation results, cl
 
 See `reference.md` for the per-scan agent prompt templates:
 
-- **critical-scan** — null/undefined access, unhandled promise rejections, race conditions, resource leaks, prototype-pollution gaps.
-- **logic-scan** — off-by-one, type guards, edge cases, classifier-predicate correctness, parser correctness in `src/generate.mts`.
-- **workflow-scan** — `scripts/`, `package.json`, git hooks, `.github/workflows/`.
-- **security-scan** — GitHub Actions workflow security (zizmor). For a full security pass also run the dedicated `security-scan` skill (combined AgentShield + zizmor).
-- **documentation-scan** — README accuracy, CLAUDE.md drift, outdated examples in `docs/`.
+- **critical-scan** - null/undefined access, unhandled promise rejections, race conditions, resource leaks, prototype-pollution gaps.
+- **logic-scan** - off-by-one, type guards, edge cases, classifier-predicate correctness, parser correctness in `src/generate.mts`.
+- **workflow-scan** - `scripts/`, `package.json`, git hooks, `.github/workflows/`.
+- **security-scan** - GitHub Actions workflow security (zizmor). For a full security pass also run the dedicated `security-scan` skill (combined AgentShield + zizmor).
+- **documentation-scan** - README accuracy, CLAUDE.md drift, outdated examples in `docs/`.

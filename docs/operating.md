@@ -26,7 +26,7 @@ custodian must:
    - Email + Google Drive (same account)
    - Two laptops syncing to the same iCloud / OneDrive
 
-2. **Be reachable** for the rotation cadence — a custodian who
+2. **Be reachable** for the rotation cadence - a custodian who
    takes weeks to respond is a 1/threshold liability.
 
 3. **Recognize and refuse social engineering**. Never share over
@@ -37,25 +37,25 @@ custodian must:
 
 4. **Test their share once a year**. Against a val that already
    holds a wrapping key, the CLI's `restore` command writes no
-   state — it reports match or mismatch and stops, so it's safe to
+   state - it reports match or mismatch and stops, so it's safe to
    run as a drill (see "Restoration drill" below).
 
 ## Rotation cadence
 
 Rotate the comment-store wrapping key on:
 
-- **Suspected compromise** — share leak, custodian device theft,
+- **Suspected compromise** - share leak, custodian device theft,
   Val Town platform incident touching env vars.
-- **Custodian change** — someone leaves and held a share. Rotate
+- **Custodian change** - someone leaves and held a share. Rotate
   to invalidate their (now decommissioned) share.
-- **Annual hygiene** — even with no incident, rotate yearly to
+- **Annual hygiene** - even with no incident, rotate yearly to
   exercise the procedure and catch share-storage decay before
   it matters.
 
 Rotate the blob wrapping key on:
 
 - **Same triggers as comment-store** plus:
-- **Any time you re-publish** is fine — blobs are regenerable, so
+- **Any time you re-publish** is fine - blobs are regenerable, so
   rotating + re-publishing is cheap.
 
 ## Comment-store rotation runbook
@@ -163,7 +163,7 @@ Your share storage has drifted from what the val holds. Either:
   updated. Find the most recent rotation's shares.
 
 If you have confirmed the shares are a legitimate key the val
-lost — a retired generation whose rows you still need to read —
+lost - a retired generation whose rows you still need to read -
 plant them deliberately:
 
 ```bash
@@ -187,7 +187,7 @@ meander db key restore walkthrough --threshold 2
 ```
 
 After this, the val resumes serving comments normally. No data
-loss. No comment ciphertext was decrypted in the recovery — only
+loss. No comment ciphertext was decrypted in the recovery - only
 the wrapping key was reconstituted.
 
 For the blob key:
@@ -216,12 +216,12 @@ If audit succeeds and reports sane state, the problem is somewhere
 else (val process down, sqlite issue). If audit fails, the
 error message points at which env var is missing.
 
-**Comment writes return 401 / 403.** Auth, not encryption — see
+**Comment writes return 401 / 403.** Auth, not encryption - see
 [deploying.md](./deploying.md) for `MEANDER_ALLOWED_EMAIL_DOMAINS`
 and `MEANDER_DEMO_MODE`.
 
 **`meander db key rotate` reports "rewrap stalled".** A row's
-DEK couldn't be unwrapped — usually means the row was written
+DEK couldn't be unwrapped - usually means the row was written
 under a generation no longer in env. Check audit output;
 restore the missing generation if shares are available.
 
@@ -245,28 +245,28 @@ backup paths, neither built into meander today:
   as a daily backup (round-trips full plaintext through the val).
 
 - **SQLite dump via Val Town's data UI**: a manual backup option
-  if you want a full snapshot. Contains ciphertext only — useless
+  if you want a full snapshot. Contains ciphertext only - useless
   without the wrapping key.
 
 A scheduled-export GitHub Action that runs against
 `/api/comments/export` and commits the JSON to a private backup
 repo is a reasonable follow-up if your discussion volume justifies
-it. Give it `MEANDER_ADMIN_TOKEN` as a repository secret — the
+it. Give it `MEANDER_ADMIN_TOKEN` as a repository secret - the
 magic-code flow needs a mailbox no CI job has.
 
 ## When to involve which custodian
 
 | Operation                     | Threshold custodians needed                              |
 | ----------------------------- | -------------------------------------------------------- |
-| Read comments (val running)   | 0 — an encrypted walkthrough also wants a reader sign-in |
+| Read comments (val running)   | 0 - an encrypted walkthrough also wants a reader sign-in |
 | Read comments (val env wiped) | `threshold` (db key restore)                             |
 | New comment writes            | 0                                                        |
 | Annual rotation               | `threshold`                                              |
 | Suspected compromise rotation | `threshold`                                              |
 | Add a new custodian           | `threshold` (rotate to issue new shares)                 |
 | Remove a custodian            | `threshold` (rotate; old shares decommissioned)          |
-| Retire an old generation      | 0 (no shares — val-only)                                 |
-| Audit                         | 0 (no shares — val-only)                                 |
+| Retire an old generation      | 0 (no shares - val-only)                                 |
+| Audit                         | 0 (no shares - val-only)                                 |
 
 Most day-to-day operation needs zero custodian involvement.
 Custodians are only invoked for rotation, restoration, and

@@ -52,7 +52,7 @@ Its pure helpers (crypto, JWT, auth-domain matching) live in
 available in both Deno and Node so the helpers behave
 identically; tests don't mock anything.
 
-The val's HTTP routes — the Hono app + blob/sqlite interactions —
+The val's HTTP routes - the Hono app + blob/sqlite interactions -
 are not unit-tested; they're exercised end-to-end by
 `meander deploy-val` against a staging val and the human
 sign-in flow. If a future route changes pull logic out of the
@@ -61,9 +61,9 @@ there.
 
 ## CI
 
-- `.github/workflows/ci.yml` — lint + type-check + smoke test
+- `.github/workflows/ci.yml` - lint + type-check + smoke test
   - full test suite with coverage.
-- `.github/workflows/pages.yml` — builds the fixture under
+- `.github/workflows/pages.yml` - builds the fixture under
   `--base-path=/meander` and deploys it to
   `https://socketdev.github.io/meander/` as a live demo.
 
@@ -98,18 +98,18 @@ Browser scripts under `assets/*.js` are a separate world:
 
 ## Architecture tour
 
-- `src/cli.mts` — argv parser + command dispatcher.
-- `src/generate.mts` — HTML emission + annotation pipeline.
-- `src/config.mts` — single-source schema (TypeBox) + loader.
-- `src/serve.mts` — local preview server.
-- `src/publish.mts` — encrypt + upload to Val Town.
-- `src/deploy-val.mts` — one-shot val deploy.
-- `src/crypto.mts` — AES-256-GCM + PBKDF2 helpers.
-- `src/classifiers.mts` — inline `<code>` shape predicates.
+- `src/cli.mts` - argv parser + command dispatcher.
+- `src/generate.mts` - HTML emission + annotation pipeline.
+- `src/config.mts` - single-source schema (TypeBox) + loader.
+- `src/serve.mts` - local preview server.
+- `src/publish.mts` - encrypt + upload to Val Town.
+- `src/deploy-val.mts` - one-shot val deploy.
+- `src/crypto.mts` - AES-256-GCM + PBKDF2 helpers.
+- `src/classifiers.mts` - inline `<code>` shape predicates.
 - `src/minify.mts`, `src/security.mts`, `src/prose-polishers.mts`,
-  `src/render-mermaid.mts`, `src/url-rewrite.mts` — emit-time
+  `src/render-mermaid.mts`, `src/url-rewrite.mts` - emit-time
   passes applied by `generate`.
-- `assets/val/index.ts` — the deployed Hono handler.
+- `assets/val/index.ts` - the deployed Hono handler.
 
 ## Submitting changes
 

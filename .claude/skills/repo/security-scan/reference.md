@@ -35,7 +35,7 @@ The rule list below is grouped by what each rule protects against.
 Fix: replace the literal with an environment-variable reference
 (`${TOKEN_NAME}`) or move the secret into the shell environment and
 read via `process.env`. Don't commit literals even if they're
-redacted with asterisks — the redaction can be undone in git
+redacted with asterisks - the redaction can be undone in git
 history. The `token-hygiene` hook at `.claude/hooks/token-hygiene/`
 catches most of these at command-issue time, but the AgentShield
 scan picks up anything that lands in repo files.
@@ -45,7 +45,7 @@ scan picks up anything that lands in repo files.
 | Rule | What it flags | Default severity |
 |---|---|---|
 | `bash-wildcard-allowlist` | `"Bash(*)"` or `"Bash(.*)"` in allow list | HIGH |
-| `overly-broad-glob` | `"Read(/**)"` or a home-directory wildcard — broader than the work requires | MEDIUM |
+| `overly-broad-glob` | `"Read(/**)"` or a home-directory wildcard - broader than the work requires | MEDIUM |
 | `unknown-tool-allowed` | A tool name not recognized by Claude Code's catalog | MEDIUM |
 
 Fix: narrow the allow list to the specific commands / paths the
@@ -57,12 +57,12 @@ a convenience list.
 | Rule | What it flags | Default severity |
 |---|---|---|
 | `instruction-override-in-agent-md` | Text in agent / skill markdown that looks like "ignore previous instructions" or asks Claude to override its system prompt | HIGH |
-| `executable-content-in-md` | Shell-looking blocks not fenced as code — Claude may execute them literally | MEDIUM |
+| `executable-content-in-md` | Shell-looking blocks not fenced as code - Claude may execute them literally | MEDIUM |
 | `external-url-to-fetch` | Hard-coded URLs to fetch third-party content at runtime without a SHA pin | MEDIUM |
 
 Fix: fence all shell blocks as markdown code blocks. Pin any
 external fetch by SHA (this matches meander's pinning of the hljs
-CDN with SRI integrity hashes — see `src/generate.mts`). Don't
+CDN with SRI integrity hashes - see `src/generate.mts`). Don't
 include "override this" language in agent definitions; if you need
 an escape hatch, make it an explicit config flag.
 
@@ -78,7 +78,7 @@ Fix: hooks should use array-form commands (`["cmd", "arg1",
 "$VAR"]`) or explicit argv parsing. Avoid shell interpolation of
 any variable the user or model can influence. The hooks shipped at
 `.claude/hooks/` (check-new-deps, token-hygiene, public-surface-reminder)
-all parse argv via Node — match that pattern.
+all parse argv via Node - match that pattern.
 
 ### MCP-server rules
 
@@ -102,16 +102,16 @@ most likely to see:
 
 | Rule | What it flags | Default severity |
 |---|---|---|
-| `unpinned-action` | `uses: actions/checkout@v4` (tag — mutable) instead of `@<full-sha>` | HIGH |
+| `unpinned-action` | `uses: actions/checkout@v4` (tag - mutable) instead of `@<full-sha>` | HIGH |
 | `template-injection` | `${{ github.event.issue.title }}` interpolated into a `run:` step without pre-validation | CRITICAL |
 | `excessive-permissions` | `permissions: write-all` or `permissions: contents: write` when the job only reads | HIGH |
 | `secret-in-env-at-step-level` | `env:` block at step level carrying a secret other jobs in the workflow can't see (OK in-scope; flagged when narrower placement would work) | MEDIUM |
-| `pull-request-target-no-ref` | `pull_request_target` trigger with no `ref:` — default checks out main, but the PR's code runs via an embedded command | CRITICAL |
-| `bash-at-step-level-no-shell` | `run:` without `shell: bash` — portable but bash-specific syntax fails on Windows runners | LOW |
+| `pull-request-target-no-ref` | `pull_request_target` trigger with no `ref:` - default checks out main, but the PR's code runs via an embedded command | CRITICAL |
+| `bash-at-step-level-no-shell` | `run:` without `shell: bash` - portable but bash-specific syntax fails on Windows runners | LOW |
 | `artifact-upload-secret` | An action uploads artifacts from a path that may contain a secret | HIGH |
 
 Fix: pin every action SHA (use `# v4` trailing comment for human
-readability — meander already does this on `actions/checkout@…`).
+readability - meander already does this on `actions/checkout@…`).
 For `template-injection`, stash the untrusted input in an env var
 first, then reference that env var in the shell:
 
@@ -169,7 +169,7 @@ the top and each job tightens from there, zizmor may flag the
 workflow-level permissions as excessive even if the job-level
 blocks are correctly narrowed.
 
-Resolution: this is fine — workflow-level `contents: read` is
+Resolution: this is fine - workflow-level `contents: read` is
 already minimal. Suppress if noise.
 
 ### "Template injection" on `github.run_id` / `github.sha`
@@ -185,7 +185,7 @@ interpolation.
 
 ### "Dotfile leak" for `.env.example`
 
-`.env.example` is by convention a *template* for developers — no
+`.env.example` is by convention a *template* for developers - no
 real values. If AgentShield flags it because of the path pattern,
 it's a false positive.
 
@@ -332,7 +332,7 @@ rest in the file.
 <a id="skipping-checks"></a>
 ## 6. When to skip a check (and how)
 
-Skipping a rule is sometimes correct — when the finding is a
+Skipping a rule is sometimes correct - when the finding is a
 documented false positive, or when the rule's cost outweighs its
 value for this repo.
 
@@ -408,23 +408,23 @@ Read in this order:
 <a id="cross-references"></a>
 ## 8. Cross-references
 
-- SKILL.md — the phased scan workflow.
-- `.claude/skills/fleet/_shared/security-tools.md` — tool detection
+- SKILL.md - the phased scan workflow.
+- `.claude/skills/fleet/_shared/security-tools.md` - tool detection
   (AgentShield, zizmor) + install paths.
-- `.claude/skills/fleet/_shared/report-format.md` — grade rubric +
+- `.claude/skills/fleet/_shared/report-format.md` - grade rubric +
   HANDOFF block format.
-- `.claude/skills/fleet/_shared/env-check.md` — common environment prep.
-- `.claude/agents/fleet/security-reviewer.md` — the agent that produces
+- `.claude/skills/fleet/_shared/env-check.md` - common environment prep.
+- `.claude/agents/fleet/security-reviewer.md` - the agent that produces
   the final grade.
-- `.claude/hooks/token-hygiene/` — runtime hook that blocks
+- `.claude/hooks/token-hygiene/` - runtime hook that blocks
   commands leaking tokens. Complements (doesn't replace) the
   AgentShield static scan.
-- `.claude/hooks/check-new-deps/` — runtime hook that blocks
+- `.claude/hooks/check-new-deps/` - runtime hook that blocks
   installs of unvetted packages.
-- `.claude/hooks/public-surface-reminder/` — nudge before
+- `.claude/hooks/public-surface-reminder/` - nudge before
   `git commit` / `git push` / `gh pr` reminding that customer
   names + tracker IDs stay out of public surface.
-- [AgentShield docs](https://github.com/socketdev/agentshield) —
+- [AgentShield docs](https://github.com/socketdev/agentshield) -
   upstream tool.
-- [zizmor docs](https://woodruffw.github.io/zizmor/) — upstream
+- [zizmor docs](https://woodruffw.github.io/zizmor/) - upstream
   tool.

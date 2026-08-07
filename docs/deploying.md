@@ -2,10 +2,10 @@
 
 Meander has two deploy targets, used independently:
 
-- **GitHub Pages** for walkthrough HTML — the common case. No
+- **GitHub Pages** for walkthrough HTML - the common case. No
   Val Town involvement, no encryption, GitHub gates access via
   Pages permissions.
-- **Val Town** for the comment backend, a small Hono val — the
+- **Val Town** for the comment backend, a small Hono val - the
   server that handles email magic-code auth, JWT sessions, and
   the SQLite comment store.
 
@@ -20,7 +20,7 @@ threat model.
 ### Prerequisites
 
 - A Val Town account.
-- A Val Town API token — create one at
+- A Val Town API token - create one at
   [val.town/settings/api](https://val.town/settings/api).
 
 ### Token scopes
@@ -37,7 +37,7 @@ needs:
 
 For CI deploys of the comment backend (via
 `.github/workflows/valtown.yml`), scope the token to
-**`val:write` only** — nothing broader. No blob, no user. The
+**`val:write` only** - nothing broader. No blob, no user. The
 publish workflow needs `blob:write` separately.
 
 Rotate by minting a new token and deleting the old one in Val
@@ -50,7 +50,7 @@ Town → Settings → API Tokens. Update the GitHub secret under
 export VALTOWN_TOKEN=vtwn_...
 ```
 
-- `VALTOWN_TOKEN` — the API token you just created. If your CI
+- `VALTOWN_TOKEN` - the API token you just created. If your CI
   uses a different secret name, set
   `MEANDER_VALTOWN_TOKEN_ENV=MY_NAME` or pass `--token-env MY_NAME`
   to the CLI.
@@ -142,7 +142,7 @@ this val to restore anonymous comment reads on them without waiting
 for the first request to derive it.
 
 When `encryptBlobs: false` (the default), `publish` uploads
-plaintext bytes — `MEANDER_BLOB_KEY` is not needed, and the
+plaintext bytes - `MEANDER_BLOB_KEY` is not needed, and the
 walkthrough is public.
 
 Re-run `generate` + `publish` whenever the source files or
@@ -189,7 +189,7 @@ meander deploy-val --demo-mode
 
 Demo-mode deploys:
 
-- Show a dismissible "demo mode — comments aren't saved" banner
+- Show a dismissible "demo mode - comments aren't saved" banner
   in the UI.
 - Return 403 on every comment-write endpoint.
 - Still serve every page + render the composer (so visitors see
@@ -229,6 +229,6 @@ without breakage.
 
 ## Day-2 ops
 
-See [operating.md](./operating.md) for the day-2 ops runbook —
+See [operating.md](./operating.md) for the day-2 ops runbook -
 key rotation, restoration drills, custodian responsibilities,
 backup strategy.

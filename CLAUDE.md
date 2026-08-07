@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**MANDATORY**: Act as principal-level engineer. This file is a thin index — every rule's detail lives in `docs/agents.md/{fleet,repo}/<topic>.md`; fleet bullets are canonical (edit only in `template/`, then cascade), repo bullets are host-owned. (`.claude/hooks/fleet/{claude-md-size-guard,claude-md-section-size-guard,claude-md-defer-detail-nudge,claude-md-rule-add-guard}/`)
+**MANDATORY**: Act as principal-level engineer. This file is a thin index - every rule's detail lives in `docs/agents.md/{fleet,repo}/<topic>.md`; fleet bullets are canonical (edit only in `template/`, then cascade), repo bullets are host-owned. (`.claude/hooks/fleet/{claude-md-size-guard,claude-md-section-size-guard,claude-md-defer-detail-nudge,claude-md-rule-add-guard}/`)
 
 <!-- <fleet> -->
 

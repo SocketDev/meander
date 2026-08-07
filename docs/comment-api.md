@@ -4,7 +4,7 @@ The deployed val exposes a small REST API. Comment reads are open on
 a public walkthrough, so every visitor sees existing discussions; on
 an encrypted one they take the same credentials the prose does.
 Writes and the bulk export require a signed-in session on any
-walkthrough. One val can host many walkthroughs — every query is
+walkthrough. One val can host many walkthroughs - every query is
 scoped by `slug`, so a comment id from one walkthrough does not
 resolve against another.
 
@@ -28,11 +28,11 @@ walkthrough drives it. See
 
 ### Magic-code flow
 
-1. `POST /api/auth/request { email }` — the val checks the email
+1. `POST /api/auth/request { email }` - the val checks the email
    domain against `MEANDER_ALLOWED_EMAIL_DOMAINS`, mints a
    6-digit code, stores a SHA-256 hash of it in SQLite, and
    emails the code via Val Town's built-in email.
-2. `POST /api/auth/verify { email, code }` — the val checks the
+2. `POST /api/auth/verify { email, code }` - the val checks the
    code (max 5 attempts, 10-minute expiry) and returns
    `{ token, email }`. The one-shot code is deleted after a
    successful match.
@@ -42,11 +42,11 @@ walkthrough drives it. See
 
 Rejection reasons the client can surface:
 
-- `403` from `/api/auth/request` — email domain not allowed, or
+- `403` from `/api/auth/request` - email domain not allowed, or
   the server has no `MEANDER_ALLOWED_EMAIL_DOMAINS` configured
   (fresh-deploy safe default).
-- `401` from `/api/auth/verify` — wrong code.
-- `429` from `/api/auth/verify` — too many failed attempts; user
+- `401` from `/api/auth/verify` - wrong code.
+- `429` from `/api/auth/verify` - too many failed attempts; user
   needs to request a fresh code.
 
 ## Comment endpoints
@@ -74,7 +74,7 @@ carries the reason and nothing else. This is the gate
 discussion of them. A walkthrough with no recorded visibility is
 treated as private.
 
-The `author` field on a POST is **not** honored — the server
+The `author` field on a POST is **not** honored - the server
 stamps the authenticated email. Clients can't spoof a different
 name through the API.
 
@@ -87,8 +87,8 @@ someone else is `403`. `Authorization: Bearer <MEANDER_ADMIN_TOKEN>`
 overrides both checks, so an operator can clear anything.
 
 Deleting a root comment deletes its replies with it. Orphaned
-replies would be retained but unreachable — the export walks
-roots, and the thread UI has nothing to hang them under — so the
+replies would be retained but unreachable - the export walks
+roots, and the thread UI has nothing to hang them under - so the
 thread is the unit that goes. Deleting a reply removes only that
 reply. The response reports the count: `{ ok, id, deleted }`.
 
@@ -98,7 +98,7 @@ The export returns every comment body and author identity for a
 slug, decrypted. It takes either identity:
 
 - A session JWT, same as the write routes. The in-page export
-  button sends this — it fetches the JSON and saves it through an
+  button sends this - it fetches the JSON and saves it through an
   object URL, because a plain link download can't carry the
   `Authorization` header.
 - `Authorization: Bearer <MEANDER_ADMIN_TOKEN>`, for a headless
@@ -110,17 +110,17 @@ slug, decrypted. It takes either identity:
 Comments live in a Val Town SQLite database. Each row carries:
 
 - `id`, `slug`, `part`, `file`, `line_from`, `line_to`, `parent_id`,
-  `resolved`, `created_at` — plaintext, for indexing + filtering.
-- `body`, `author` — encrypted with AES-256-GCM under a per-row
+  `resolved`, `created_at` - plaintext, for indexing + filtering.
+- `body`, `author` - encrypted with AES-256-GCM under a per-row
   data key.
-- `dek_wrapped`, `key_generation` — the per-row data key, wrapped
+- `dek_wrapped`, `key_generation` - the per-row data key, wrapped
   under `MEANDER_DB_KEY_<key_generation>`. See
   [encryption.md](./encryption.md) for the envelope scheme + the
   rotation lifecycle.
 
 Magic codes live in a separate `magic_codes` table with `email`
 primary key. Stores a salted SHA-256 hash of the code, not the
-code itself — leaking this table doesn't leak any user's code.
+code itself - leaking this table doesn't leak any user's code.
 
 ## Admin endpoints
 
@@ -135,7 +135,7 @@ the operator's Val Town API token.
 | `GET`  | `/admin/key-audit` | Per-generation row counts + the current pointer.                                                                               |
 | `POST` | `/admin/rewrap`    | Re-wrap rows from one generation to another. Body: `{ fromGeneration, toGeneration, batchSize? }`. Idempotent + cursor-driven. |
 
-Comment ciphertext is never decrypted on these routes — only
+Comment ciphertext is never decrypted on these routes - only
 each row's small wrapped DEK moves. See
 [operating.md](./operating.md) for the rotation runbook.
 
@@ -145,11 +145,11 @@ When the val boots with `MEANDER_DEMO_MODE=true`, every write
 route returns `403 {"error": "demo mode — writes disabled"}`,
 regardless of the caller's session, and the export returns
 `403 {"error": "demo mode — export disabled"}`. Reads still work
-under their own gate — demo mode disables writes, and a demo
+under their own gate - demo mode disables writes, and a demo
 deployment still serves what a visitor may read. The served HTML
 carries `data-demo-mode="true"` on
 the `<body>` so the client can render a banner + disable the
 composer.
 
-The admin token bypasses demo mode on the routes that accept it —
+The admin token bypasses demo mode on the routes that accept it -
 it is an operator credential, not a visitor session.

@@ -22,7 +22,7 @@ card; the code that follows becomes the paired, highlighted code
 block. Readers can leave threaded comments on any line range.
 
 The generator emits static HTML. Comments are stored server-side
-in a Val Town val (SQLite + blob storage, encrypted at rest) —
+in a Val Town val (SQLite + blob storage, encrypted at rest) -
 you only need that piece if you want the commenting layer. See
 [docs/features.md](docs/features.md) for the full feature list
 and configuration knobs.
@@ -105,21 +105,21 @@ pages/
 
 ### Features
 
-- **Side-by-side prose + code** — each block comment pairs with
+- **Side-by-side prose + code** - each block comment pairs with
   the code that follows it.
-- **Multi-part walkthroughs** — split a codebase into ordered
+- **Multi-part walkthroughs** - split a codebase into ordered
   parts; the top nav moves readers between them.
-- **Go-to-definition** — exported symbols are indexed so readers
+- **Go-to-definition** - exported symbols are indexed so readers
   can jump to any definition across parts.
-- **Line-range commenting** — shift-click to select lines, type a
+- **Line-range commenting** - shift-click to select lines, type a
   comment, reply, resolve, delete.
-- **Documents tab** — optional Markdown pages with syntax
+- **Documents tab** - optional Markdown pages with syntax
   highlighting, a floating table of contents, block-level
   comments, and cross-doc links.
-- **Reader UX** — resizable prose/code splitter, jump-to-file
+- **Reader UX** - resizable prose/code splitter, jump-to-file
   menus, theme toggle, Cmd/Ctrl-click hotlinks, JSDoc annotation,
   opt-in Mermaid pre-rendering.
-- **Val Town hosting** — one Hono val serves every walkthrough
+- **Val Town hosting** - one Hono val serves every walkthrough
   out of blob storage, with encryption at rest.
 
 ### Config reference
@@ -154,14 +154,14 @@ path; the part with the most matches wins, ties broken by
 config order. Pick keywords that distinguish parts, not generic
 terms.
 
-The full schema — comments / theme / styles opt-outs, favicon
-overrides, CSP, SRI, mermaid, minify, service worker — lives in
+The full schema - comments / theme / styles opt-outs, favicon
+overrides, CSP, SRI, mermaid, minify, service worker - lives in
 [`docs/features.md`](docs/features.md).
 
 ### Publishing with comments
 
 The commenting layer runs in a Val Town val. If you only want
-static pages, you can skip this — `meander serve` previews the
+static pages, you can skip this - `meander serve` previews the
 HTML standalone.
 
 To deploy the val + publish encrypted pages:
@@ -176,9 +176,9 @@ See [docs/deploying.md](docs/deploying.md) for the full setup
 
 ### Examples
 
-- [`example/minimal/`](example/minimal/) — the smallest runnable
+- [`example/minimal/`](example/minimal/) - the smallest runnable
   meander project. Start here.
-- [`example/consumer-build/`](example/consumer-build/) —
+- [`example/consumer-build/`](example/consumer-build/) -
   integrating meander as a step in your own build pipeline (CLI,
   programmatic, GH Pages workflow).
 
@@ -199,17 +199,17 @@ pnpm test            # vitest suite
 
 Further reading:
 
-- [Features + configuration](docs/features.md) — every opt-in and
+- [Features + configuration](docs/features.md) - every opt-in and
   opt-out knob, with examples.
-- [Deploying](docs/deploying.md) — Val Town setup, token scopes,
+- [Deploying](docs/deploying.md) - Val Town setup, token scopes,
   first-time deploy, CI integration.
-- [Comment API](docs/comment-api.md) — the REST endpoints the
+- [Comment API](docs/comment-api.md) - the REST endpoints the
   browser client hits.
-- [Encryption](docs/encryption.md) — envelope scheme, threat
+- [Encryption](docs/encryption.md) - envelope scheme, threat
   model, Shamir custody, recovery scenarios.
-- [Operating](docs/operating.md) — day-2 ops runbook: rotation,
+- [Operating](docs/operating.md) - day-2 ops runbook: rotation,
   restoration drills, custodian responsibilities.
-- [Contributing](docs/contributing.md) — working on meander
+- [Contributing](docs/contributing.md) - working on meander
   itself: tests, CI, style, architecture tour.
 
 ## License

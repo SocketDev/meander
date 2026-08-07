@@ -6,7 +6,7 @@ pipeline (CI, Makefile, rolldown bundle, whatever).
 meander is usable as a CLI **and** as a library. Pick whichever
 matches the rest of your toolchain.
 
-## Option 1 — CLI, scripted
+## Option 1 - CLI, scripted
 
 Simplest. Good if you only need it occasionally.
 
@@ -25,7 +25,7 @@ pnpm run walkthrough          # emit pages/
 pnpm run walkthrough:preview  # watch + serve at localhost:8080
 ```
 
-## Option 2 — Programmatic
+## Option 2 - Programmatic
 
 Import the generator and call it from your own build script. Good
 when you want meander output as one step in a larger pipeline (a
@@ -46,11 +46,11 @@ Invoke it the same way you run any other Node script:
 node --experimental-strip-types scripts/build-walkthrough.mts
 ```
 
-## Option 3 — Minify your pages at emit time
+## Option 3 - Minify your pages at emit time
 
 meander can run inline scripts through rolldown's minifier,
 inline SVGs through svgo, and `meander.css` through lightningcss
-at emit time — enable via the config:
+at emit time - enable via the config:
 
 ```json
 {
@@ -65,7 +65,7 @@ at emit time — enable via the config:
 Requirements:
 
 - `svgo` and `lightningcss` are already installed as meander
-  deps — no action needed for `svg: true` or `css: true`.
+  deps - no action needed for `svg: true` or `css: true`.
 - For `js: true`, install rolldown in your project:
 
   ```bash

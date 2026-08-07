@@ -32,9 +32,9 @@ output is reproducible across sessions and authors.
 
 Two `meander.config.json` slots accept the result:
 
-1. **`parts[].filename`** — the slug for an emitted walkthrough
+1. **`parts[].filename`** - the slug for an emitted walkthrough
    part. URL: `/<slug>/parts/<filename>.html`.
-2. **`documents[].filename`** — the slug for a doc page. URL:
+2. **`documents[].filename`** - the slug for a doc page. URL:
    `/<slug>/docs/<filename>`. Also surfaces in the generated
    `llms.txt` and `llms-full.txt`.
 
@@ -48,7 +48,7 @@ the same in both:
 ```
 
 `loadMeanderConfig` in the same file additionally cross-checks
-**uniqueness across `parts[]` + `documents[]` combined** — a
+**uniqueness across `parts[]` + `documents[]` combined** - a
 collision throws at config-load time. This skill picks the
 word; the loader enforces the shape and uniqueness.
 </context>
@@ -93,54 +93,54 @@ word; the loader enforces the shape and uniqueness.
 Apply in order. Stop at the first rule that produces a clean
 filename.
 
-### Step 1 — Inventory the nouns in the title
+### Step 1 - Inventory the nouns in the title
 
 List every noun and nominalized action (gerund, `-ion`,
 `-ance`). Drop articles, prepositions, conjunctions ("and",
 "&", "of"). Drop any noun that appears in two or more other
-titles in the same manifest — those are qualifiers, not
+titles in the same manifest - those are qualifiers, not
 distinguishers.
 
 > **Why:** the filename has to distinguish this page from its
 > siblings. A non-distinct word can never be load-bearing.
 
-### Step 2 — Pick the distinguishing noun
+### Step 2 - Pick the distinguishing noun
 
 If exactly one noun is unique to this title and the others
 appear elsewhere in the manifest, that noun wins.
 
-### Step 3 — If several nouns tie, pick the superset
+### Step 3 - If several nouns tie, pick the superset
 
 When the title lists facets of one bigger concept, pick the
 bigger one.
 
-### Step 4 — If the title is "verb on a subject", pick the verb's nominal form
+### Step 4 - If the title is "verb on a subject", pick the verb's nominal form
 
 Use `-ing` (gerund) when the activity itself is the topic;
 use `-ion` / `-ance` when the state or output is the topic.
 
-### Step 5 — If the title is already a single content noun, lowercase it
+### Step 5 - If the title is already a single content noun, lowercase it
 
 `Anatomy` → `anatomy`. No transformation beyond casing.
 
-### Step 6 — When the term is a multi-word term-of-art, hyphenate
+### Step 6 - When the term is a multi-word term-of-art, hyphenate
 
 Meander permits hyphens in `parts[].filename`/
 `documents[].filename`, so multi-word internal terms can stay
 hyphenated **as long as the hyphenated form names a single
 concept**:
 
-- `db-key` — the database wrapping key. One concept, two
+- `db-key` - the database wrapping key. One concept, two
   words. Hyphen is correct.
-- `blob-key` — the blob wrapping key. One concept. Correct.
-- `building-and-stringifying` — two concepts (building,
+- `blob-key` - the blob wrapping key. One concept. Correct.
+- `building-and-stringifying` - two concepts (building,
   stringifying). Wrong; pick one.
 
 The test: would a developer in this codebase use the
 hyphenated form when speaking? `db-key`, yes.
 `building-and-stringifying`, never.
 
-### Step 7 — Validate against hard constraints
+### Step 7 - Validate against hard constraints
 
 Check the chosen filename:
 
@@ -152,12 +152,12 @@ Check the chosen filename:
 
 If any fails, return to Step 2 with the next-best candidate.
 
-### Step 8 — Sanity check across the manifest
+### Step 8 - Sanity check across the manifest
 
 Read the chosen filename in the context of its neighbors. If
 your pick is the odd one out (a gerund among plain nouns, a
 hyphenated form among single words), prefer the form that
-matches the surrounding family — internal consistency
+matches the surrounding family - internal consistency
 outweighs individually-optimal word choice.
 </instructions>
 
@@ -193,7 +193,7 @@ building. Step 3 (superset) + Step 4 (gerund). Result:
 <filename>db-key</filename>
 <reasoning>
 Nouns: `Database`, `Wrapping`, `Key`, `Ceremony`. The
-domain-specific term-of-art in this codebase is "db-key" — one
+domain-specific term-of-art in this codebase is "db-key" - one
 concept, hyphenated. Step 6 applies. The alternative
 `ceremony` is too abstract for a URL segment.
 </reasoning>
@@ -227,7 +227,7 @@ Title is already a single content noun. Step 5: lowercase it.
 </reasoning>
 </example>
 
-## Counter-examples — choices the procedure rejects
+## Counter-examples - choices the procedure rejects
 
 <example id="bad-1">
 <title>Building & Emitting Pages</title>
@@ -274,7 +274,7 @@ Fails the soft constraints on stability and content-bearing.
 <rejected>acme</rejected>
 <reasoning>
 Real customer or company names belong in walkthroughs only as
-deliberate authoring choices — not as URL segments that bake
+deliberate authoring choices - not as URL segments that bake
 the name into the file path. Pick the technical concept the
 walkthrough is about (e.g. `integration`, `webhooks`,
 `auth`), not the customer.
@@ -316,20 +316,20 @@ If any checkbox fails, return to the decision procedure.
 - The slot exposes a **hash** or **date-based identifier**
   (release slug, blob key). Use the hash; it's already
   optimal.
-- The walkthrough's `slug` field — that's the site-level
+- The walkthrough's `slug` field - that's the site-level
   identifier (`/<slug>/...`), not a per-page filename. Slug
   selection has different constraints (longer, more brand-
   bearing) and isn't covered here.
 </when-not-to-use>
 
 <further-reading>
-- [reference.md](./reference.md) — edge cases, manifest-type
+- [reference.md](./reference.md) - edge cases, manifest-type
   notes, acronym + proper-noun handling, hyphenation
   guidance, schema regex quick-checks.
-- `/Users/jdalton/projects/meander/src/config.mts` —
+- `/Users/jdalton/projects/meander/src/config.mts` -
   `WalkthroughPartSchema` (line 24), `DocEntrySchema` (line
   85), `loadMeanderConfig` + `checkFilenameUniqueness`
   (line 541+).
 - `/Users/jdalton/projects/meander/CLAUDE.md` § Consumer
-  contract — the surrounding `meander.config.json` shape.
+  contract - the surrounding `meander.config.json` shape.
 </further-reading>

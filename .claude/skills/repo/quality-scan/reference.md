@@ -25,32 +25,32 @@ formatted.
 
 ### KISS (Keep It Simple, Stupid)
 
-Always prioritize simplicity — the simpler the code, the fewer
+Always prioritize simplicity - the simpler the code, the fewer
 bugs it will have.
 
 Common violations to flag:
 
-- **Over-abstraction** — utilities, helpers, or wrappers for a
+- **Over-abstraction** - utilities, helpers, or wrappers for a
   one-time operation.
-- **Premature optimization** — caching, memoization, or
+- **Premature optimization** - caching, memoization, or
   performance tricks before profiling.
-- **Unnecessary indirection** — multiple function-call layers when
+- **Unnecessary indirection** - multiple function-call layers when
   direct code would be clearer.
-- **Complex path construction** — manual path building when a
+- **Complex path construction** - manual path building when a
   helper returns the path you need.
-- **Feature creep** — "nice to have" additions that complicate the
+- **Feature creep** - "nice to have" additions that complicate the
   core logic.
 
 Examples:
 
-**Bad — ignoring a return value and reconstructing a path:**
+**Bad - ignoring a return value and reconstructing a path:**
 
 ```typescript
 await downloadAsset({ asset, downloadDir })
 const downloadedPath = path.join(downloadDir, asset)  // assumes structure
 ```
 
-**Good — use the return value:**
+**Good - use the return value:**
 
 ```typescript
 const downloadedPath = await downloadAsset({ asset, downloadDir })
@@ -774,11 +774,11 @@ Scan all markdown documentation and report all inaccuracies. If the documentatio
 
 ### Scan priority order
 
-1. **critical** — most important, run first
-2. **logic** — correctness of comment/code pairing, classifiers, URL rewriting, schema
-3. **workflow** — developer experience, CI hygiene
-4. **security** — GitHub Actions hardening
-5. **documentation** — README, docs, CLAUDE.md drift
+1. **critical** - most important, run first
+2. **logic** - correctness of comment/code pairing, classifiers, URL rewriting, schema
+3. **workflow** - developer experience, CI hygiene
+4. **security** - GitHub Actions hardening
+5. **documentation** - README, docs, CLAUDE.md drift
 
 ### Coverage targets
 
@@ -944,4 +944,4 @@ If an agent fails or times out:
 
 ### Partial scans
 
-The user can request specific scan types — for example, only critical and logic. The report includes only the requested scans and notes which were skipped.
+The user can request specific scan types - for example, only critical and logic. The report includes only the requested scans and notes which were skipped.

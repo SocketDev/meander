@@ -61,7 +61,7 @@ Update queue: `current_phase: agentshield` → `completed_phases: [env-check, ag
 Scan GitHub Actions workflows for security issues.
 
 See `_shared/security-tools.md` for zizmor detection. If not
-installed locally, skip with a warning — CI always has it via the
+installed locally, skip with a warning - CI always has it via the
 `.github/actions/setup-and-install` composite.
 
 ```bash
@@ -78,7 +78,7 @@ Checks for:
 Capture findings. Update queue phase.
 
 Note: meander's `.github/zizmor.yml` config disables the
-`secrets-outside-env` rule (intentional — see the comment in that
+`secrets-outside-env` rule (intentional - see the comment in that
 file). Don't re-flag findings the upstream config has silenced.
 
 ---
@@ -105,5 +105,5 @@ grade.
 ## Reference
 
 For rule catalogs (AgentShield + zizmor), common false positives,
-severity decision tree, and fix recipes — load
+severity decision tree, and fix recipes - load
 [reference.md](./reference.md) when triaging findings.

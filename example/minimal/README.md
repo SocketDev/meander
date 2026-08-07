@@ -13,7 +13,7 @@ meander generate meander.config.json
 meander serve meander.config.json
 ```
 
-Open <http://127.0.0.1:8080> — you should see an index page with
+Open <http://127.0.0.1:8080> - you should see an index page with
 one part link, and the part page should show two prose cards
 paired with the code from `src/app.ts`.
 

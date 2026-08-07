@@ -50,13 +50,13 @@ What it does _not_ defend against:
   share-holders are compromised, the wrapping key is recoverable
   by an attacker.
 
-## Envelope encryption — how the two layers fit
+## Envelope encryption - how the two layers fit
 
 Both encryption stories use the same construction:
 
-1. **Data Encryption Key (DEK)** — 32 random bytes. Encrypts the
+1. **Data Encryption Key (DEK)** - 32 random bytes. Encrypts the
    payload, a comment body or a walkthrough blob, with AES-256-GCM.
-2. **Wrapping key** — 32 random bytes. Encrypts the DEK with
+2. **Wrapping key** - 32 random bytes. Encrypts the DEK with
    AES-256-GCM. The wrapped DEK is stored alongside the
    ciphertext.
 
@@ -65,7 +65,7 @@ This is the standard NIST envelope pattern, also known as
 cryptographic literature; we call it _wrapping key_ + _data key_
 because the term "KEK" carries unfortunate cultural baggage). The
 benefit is that rotating the wrapping key only requires re-wrapping
-the (small) DEKs — comment ciphertext is never decrypted in a
+the (small) DEKs - comment ciphertext is never decrypted in a
 rotation.
 
 Binary formats:
@@ -79,18 +79,18 @@ Envelope blob    "ENVELOPE:1:" + <wrappedDEK> + ":" + <body ciphertext>      ASC
 The version bytes (0x10, 0x20) are reserved; future migrations
 can introduce new layouts without breaking older readers' version
 checks. The blob envelope's `ENVELOPE:1:` prefix is a literal text
-sentinel — the val recognizes it without parsing, and falls back
+sentinel - the val recognizes it without parsing, and falls back
 to "serve as plaintext" when the prefix is absent.
 
-## Comment store — `MEANDER_DB_KEY_<n>` + `MEANDER_DB_KEY_CURRENT`
+## Comment store - `MEANDER_DB_KEY_<n>` + `MEANDER_DB_KEY_CURRENT`
 
 Comments are encrypted unconditionally. Each row in the val's
 SQLite carries:
 
-- `body`, `author` — encrypted under a per-row DEK.
-- `dek_wrapped` — that DEK, wrapped under
+- `body`, `author` - encrypted under a per-row DEK.
+- `dek_wrapped` - that DEK, wrapped under
   `MEANDER_DB_KEY_<key_generation>`.
-- `key_generation` — integer pointing at which generation's
+- `key_generation` - integer pointing at which generation's
   wrapping key wrapped this row's DEK.
 
 `MEANDER_DB_KEY_CURRENT` is the integer pointer used for **new**
@@ -110,7 +110,7 @@ The lifecycle commands are under `meander db key`:
 The wrapping key never leaves the val after `init`. The operator's
 machine doesn't hold it; only the custodians' shares do.
 
-## Walkthrough blobs — `MEANDER_BLOB_KEY` (opt-in)
+## Walkthrough blobs - `MEANDER_BLOB_KEY` (opt-in)
 
 Most projects publish walkthroughs to **GitHub Pages**, where
 GitHub's own access controls and at-rest encryption are sufficient
@@ -187,8 +187,8 @@ and refuses every private one, including to the operator.
   refusal page names the slug it is refusing.
 
 A private walkthrough's comments take the same three credentials its
-pages do — the slug's reader cookie, a session token on
-`Authorization`, or the val's admin token — because a comment thread
+pages do - the slug's reader cookie, a session token on
+`Authorization`, or the val's admin token - because a comment thread
 carries prose and author identities of its own. The val answers "is
 this walkthrough private?" from a `walkthrough_visibility` row rather
 than by probing the blob, so a comment poll costs an index seek. See
@@ -211,7 +211,7 @@ that needs distinct audiences per walkthrough wants distinct vals.
 
 Serving a page decides on the blob in hand: the `ENVELOPE:` prefix
 is already in the bytes the val fetched to serve. A comment read has
-no such luxury — it touches no blob, and fetching a whole encrypted
+no such luxury - it touches no blob, and fetching a whole encrypted
 document to look at nine bytes would put a full blob GET behind
 every poll of a comment thread.
 
@@ -246,7 +246,7 @@ for its whole window at the moment a walkthrough turns private,
 which is the moment it must fail closed.
 
 One residue: the flag reads stale-public if a private blob is
-uploaded by something other than `meander publish` — a hand-written
+uploaded by something other than `meander publish` - a hand-written
 blob, or a publish from a build that predates this table. Republish
 with `meander publish` to settle it.
 
@@ -263,7 +263,7 @@ There's no rewrap dance for blobs because blobs are regenerable
 from source. Rotation = re-publish, which the CLI prompts
 explicitly.
 
-## Custodial recovery — Shamir's Secret Sharing
+## Custodial recovery - Shamir's Secret Sharing
 
 Both ceremonies split their wrapping key with **Shamir's Secret
 Sharing** before printing it. The operator distributes shares to
@@ -284,7 +284,7 @@ Constraints:
 - `threshold <= shares`
 - `shares <= 255` (GF(2^8) limit)
 
-Shares are base58-encoded (Bitcoin alphabet — no `0/O/I/l`
+Shares are base58-encoded (Bitcoin alphabet - no `0/O/I/l`
 ambiguity). The encoded form carries version + threshold + the
 share's x-coordinate inline, so `combine()` validates without
 external metadata.
@@ -296,14 +296,14 @@ What share-loss tolerance buys you:
 - A `T-of-S` split tolerates losing `S - T` shares.
 
 What it costs: every share you add is one more place that can
-_leak_. Custodian count should match real custodian independence —
+_leak_. Custodian count should match real custodian independence -
 five entries in the same password manager is one custodian, not
 five.
 
 ## Recovery scenarios
 
 **Lost the local copy of `MEANDER_DB_KEY_<n>`, but the val still
-has it.** Nothing to recover — the val is the source of truth.
+has it.** Nothing to recover - the val is the source of truth.
 You only "lose" a `db key` because comments stop decrypting; if
 they're decrypting, the val has the key.
 
