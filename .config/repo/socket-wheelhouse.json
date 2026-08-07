@@ -3,5 +3,9 @@
   "schemaVersion": 1,
   "repoName": "meander",
   "repo": { "type": "solo" },
+  "bundle": {
+    "ref": "fleet-pack-1e0fb3551ebcf541535e02b08ce452bfb482ed44",
+    "cascadeSha": "1e0fb3551ebcf541535e02b08ce452bfb482ed44"
+  },
   "build": { "from": "npm-registry", "type": "js" }
 }
