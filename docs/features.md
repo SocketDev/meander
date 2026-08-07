@@ -44,34 +44,38 @@ on files with many sections.
 
 No configuration — always on when ≥2 sections per file.
 
-## Theme toggle (system / light / dark / neo-kijū)
+## Theme toggle (light / dark)
 
-A 30×30 icon in `.topbar-actions` opens a menu with four
-choices. The pick persists to `localStorage` under
-`meander:pages:theme`; a stored value resolves synchronously in
+A 30×30 button in `.topbar-actions` flips between light and
+dark. There are two states in the UI but three in storage: the
+preference persists to `localStorage` under
+`meander:pages:theme`, and that key can also be _absent_, which
+means "follow the OS". A stored value resolves synchronously in
 `<head>` before first paint, so dark-preferring systems never
 flash the light theme.
 
-The four SVG icons stack on top of each other via
+Each press targets the opposite of the currently _resolved_
+theme. What gets stored depends on how that target compares to
+the OS preference — not to the stored value:
+
+- target matches the OS preference → the key is **removed**, so
+  the page goes back to following the OS
+- otherwise → the literal `light` or `dark` is stored
+
+That comparison is what lets a second press return the reader to
+OS-following without needing a third control, and what keeps the
+button from going dead when the OS flips underneath a stored
+override — the target still differs from what is on screen, so
+every press visibly changes something.
+
+While nothing is stored, a `matchMedia` observer re-applies the
+theme when the OS preference changes.
+
+The two SVG icons stack on top of each other via
 `position: absolute; inset: 0; margin: auto`, so switching
-preference only flips opacity — the button never reflows.
-
-### Neo-Kijū
-
-A fourth theme option, labeled **Neo-Kijū** in the menu
-(internal id: `neo-kiju`). Deep-purple palette with an
-electric-violet accent, code keywords in hot pink. Its icon
-is a lightning bolt flanked by three small sparks; on a live
-user-click switch, the bolt plays a one-shot scale-up strike
-and the three sparks flicker in sequence over ~1.5s. A page
-reload that just restores `neo-kiju` from localStorage paints
-the bolt at rest — animations are gated on
-`mdr-theme-toggle-fired` so the reader only sees motion on
-their own action.
-
-Unlike `system` / `light` / `dark`, `neo-kiju` is its own
-palette rather than a light/dark variant. `system` preference
-still resolves only to light or dark.
+themes only flips opacity — the button never reflows. The button
+shows the theme currently in effect and its `aria-label` names
+the action ("Switch to dark theme").
 
 No configuration — always on.
 

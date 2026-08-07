@@ -162,7 +162,7 @@ const CommentsConfigSchema = Type.Union([
  * Theme toggle config. `false` drops theme.js + theme-toggle
  * styles entirely (page ships pinned to the CSS `:root` palette,
  * no toggle widget). `true` or absent = default stack
- * (system/light/dark/neo-kiju).
+ * (system/light/dark).
  */
 const ThemeConfigSchema = Type.Union([
   Type.Boolean(),
@@ -173,7 +173,6 @@ const ThemeConfigSchema = Type.Union([
           Type.Literal('system'),
           Type.Literal('light'),
           Type.Literal('dark'),
-          Type.Literal('neo-kiju'),
         ]),
       ),
     ),

@@ -80,24 +80,6 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
-/* Neo-Kijū — retro mech-beast palette. Deep purple background
- * with electric-violet accent. Not a light/dark variant; own
- * coherent palette. Named internally as neo-kiju (ASCII, macron-
- * free) so CSS selectors and localStorage keys stay plain. */
-html[data-theme='neo-kiju'] {
-  --bg: #1a0830;
-  --bg-elev: #2a1044;
-  --bg-card: #2a1044;
-  --bg-tint: #3a1a5a;
-  --text: #f6eeff;
-  --muted: #b8a4dc;
-  --accent: #b24bff;
-  --border: #3d2a5a;
-  --border-strong: #5a3d7a;
-  --code-bg: #22143a;
-  color-scheme: dark;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -1988,13 +1970,9 @@ html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
 
 /* ── Theme toggle ────────────────────────────────────────────── */
 
-.theme-toggle-wrapper {
-  position: relative;
-}
-
-/* Button is position: relative so its four stacked icons (all
+/* Button is position: relative so its two stacked icons (both
  * absolute, inset: 0, margin: auto) center themselves identically
- * — switching pref only flips opacity, no layout shift. */
+ * — switching theme only flips opacity, no layout shift. */
 .theme-toggle {
   position: relative;
   display: inline-flex;
@@ -2019,16 +1997,10 @@ html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
   color: var(--text);
 }
 
-.theme-toggle[aria-expanded='true'] {
-  background: var(--bg-tint);
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-
-/* Stacked icons — all three rendered on top of each other; only
- * the one matching the current pref is visible. opacity (not
+/* Stacked icons — both rendered on top of each other; only the
+ * one matching the resolved theme is visible. opacity (not
  * display: none) keeps every icon in the layout tree so CSS
- * transitions fire on pref change. */
+ * transitions fire on theme change. */
 .theme-icon {
   position: absolute;
   inset: 0;
@@ -2040,92 +2012,9 @@ html[data-theme='dark'] .mdr-sections-panel a:nth-child(even) {
   transition: opacity 180ms ease;
 }
 
-.theme-toggle-wrapper[data-pref='system'] .theme-icon-system,
-.theme-toggle-wrapper[data-pref='light'] .theme-icon-light,
-.theme-toggle-wrapper[data-pref='dark'] .theme-icon-dark,
-.theme-toggle-wrapper[data-pref='neo-kiju'] .theme-icon-neo-kiju {
+.theme-toggle[data-resolved='light'] .theme-icon-light,
+.theme-toggle[data-resolved='dark'] .theme-icon-dark {
   opacity: 1;
-}
-
-.theme-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 180px;
-  padding: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 12px 32px rgba(0, 0, 0, 0.16);
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.theme-menu[hidden] {
-  display: none;
-}
-
-.theme-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--text);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 120ms ease;
-}
-
-.theme-menu-item:hover {
-  background: var(--bg-tint);
-  color: var(--text);
-}
-
-.theme-menu-item[aria-checked='true'] {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--text);
-}
-
-.theme-menu-item[aria-checked='true'] .theme-menu-check {
-  opacity: 1;
-}
-
-.theme-menu-check {
-  opacity: 0;
-  margin-left: auto;
-  width: 14px;
-  height: 14px;
-  color: var(--accent);
-  transition: opacity 120ms ease;
-}
-
-.theme-menu-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: var(--muted);
-}
-
-.theme-menu-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.theme-menu-item[aria-checked='true'] .theme-menu-icon,
-.theme-menu-item:hover .theme-menu-icon {
-  color: var(--text);
 }
 
 /* Mobile — fixed-column layout below 1100px, splitter hidden
@@ -2242,17 +2131,9 @@ pre.mdr-repo-tree code {
 }
 
 /* Neutralize motion when the user opts into reduced-motion.
- * Covers the neo-kiju bolt-strike + spark sequence and the
- * annotation-md fade — those are one-shot entrance effects,
- * so stripping them leaves the final rest state intact. */
+ * Covers the annotation-md fade — a one-shot entrance effect,
+ * so stripping it leaves the final rest state intact. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju,
-  html[data-theme='neo-kiju'].mdr-theme-toggle-fired
-    .theme-toggle
-    .theme-icon-neo-kiju
-    .mdr-spark {
-    animation: none;
-  }
   .annotation-md {
     transition: none;
   }
@@ -2784,133 +2665,6 @@ pre.mdr-repo-tree code {
   color: var(--muted);
 }
 
-/* ── Neo-Kijū — bolt strike + spark sequence ─────────────────── */
-
-/* Bolt strike — when neo-kiju is picked, the lightning bolt
- * icon plays a one-shot "energize": scales up, overshoots,
- * settles. Runs exactly once per user click (gated by
- * .mdr-theme-toggle-fired). On page reload with neo-kiju
- * already stored, the bolt just paints at rest — no unprompted
- * motion on a state the user didn't actively select. */
-@keyframes mdr-bolt-strike {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  40% {
-    transform: scale(1.25);
-    opacity: 1;
-  }
-  70% {
-    transform: scale(0.95);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-html[data-theme='neo-kiju'].mdr-theme-toggle-fired .theme-icon-neo-kiju {
-  transform-origin: center;
-  animation: mdr-bolt-strike 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
-}
-
-/* Sparks — hidden by default, visible only on the toggle button
- * when neo-kiju is active and the user just clicked. Three
- * sparks fire in a choreographed 3-beat sequence over 1.5s,
- * each visible for ~17% of the cycle at peak scale(1.2). */
-.mdr-spark {
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-@keyframes mdr-spark-middle {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  10% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  22% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  33%,
-  100% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-@keyframes mdr-spark-top {
-  0%,
-  33% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  43% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  56% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  67%,
-  100% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-@keyframes mdr-spark-bottom {
-  0%,
-  67% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  77% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  90% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-/* Spark-1 is the top-right spark on the bolt SVG path. Each
- * spark has its own keyframe set so the 3-beat sequence reads
- * distinctly instead of all three flickering at the same offset. */
-html[data-theme='neo-kiju'].mdr-theme-toggle-fired
-  .theme-toggle
-  .theme-icon-neo-kiju
-  .mdr-spark-1 {
-  animation: mdr-spark-top 1.5s ease 0.55s 1 forwards;
-}
-
-html[data-theme='neo-kiju'].mdr-theme-toggle-fired
-  .theme-toggle
-  .theme-icon-neo-kiju
-  .mdr-spark-2 {
-  animation: mdr-spark-middle 1.5s ease 0.55s 1 forwards;
-}
-
-html[data-theme='neo-kiju'].mdr-theme-toggle-fired
-  .theme-toggle
-  .theme-icon-neo-kiju
-  .mdr-spark-3 {
-  animation: mdr-spark-bottom 1.5s ease 0.55s 1 forwards;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Auth widget + demo banner (email magic-code sign-in)               */
 /* ------------------------------------------------------------------ */
@@ -2963,8 +2717,7 @@ html[data-theme='neo-kiju'].mdr-theme-toggle-fired
   font-size: 13px;
 }
 
-[data-theme='dark'] .mdr-demo-banner,
-[data-theme='neo-kiju'] .mdr-demo-banner {
+[data-theme='dark'] .mdr-demo-banner {
   background: var(--demo-banner-bg, rgba(255, 196, 0, 0.15));
   color: var(--demo-banner-fg, #ffd54f);
   border-bottom-color: var(--demo-banner-border, rgba(255, 196, 0, 0.35));

@@ -58,7 +58,7 @@ export type ResolvedOptOuts = {
   }
   theme: {
     enabled: boolean
-    themes: ReadonlyArray<'system' | 'light' | 'dark' | 'neo-kiju'>
+    themes: ReadonlyArray<'system' | 'light' | 'dark'>
   }
   styles: {
     base: boolean
@@ -75,7 +75,7 @@ export type ResolvedOptOuts = {
   outDir: string
 }
 
-const DEFAULT_THEMES = ['system', 'light', 'dark', 'neo-kiju'] as const
+const DEFAULT_THEMES = ['system', 'light', 'dark'] as const
 
 /**
  * Cross-check filename uniqueness. The schema's regex enforces

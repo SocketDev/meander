@@ -39,7 +39,7 @@ describe('resolveOptOuts', () => {
     expect(r.comments.allowedEmailDomains).toEqual([])
     expect(r.comments.seedPath).toBeUndefined()
     expect(r.theme.enabled).toBe(true)
-    expect(r.theme.themes).toEqual(['system', 'light', 'dark', 'neo-kiju'])
+    expect(r.theme.themes).toEqual(['system', 'light', 'dark'])
     expect(r.styles.base).toBe(true)
     expect(r.styles.theme).toBe(true)
     expect(r.styles.ui).toBe(true)

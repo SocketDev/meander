@@ -32,7 +32,6 @@
 - **`docs`** — rich doc entries with filename, title, summary
 - **`nav`** — enhance part-nav with topics label + compact titles
 - **`boot`** — flag Safari via html[data-ua="safari"]
-- **`theme`** — add Neo-Kijū theme (purple mech-beast palette)
 - **`tokenizers`** — pluggable inline-code tokenizer registry
 - **`footer`** — add default footer with meander attribution
 - **`index`** — hero panel + card-grid TOC on the index page
