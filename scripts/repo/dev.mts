@@ -81,10 +81,10 @@ async function startWatcher(): Promise<void> {
       const started = Date.now()
       generate(configPath, { __proto__: null } as GenerateOptions)
         .then(() => {
-          logger.log(`✓ regen (${reason}) in ${Date.now() - started}ms`)
+          logger.success(`regen (${reason}) in ${Date.now() - started}ms`)
         })
         .catch((e: unknown) => {
-          logger.fail(`✗ regen failed (${reason}):`, e)
+          logger.fail(`regen failed (${reason}):`, e)
         })
     }, DEBOUNCE_MS)
   }

@@ -342,7 +342,7 @@ export function buildSections(
     if (!source) {
       continue
     }
-    const lines = source.split('\n')
+    const lines = source.split(/\r?\n/)
     const blocks = parseWalkthroughBlocks(file, source)
     if (blocks.length === 0) {
       continue
@@ -475,7 +475,7 @@ export function buildSymbols(
 export function cleanCommentText(raw: string): string {
   const withoutDelimiters = raw.replace(/^\/\*/, '').replace(/\*\/$/, '')
   const lines = withoutDelimiters
-    .split('\n')
+    .split(/\r?\n/)
     .map(line => line.replace(/^\s*\*\s?/, ''))
   const filtered = lines.filter(
     (line, i, arr) =>
@@ -499,7 +499,7 @@ export function escapeHtml(value: string): string {
 
 export function extractSymbols(source: string): ExtractedSymbol[] {
   const out: ExtractedSymbol[] = []
-  const lines = source.split('\n')
+  const lines = source.split(/\r?\n/)
   // Match an exported top-level declaration and capture its name:
   // ^export\s+ the export keyword, (?:async\s+)? an optional async,
   // (?:class|const|enum|function|interface|type) the declaration
@@ -1079,7 +1079,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
      */
     let lineTotal = 0
     for (const s of partSections) {
-      lineTotal += s.code.split('\n').length
+      lineTotal += s.code.split(/\r?\n/).length
     }
     lineCounts.set(part.id, lineTotal)
     const html = renderPartHtml(
@@ -2006,7 +2006,7 @@ export function renderPartHtml(
 
       const pairedRows = fileSections
         .map((section, i) => {
-          const codeLines = section.code.split('\n')
+          const codeLines = section.code.split(/\r?\n/)
           const tableRows = codeLines
             .map((line, j) => {
               const lineNum = section.startLine + j
@@ -2433,7 +2433,7 @@ export function splitAnnotationByTags(markdown: string): Array<
       body: string
     }
 > {
-  const lines = markdown.split('\n')
+  const lines = markdown.split(/\r?\n/)
   const out: Array<
     | { kind: 'prose'; text: string }
     | { kind: 'tag'; tag: string; type: string | undefined; body: string }
@@ -2669,7 +2669,7 @@ export function wrapBlocks(html: string): {
   // followed by whitespace or `>` (so `<pre>` matches but `<param>` doesn't).
   const BLOCK_TAGS = /^<(h[1-6]|p|ul|ol|blockquote|pre|table|hr|details)[\s>]/i
 
-  const lines = html.split('\n')
+  const lines = html.split(/\r?\n/)
   const result: string[] = []
   let blockId = 0
   let inBlock = false

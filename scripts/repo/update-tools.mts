@@ -201,9 +201,9 @@ async function main(): Promise<void> {
      * a partially-refreshed entry. Throws on schema violation.
      */
     validateExternalToolsFile(toolsPath)
-    logger.log('✓ external-tools.json updated')
+    logger.success('external-tools.json updated')
   } else {
-    logger.log('✓ external-tools.json already up to date')
+    logger.success('external-tools.json already up to date')
   }
 }
 

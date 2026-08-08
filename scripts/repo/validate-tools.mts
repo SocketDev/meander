@@ -107,7 +107,7 @@ if (isMain) {
   try {
     const tools = validateExternalTools(toolsPath)
     const count = Object.keys(tools).length
-    logger.log(`✓ external-tools.json valid (${count} tools)`)
+    logger.success(`external-tools.json valid (${count} tools)`)
   } catch (e) {
     logger.fail(errorMessage(e))
     process.exitCode = 1

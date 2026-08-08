@@ -96,7 +96,7 @@
     "lightningcss": "catalog:",
     "marked": "18.0.7",
     "node-html-parser": "7.1.0",
-    "svgo": "4.0.2"
+    "svgo": "catalog:"
   },
   "devDependencies": {
     "@playwright/mcp": "catalog:",
