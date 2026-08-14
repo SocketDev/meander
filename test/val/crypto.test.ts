@@ -18,7 +18,7 @@ import {
   unpackEnvelope,
   unwrapKey,
   wrapKey,
-} from '../../assets/val/lib/crypto.ts'
+} from '../../assets/repo/val/lib/crypto.ts'
 
 export function FRESH_BYTES() {
   return randomDataKeyBytes()

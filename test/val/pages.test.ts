@@ -16,12 +16,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { signJwt } from '../../assets/val/lib/jwt.ts'
+import { signJwt } from '../../assets/repo/val/lib/jwt.ts'
 import {
   mintReaderToken,
   mintSessionToken,
   READER_SCOPE,
-} from '../../assets/val/lib/session.ts'
+} from '../../assets/repo/val/lib/session.ts'
 import {
   ADMIN_TOKEN,
   encryptedBlob,

@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mintReaderToken,
   mintSessionToken,
-} from '../../assets/val/lib/session.ts'
+} from '../../assets/repo/val/lib/session.ts'
 import {
   ADMIN_TOKEN,
   encryptedBlob,

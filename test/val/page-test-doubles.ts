@@ -25,11 +25,11 @@ import {
   packEnvelope,
   randomDataKeyBytes,
   wrapKey,
-} from '../../assets/val/lib/crypto.ts'
-import type { MagicCodeOutcome } from '../../assets/val/lib/magic-code.ts'
-import { registerPageRoutes } from '../../assets/val/lib/pages.ts'
-import type { PageDeps } from '../../assets/val/lib/pages.ts'
-import { READER_COOKIE_NAME } from '../../assets/val/lib/session.ts'
+} from '../../assets/repo/val/lib/crypto.ts'
+import type { MagicCodeOutcome } from '../../assets/repo/val/lib/magic-code.ts'
+import { registerPageRoutes } from '../../assets/repo/val/lib/pages.ts'
+import type { PageDeps } from '../../assets/repo/val/lib/pages.ts'
+import { READER_COOKIE_NAME } from '../../assets/repo/val/lib/session.ts'
 
 export const JWT_SECRET = 'test-jwt-secret'
 

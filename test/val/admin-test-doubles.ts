@@ -13,13 +13,16 @@
  * tests, only factories, so test discovery skips it.
  */
 
-import { importKey, registerAdminRoutes } from '../../assets/val/lib/admin.ts'
+import {
+  importKey,
+  registerAdminRoutes,
+} from '../../assets/repo/val/lib/admin.ts'
 import type {
   AdminDeps,
   AdminKeyContext,
   SqliteClient,
-} from '../../assets/val/lib/admin.ts'
-import { randomDataKeyBytes } from '../../assets/val/lib/crypto.ts'
+} from '../../assets/repo/val/lib/admin.ts'
+import { randomDataKeyBytes } from '../../assets/repo/val/lib/crypto.ts'
 
 /**
  * Mini Hono — just enough surface for registerAdminRoutes and

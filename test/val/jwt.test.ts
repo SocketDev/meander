@@ -11,7 +11,7 @@ import {
   b64urlEncode,
   signJwt,
   verifyJwt,
-} from '../../assets/val/lib/jwt.ts'
+} from '../../assets/repo/val/lib/jwt.ts'
 
 const SECRET = 'x'.repeat(32)
 

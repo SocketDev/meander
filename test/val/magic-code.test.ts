@@ -9,13 +9,13 @@
 
 import { describe, expect, it } from 'vitest'
 
-import type { SqliteClient } from '../../assets/val/lib/admin.ts'
-import { hashCode } from '../../assets/val/lib/auth.ts'
+import type { SqliteClient } from '../../assets/repo/val/lib/admin.ts'
+import { hashCode } from '../../assets/repo/val/lib/auth.ts'
 import {
   consumeMagicCode,
   MAGIC_CODE_MAX_ATTEMPTS,
   storeMagicCode,
-} from '../../assets/val/lib/magic-code.ts'
+} from '../../assets/repo/val/lib/magic-code.ts'
 
 const EMAIL = 'a@socket.dev'
 const CODE = '424242'

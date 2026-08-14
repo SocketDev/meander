@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { signJwt } from '../../assets/val/lib/jwt.ts'
+import { signJwt } from '../../assets/repo/val/lib/jwt.ts'
 import {
   bearerToken,
   clearedReaderCookie,
@@ -24,7 +24,7 @@ import {
   readSessionToken,
   resolveReaderAccess,
   SESSION_SCOPE,
-} from '../../assets/val/lib/session.ts'
+} from '../../assets/repo/val/lib/session.ts'
 
 const SECRET = 'test-jwt-secret'
 

@@ -11,7 +11,7 @@ import {
   hashCode,
   parseAllowedDomains,
   sixDigitCode,
-} from '../../assets/val/lib/auth.ts'
+} from '../../assets/repo/val/lib/auth.ts'
 
 test('parseAllowedDomains: empty → empty array', () => {
   assert.deepEqual(parseAllowedDomains(''), [])

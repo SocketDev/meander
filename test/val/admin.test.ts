@@ -15,9 +15,9 @@ import { strict as assert } from 'node:assert'
 
 import { test } from 'vitest'
 
-import { unwrapKey, wrapKey } from '../../assets/val/lib/admin.ts'
-import { randomDataKeyBytes } from '../../assets/val/lib/crypto.ts'
-import { constantTimeEqual } from '../../assets/val/lib/session.ts'
+import { unwrapKey, wrapKey } from '../../assets/repo/val/lib/admin.ts'
+import { randomDataKeyBytes } from '../../assets/repo/val/lib/crypto.ts'
+import { constantTimeEqual } from '../../assets/repo/val/lib/session.ts'
 import { makeKeyContext, makeSqlite, setupApp } from './admin-test-doubles.ts'
 import type { Row } from './admin-test-doubles.ts'
 

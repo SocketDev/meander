@@ -16,7 +16,7 @@ import {
   packEnvelope,
   randomDataKeyBytes,
   wrapKey,
-} from '../../assets/val/lib/crypto.ts'
+} from '../../assets/repo/val/lib/crypto.ts'
 import {
   blobTextIsEncrypted,
   probeSlugPrivacy,
@@ -24,7 +24,7 @@ import {
   recordSlugPrivacy,
   resolveSlugPrivacy,
   WALKTHROUGH_VISIBILITY_TABLE_SQL,
-} from '../../assets/val/lib/visibility.ts'
+} from '../../assets/repo/val/lib/visibility.ts'
 
 const BLOB_KEY_BYTES = new Uint8Array(32).fill(0x3c)
 
