@@ -80,8 +80,8 @@ describe('dbKeyInit', () => {
     const lines = deps.io.output
     const shareBase58: string[] = []
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i]?.startsWith('Share ') && lines[i].endsWith(':')) {
-        shareBase58.push(lines[i + 1])
+      if (lines[i]?.startsWith('Share ') && lines[i]!.endsWith(':')) {
+        shareBase58.push(lines[i + 1]!)
       }
     }
     expect(shareBase58).toHaveLength(3)
@@ -168,8 +168,8 @@ describe('dbKeyRotate', () => {
     expect(deps.env.store.get('MEANDER_DB_KEY_1')).toBe(HEX_OF_BYTE(0x33))
     /* Both rewrap batches were called. */
     expect(deps.admin.rewrapCalls).toHaveLength(2)
-    expect(deps.admin.rewrapCalls[0].fromGeneration).toBe(1)
-    expect(deps.admin.rewrapCalls[0].toGeneration).toBe(2)
+    expect(deps.admin.rewrapCalls[0]!.fromGeneration).toBe(1)
+    expect(deps.admin.rewrapCalls[0]!.toGeneration).toBe(2)
     /* Status output mentions both batches. */
     expect(deps.io.text()).toContain('rewrapped 100 this batch, 50 remaining')
     expect(deps.io.text()).toContain('rewrapped 50 this batch, 0 remaining')

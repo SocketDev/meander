@@ -108,7 +108,7 @@ describe('decrypt rejects malformed input', () => {
     /* Flip a bit in the payload region (after version + IV).
      * AES-GCM's auth tag must reject.
      */
-    bytes[bytes.length - 20] ^= 0xff
+    bytes[bytes.length - 20] = bytes[bytes.length - 20]! ^ 0xff
     expect(() => decrypt(bytes.toString('base64'), key)).toThrow()
   })
 })
