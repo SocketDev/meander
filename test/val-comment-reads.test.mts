@@ -22,7 +22,7 @@ import {
   sessionFor,
   UNRESOLVED_ROUTE,
 } from './utils/val-comment-harness.mts'
-import { mintReaderToken } from '../assets/val/lib/session.ts'
+import { mintReaderToken } from '../assets/repo/val/lib/session.ts'
 
 async function harnessWithComment(
   options: Parameters<typeof makeHarness>[0] = {},

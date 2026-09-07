@@ -35,7 +35,7 @@ describe('generate opt-outs', () => {
   })
 
   afterEach(async () => {
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   function writeConfig(extra: Record<string, unknown>): string {

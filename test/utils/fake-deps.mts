@@ -1,5 +1,5 @@
 /**
- * @file In-memory fakes for the ceremony injection seam.
+ * @file In-memory fakes for the ceremony dependency interface.
  *   Each ceremony function takes a `CeremonyDeps` struct (see
  *   src/ceremony-deps.mts). Production wires the struct to real
  *   fetch / readline / crypto; tests build fakes:

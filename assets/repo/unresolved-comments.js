@@ -27,7 +27,7 @@ const logger = getDefaultLogger()
         return {}
       }
       const parsed = JSON.parse(raw)
-      return parsed && typeof parsed === 'object' ? parsed : {}
+      return parsed !== null && typeof parsed === 'object' ? parsed : {}
     } catch (_) {
       return {}
     }

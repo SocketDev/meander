@@ -1,3 +1,5 @@
+// oxlint-disable-next-line socket/prefer-stable-self-import -- no stable alias
+import { REPO_ASSETS_DIR } from '../../src/paths.mts'
 /*
  * Local dev entry: generate + serve the test fixture, with
  * optional file-watcher that re-runs generate on source change.
@@ -36,7 +38,7 @@ const logger = getDefaultLogger()
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '..', '..')
 const fixtureDir = path.join(repoRoot, 'test', 'fixtures', 'test-docs')
-const assetsDir = path.join(repoRoot, 'assets')
+const assetsDir = REPO_ASSETS_DIR
 const configPath = path.join(fixtureDir, 'meander.config.json')
 
 const portArg = process.argv.find(a => a.startsWith('--port='))

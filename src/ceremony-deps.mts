@@ -1,5 +1,5 @@
 /**
- * Dependency-injection seam for `meander db key` and
+ * Dependency injection interface for `meander db key` and
  * `meander blob key` ceremonies.
  *
  * The ceremony commands are pure orchestration over four side

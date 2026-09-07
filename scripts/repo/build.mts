@@ -33,7 +33,7 @@ const rootPath = path.join(scriptDir, '..', '..')
 const distPath = path.join(rootPath, 'dist')
 
 export async function main(): Promise<void> {
-  await safeDelete(distPath, { recursive: true, force: true })
+  await safeDelete(distPath, { recursive: true })
 
   logger.log('→ bundling dist/cli.mjs (rolldown)')
   await build(cliBuildConfig)

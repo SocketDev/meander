@@ -1,14 +1,14 @@
 /**
- * @file Tests for the val's session gate (assets/val/lib/auth.ts) and the
- *   admin-token predicate (assets/val/lib/admin.ts). Both modules are pure —
- *   no Deno globals, no `https://esm.town/...` imports — so Node drives them
- *   directly. `assets/val/index.ts` only binds the gate to env config.
+ * @file Tests for the val's session gate (assets/repo/val/lib/auth.ts) and the
+ *   admin-token predicate (assets/repo/val/lib/admin.ts). Both modules are pure
+ *   — no Deno globals, no `https://esm.town/...` imports — so Node drives them
+ *   directly. `assets/repo/val/index.ts` only binds the gate to env config.
  */
 
 import { describe, expect, it } from 'vitest'
 
-import { isAdminToken, readBearerToken } from '../assets/val/lib/admin.ts'
-import { authGate } from '../assets/val/lib/auth.ts'
+import { isAdminToken, readBearerToken } from '../assets/repo/val/lib/admin.ts'
+import { authGate } from '../assets/repo/val/lib/auth.ts'
 
 function contextWithHeader(
   value: string | undefined,

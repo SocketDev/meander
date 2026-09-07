@@ -88,7 +88,7 @@ beforeEach(() => {
 afterEach(async () => {
   nock.cleanAll()
   nock.enableNetConnect()
-  await safeDelete(workDir, { recursive: true, force: true })
+  await safeDelete(workDir, { recursive: true })
   if (savedToken === undefined) {
     delete process.env['VALTOWN_TOKEN']
   } else {

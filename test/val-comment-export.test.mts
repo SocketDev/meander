@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { signJwt } from '../assets/val/lib/jwt.ts'
-import { SESSION_SCOPE } from '../assets/val/lib/session.ts'
+import { signJwt } from '../assets/repo/val/lib/jwt.ts'
+import { SESSION_SCOPE } from '../assets/repo/val/lib/session.ts'
 import {
   ADMIN_TOKEN,
   EXPORT_ROUTE,

@@ -48,7 +48,7 @@ export async function runCommand(
     })
     return result.code
   } catch (e) {
-    if (e && typeof e === 'object' && 'code' in e) {
+    if (e !== null && typeof e === 'object' && 'code' in e) {
       return e.code as number
     }
     throw e
@@ -134,7 +134,7 @@ export async function runCommandQuiet(
     }
   } catch (e) {
     if (
-      e &&
+      e !== null &&
       typeof e === 'object' &&
       'code' in e &&
       'stdout' in e &&

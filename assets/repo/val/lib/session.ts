@@ -199,6 +199,33 @@ export function parseCookieHeader(
 }
 
 /**
+ * The `Set-Cookie` value that grants read access to `slug`.
+ */
+export function readerCookie(
+  token: string,
+  slug: string,
+  ttlSeconds: number = READER_TTL_SECONDS,
+): string {
+  return [
+    `${READER_COOKIE_NAME}=${token}`,
+    `Path=${readerCookiePath(slug)}`,
+    `Max-Age=${ttlSeconds}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+  ].join('; ')
+}
+
+/**
+ * The cookie `Path` for a slug. Every gated page for the
+ * walkthrough lives under it — `/<slug>/`, `/<slug>/documents`,
+ * `/<slug>/part/<id>` — and nothing else does.
+ */
+export function readerCookiePath(slug: string): string {
+  return `/${slug}/`
+}
+
+/**
  * Verify a reader token and return the email it carries, or
  * undefined when the signature fails, the token expired, the scope
  * is not `read`, or the `slug` claim names a different walkthrough.
@@ -245,33 +272,6 @@ export async function readSessionToken(
     return undefined
   }
   return payload['email']
-}
-
-/**
- * The `Set-Cookie` value that grants read access to `slug`.
- */
-export function readerCookie(
-  token: string,
-  slug: string,
-  ttlSeconds: number = READER_TTL_SECONDS,
-): string {
-  return [
-    `${READER_COOKIE_NAME}=${token}`,
-    `Path=${readerCookiePath(slug)}`,
-    `Max-Age=${ttlSeconds}`,
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-  ].join('; ')
-}
-
-/**
- * The cookie `Path` for a slug. Every gated page for the
- * walkthrough lives under it — `/<slug>/`, `/<slug>/documents`,
- * `/<slug>/part/<id>` — and nothing else does.
- */
-export function readerCookiePath(slug: string): string {
-  return `/${slug}/`
 }
 
 /**

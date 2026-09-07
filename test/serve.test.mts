@@ -128,7 +128,7 @@ describe('readWalkthroughMeta', () => {
   })
 
   afterEach(async () => {
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   it('reads from manifest.json when present', async () => {
@@ -221,7 +221,7 @@ describe('serve (HTTP handler)', () => {
       await new Promise<void>(resolve => server!.close(() => resolve()))
       server = undefined
     }
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   async function start(
@@ -366,7 +366,7 @@ describe('serve (config + fallback resolution)', () => {
       await new Promise<void>(resolve => server!.close(() => resolve()))
       server = undefined
     }
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   it('honors outDir from the config', async () => {

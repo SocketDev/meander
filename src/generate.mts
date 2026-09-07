@@ -1,3 +1,4 @@
+import { REPO_ASSETS_DIR } from './paths.mts'
 /* max-file-lines: generator — the walkthrough static-site build pipeline
  * (parse walkthrough comments -> sections -> symbol table -> per-page HTML
  * render -> post-process -> manifest). The render helpers share the
@@ -12,7 +13,6 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { marked, Marked, Renderer } from 'marked'
 import type { Tokens } from 'marked'
@@ -232,7 +232,7 @@ export type SymbolLocation = readonly [file: string, line: number, part: number]
  * places (length > 1, e.g. a `parse` function exported from
  * several ecosystem-specific files, or TypeScript overload
  * signatures on consecutive lines). The consumer
- * (assets/sref.js) picks a single target for the trivial case
+ * (assets/repo/sref.js) picks a single target for the trivial case
  * and shows a disambiguator for the multi-target case — rather
  * than silently dropping ambiguous names like the old
  * singleton shape did.
@@ -326,7 +326,7 @@ export type GenerateOptions = {
    * Subdirectory under the output dir where emitted static
    * assets (currently `meander.css`) land. Default: ""
    * (emit flat). Example: `--asset-dir assets` writes
-   * `assets/meander.css` and rewrites the <link href>.
+   * `assets/repo/meander.css` and rewrites the <link href>.
    */
   assetDir?: string | undefined
 }
@@ -656,7 +656,7 @@ export async function generate(
   const sections = buildSections(parts, sources)
   const symbols = buildSymbols(parts, sources)
 
-  const bundledAssetsDir = getAssetsDir()
+  const bundledAssetsDir = REPO_ASSETS_DIR
   /* Non-comment scripts — always inlined (line-select is nav-ish
    * UX, sref is the symbol-reference link feature, doc-tabs/doc-toc
    * power the documents page layout).
@@ -882,7 +882,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   if (faviconEnabled) {
     const bundledFavDir = path.join(bundledAssetsDir, 'favicon')
     const override =
-      faviconOpt && typeof faviconOpt === 'object' ? faviconOpt : undefined
+      faviconOpt !== null && typeof faviconOpt === 'object'
+        ? faviconOpt
+        : undefined
     /* For each slot, prefer the consumer's override path
      * (resolved relative to meander.config.json's dir), falling
      * back to the bundled default if the override isn't
@@ -941,7 +943,7 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
    * use their default).
    */
   const themeColor =
-    faviconOpt && typeof faviconOpt === 'object'
+    faviconOpt !== null && typeof faviconOpt === 'object'
       ? faviconOpt.themeColor
       : undefined
   const themeColorTags = (() => {
@@ -1303,12 +1305,6 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost" && locatio
   logger.log(
     `Generated ${parts.length} part files + index + manifest in ${outDir}`,
   )
-}
-
-export function getAssetsDir(): string {
-  const thisFile = fileURLToPath(import.meta.url)
-  // In dist/generate.js → assets is at ../assets
-  return path.join(path.dirname(thisFile), '..', 'assets')
 }
 
 export function getLanguageClass(file: string): string {

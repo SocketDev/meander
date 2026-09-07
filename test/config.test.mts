@@ -155,7 +155,7 @@ describe('loadMeanderConfig', () => {
   })
 
   afterEach(async () => {
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   function writeConfig(body: unknown): string {

@@ -13,7 +13,7 @@
  * publish already holds for the blob API reaches it. So the write
  * needs no val id, no val URL, and no second credential.
  *
- * `assets/val/lib/visibility.ts` carries the identical
+ * `assets/repo/val/lib/visibility.ts` carries the identical
  * `CREATE TABLE IF NOT EXISTS`. Both processes bootstrap the table
  * because either can be first: publish may run against a val that has
  * never served a request, and the val may boot against a database no
@@ -28,7 +28,7 @@ export const API_BASE = 'https://api.val.town'
 
 /**
  * Byte-identical to `WALKTHROUGH_VISIBILITY_TABLE_SQL` in
- * `assets/val/lib/visibility.ts`, which the val runs from `ensureDb`.
+ * `assets/repo/val/lib/visibility.ts`, which the val runs from `ensureDb`.
  * The val tree is Deno source the Node build cannot import, so the
  * statement is stated in both places and pinned by a test.
  */

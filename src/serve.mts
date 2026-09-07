@@ -253,7 +253,9 @@ export async function serve(
       const addr = server.address()
       /* v8 ignore next -- server.address() is always an object after successful listen(). */
       const boundPort =
-        typeof addr === 'object' && addr && 'port' in addr ? addr.port : port
+        typeof addr === 'object' && addr !== null && 'port' in addr
+          ? addr.port
+          : port
       const url = `http://127.0.0.1:${boundPort}${basePath}/`
       logger.log(`meander serving ${outDir} at ${url}`)
       /* v8 ignore next 3 -- slug is empty only when the manifest.json fallback-scan path runs without a slug. */

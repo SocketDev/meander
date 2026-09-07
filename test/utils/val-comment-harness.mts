@@ -19,26 +19,26 @@
  *   HS256 JWTs.
  */
 
-import type { EncryptedCommentRow } from '../../assets/val/lib/comment-store.ts'
-import { registerCommentRoutes } from '../../assets/val/lib/comments.ts'
-import { authGate } from '../../assets/val/lib/auth.ts'
+import type { EncryptedCommentRow } from '../../assets/repo/val/lib/comment-store.ts'
+import { registerCommentRoutes } from '../../assets/repo/val/lib/comments.ts'
+import { authGate } from '../../assets/repo/val/lib/auth.ts'
 import {
   encrypt,
   importKey,
   packEnvelope,
   randomDataKeyBytes,
   wrapKey,
-} from '../../assets/val/lib/crypto.ts'
+} from '../../assets/repo/val/lib/crypto.ts'
 import {
   mintReaderToken,
   mintSessionToken,
   READER_COOKIE_NAME,
   readSessionToken,
-} from '../../assets/val/lib/session.ts'
+} from '../../assets/repo/val/lib/session.ts'
 import {
   probeSlugPrivacy,
   resolveSlugPrivacy,
-} from '../../assets/val/lib/visibility.ts'
+} from '../../assets/repo/val/lib/visibility.ts'
 
 export const JWT_SECRET = 'test-jwt-secret'
 export const ADMIN_TOKEN = 'test-admin-token'

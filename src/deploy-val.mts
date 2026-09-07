@@ -1,5 +1,5 @@
+import { REPO_ASSETS_DIR } from './paths.mts'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import ValTown from '@valtown/sdk'
 
@@ -189,6 +189,5 @@ export async function deployVal(
 }
 
 export function getValSourcePath(): string {
-  const thisFile = fileURLToPath(import.meta.url)
-  return path.join(path.dirname(thisFile), '..', 'assets', 'val', 'index.ts')
+  return path.join(REPO_ASSETS_DIR, 'val', 'index.ts')
 }

@@ -1,6 +1,6 @@
 /**
  * @file Pins the two copies of the `walkthrough_visibility` schema together.
- *   Both the val (assets/val/lib/visibility.ts, run from `ensureDb`) and
+ *   Both the val (assets/repo/val/lib/visibility.ts, run from `ensureDb`) and
  *   `meander publish` (src/val-visibility.mts) bootstrap the table, because
  *   either can reach the database first. They cannot share the constant by
  *   import: the val tree is Deno source carrying `npm:` specifiers, and the
@@ -14,7 +14,7 @@
 import nock from 'nock'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { WALKTHROUGH_VISIBILITY_TABLE_SQL as VAL_TABLE_SQL } from '../assets/val/lib/visibility.ts'
+import { WALKTHROUGH_VISIBILITY_TABLE_SQL as VAL_TABLE_SQL } from '../assets/repo/val/lib/visibility.ts'
 // oxlint-disable-next-line socket/no-src-import-in-test-expect -- both constants ARE the system under test: the assertion is that the val's copy of the DDL and publish's copy are the same statement. Neither builds an expected value out of a helper, and the val-side constant has no published-snapshot alias to import instead.
 import {
   API_BASE,

@@ -22,7 +22,7 @@
  * retire   Delete an old generation's MEANDER_DB_KEY_<n> from
  * the val env. Refuses if any rows still reference it.
  *
- * Each function takes a `CeremonyDeps` injection seam — see
+ * Each function takes a `CeremonyDeps` interface — see
  * src/ceremony-deps.mts. In production the CLI builds deps from
  * VALTOWN_TOKEN + the val's URL; tests pass in-memory fakes.
  */

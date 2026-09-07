@@ -29,7 +29,7 @@ describe('generate index trail layout', () => {
   })
 
   afterEach(async () => {
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   function makePart(id: number) {

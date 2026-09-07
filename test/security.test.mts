@@ -52,7 +52,7 @@ describe('sriForUrl cache', () => {
   afterEach(async () => {
     nock.cleanAll()
     nock.enableNetConnect()
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   it('fetches + returns sha512 on first call', async () => {
@@ -126,7 +126,7 @@ describe('injectSriIntegrity', () => {
   afterEach(async () => {
     nock.cleanAll()
     nock.enableNetConnect()
-    await safeDelete(tmpDir, { recursive: true, force: true })
+    await safeDelete(tmpDir, { recursive: true })
   })
 
   it('injects integrity on a remote <script src>', async () => {
