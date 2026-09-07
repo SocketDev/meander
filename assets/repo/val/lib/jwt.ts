@@ -3,7 +3,7 @@
  * (tests) identically via Web Crypto.
  */
 
-export function b64urlDecode(s: string): Uint8Array {
+export function b64urlDecode(s: string): Uint8Array<ArrayBuffer> {
   const padded = s.replaceAll('-', '+').replaceAll('_', '/')
   const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
   return new Uint8Array(

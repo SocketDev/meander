@@ -30,7 +30,7 @@ const KEY_BYTES = 32
 const IV_BYTES = 12
 const TAG_BYTES = 16
 
-export function base64Decode(s: string): Uint8Array {
+export function base64Decode(s: string): Uint8Array<ArrayBuffer> {
   const bin = atob(s)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) {
@@ -47,7 +47,7 @@ export function base64Decode(s: string): Uint8Array {
 export function base64Encode(bytes: Uint8Array): string {
   let s = ''
   for (let i = 0; i < bytes.length; i++) {
-    s += String.fromCharCode(bytes[i])
+    s += String.fromCharCode(bytes[i]!)
   }
   return btoa(s)
 }
@@ -57,7 +57,7 @@ export function base64Encode(bytes: Uint8Array): string {
  * wrapping keys (`MEANDER_BLOB_KEY`, `MEANDER_DB_KEY_<n>`) arrive
  * as hex so they're easy to print, paste, and store.
  */
-export function decodeHexKey(hex: string): Uint8Array {
+export function decodeHexKey(hex: string): Uint8Array<ArrayBuffer> {
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error('decodeHexKey: must be 64 hex characters (32 bytes)')
   }
@@ -82,7 +82,7 @@ export async function decrypt(
   }
   if (combined[0] !== BODY_VERSION) {
     throw new Error(
-      `decrypt: unsupported body version 0x${combined[0].toString(16)}`,
+      `decrypt: unsupported body version 0x${combined[0]!.toString(16)}`,
     )
   }
   const iv = combined.slice(1, 1 + IV_BYTES)
@@ -131,7 +131,7 @@ export async function importKey(raw: Uint8Array): Promise<CryptoKey> {
   }
   return crypto.subtle.importKey(
     'raw',
-    raw,
+    new Uint8Array(raw),
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt'],
@@ -152,7 +152,7 @@ export function packEnvelope(ciphertext: string, wrappedDek: string): string {
 /**
  * A fresh 32-byte data key suitable for use as a per-row DEK.
  */
-export function randomDataKeyBytes(): Uint8Array {
+export function randomDataKeyBytes(): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(KEY_BYTES))
 }
 
@@ -171,7 +171,7 @@ export function unpackEnvelope(
   if (parts.length !== 4 || parts[1] !== '1') {
     throw new Error('unpackEnvelope: malformed envelope header')
   }
-  return { wrappedDek: parts[2], ciphertext: parts[3] }
+  return { wrappedDek: parts[2]!, ciphertext: parts[3]! }
 }
 
 /**
@@ -181,7 +181,7 @@ export function unpackEnvelope(
 export async function unwrapKey(
   wrapped: string,
   wrappingKey: CryptoKey,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const combined = base64Decode(wrapped)
   if (combined.length !== 1 + IV_BYTES + KEY_BYTES + TAG_BYTES) {
     throw new Error(
@@ -190,7 +190,7 @@ export async function unwrapKey(
   }
   if (combined[0] !== WRAP_VERSION) {
     throw new Error(
-      `unwrapKey: unsupported wrap version 0x${combined[0].toString(16)}`,
+      `unwrapKey: unsupported wrap version 0x${combined[0]!.toString(16)}`,
     )
   }
   const iv = combined.slice(1, 1 + IV_BYTES)
@@ -225,7 +225,7 @@ export async function wrapKey(
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     wrappingKey,
-    rawDek,
+    new Uint8Array(rawDek),
   )
   const combined = new Uint8Array(1 + iv.length + ciphertext.byteLength)
   combined[0] = WRAP_VERSION
