@@ -6,7 +6,10 @@
  *   the real one. Separating gives each side a clean mock state.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Interface } from 'node:readline/promises'
+import { PassThrough } from 'node:stream'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* The mock has to live at module scope (vi.mock is hoisted), and
  * `answers` has to be reachable from inside the mock factory. Each
@@ -15,12 +18,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  */
 const answers: string[] = []
 
-vi.mock(import('node:readline/promises'), () => ({
-  createInterface: () => ({
-    question: async () => answers.shift() ?? '',
-    close: () => {},
-  }),
-}))
+const interfaces: Interface[] = []
+
+vi.mock(import('node:readline/promises'), async importOriginal => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    createInterface: () => {
+      const readline = actual.createInterface({
+        input: new PassThrough(),
+        output: new PassThrough(),
+      })
+      vi.spyOn(readline, 'question').mockImplementation(
+        async () => answers.shift() ?? '',
+      )
+      interfaces.push(readline)
+      return readline
+    },
+  }
+})
+
+afterEach(() => {
+  for (const readline of interfaces.splice(0)) {
+    readline.close()
+  }
+})
 
 import { createIoChannel } from '../src/ceremony-deps.mts'
 

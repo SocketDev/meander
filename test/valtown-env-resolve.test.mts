@@ -11,15 +11,16 @@ import { describe, expect, it, vi } from 'vitest'
 const profileMock = vi.fn()
 const aliasMock = vi.fn()
 
-vi.mock(import('@valtown/sdk'), () => {
-  /* The real export is a class — `new ValTown({...})` in production.
-   * Provide a stub class whose instances expose the same shape.
-   */
-  class FakeValTown {
-    me = { profile: { retrieve: profileMock } }
-    alias = { username: { valName: { retrieve: aliasMock } } }
+vi.mock(import('@valtown/sdk'), async importOriginal => {
+  const actual = await importOriginal()
+  class FakeValTown extends actual.default {
+    constructor(options: ConstructorParameters<typeof actual.default>[0]) {
+      super(options)
+      this.me.profile.retrieve = profileMock
+      this.alias.username.valName.retrieve = aliasMock
+    }
   }
-  return { default: FakeValTown }
+  return { ...actual, default: FakeValTown }
 })
 
 import { resolveVal } from '../src/valtown-env.mts'
