@@ -22,6 +22,7 @@
 import type { EncryptedCommentRow } from '../../assets/repo/val/lib/comment-store.ts'
 import { registerCommentRoutes } from '../../assets/repo/val/lib/comments.ts'
 import { authGate } from '../../assets/repo/val/lib/auth.ts'
+import type { AuthGateOptions } from '../../assets/repo/val/lib/auth.ts'
 import {
   encrypt,
   importKey,
@@ -359,7 +360,10 @@ export async function makeHarness(overrides: HarnessOptions = {}) {
         }
         return readSessionToken(m[1]!, JWT_SECRET)
       },
-      authRequired: (email, options) =>
+      authRequired: (
+        email: string | undefined,
+        options?: AuthGateOptions | undefined,
+      ) =>
         authGate(email, {
           allowedDomains: opts.allowedDomains ?? ['socket.dev'],
           demoMode: opts.demoMode ?? false,

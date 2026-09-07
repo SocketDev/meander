@@ -1,4 +1,6 @@
 catalog:
+  '@types/deno': 2.7.0
+  hono: 4.13.5
   '@mdn/browser-compat-data': 8.0.11
   # run-local-ci (bin: local-ci, formerly published as @redwoodjs/agent-ci)
   # runs a repo's GitHub Actions workflows locally in Docker so a change can

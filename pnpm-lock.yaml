@@ -223,6 +223,9 @@ catalogs:
     '@socketsecurity/sdk-stable':
       specifier: npm:@socketsecurity/sdk@4.1.4
       version: 4.1.4
+    '@types/deno':
+      specifier: 2.7.0
+      version: 2.7.0
     '@types/mdast':
       specifier: 4.0.4
       version: 4.0.4
@@ -256,6 +259,9 @@ catalogs:
     fast-check:
       specifier: 4.9.0
       version: 4.9.0
+    hono:
+      specifier: 4.13.5
+      version: 4.13.5
     lightningcss:
       specifier: 1.33.0
       version: 1.33.0
@@ -452,6 +458,9 @@ importers:
       '@socketsecurity/sdk-stable':
         specifier: 'catalog:'
         version: '@socketsecurity/sdk@4.1.4'
+      '@types/deno':
+        specifier: 'catalog:'
+        version: 2.7.0
       '@types/mdast':
         specifier: 'catalog:'
         version: 4.0.4
@@ -494,6 +503,9 @@ importers:
       fast-glob:
         specifier: 3.3.3
         version: 3.3.3
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.5
       magic-string:
         specifier: 1.1.0
         version: 1.1.0
@@ -4519,6 +4531,9 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
+  '@types/deno@2.7.0':
+    resolution: {integrity: sha512-Y6fWcV8KpYeO3Lik/RiYnUxtr/LWqoeACciU0CA+dr1U/45tGgaX3HWQQAPCNN53raN4Rr4Fht4y6qsUH57fDA==}
+
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -5538,6 +5553,10 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
+
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
+    engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -7397,6 +7416,8 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
+  '@types/deno@2.7.0': {}
+
   '@types/estree@1.0.9': {}
 
   '@types/geojson@7946.0.16': {}
@@ -8374,6 +8395,8 @@ snapshots:
   has-flag@4.0.0: {}
 
   he@1.2.0: {}
+
+  hono@4.13.5: {}
 
   html-escaper@2.0.2: {}
 
