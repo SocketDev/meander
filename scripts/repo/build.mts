@@ -22,7 +22,7 @@ import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
 import { build } from 'rolldown'
 
 import { cliBuildConfig } from '../../.config/repo/rolldown.cli.config.mts'
-import { isMainModule } from '../fleet/_shared/is-main-module.mts'
+import { isMainModule } from '../fleet/process/is-main-module.mts'
 import { errorMessage } from './utils/error-message.mts'
 import { runCommand } from '../fleet/util/run-command.mts'
 

@@ -23,7 +23,7 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { isMainModule } from '../fleet/_shared/is-main-module.mts'
+import { isMainModule } from '../fleet/process/is-main-module.mts'
 import { validateExternalToolsFile } from './validate-tools.mts'
 import type { ExternalTools } from './validate-tools.mts'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
@@ -88,7 +88,7 @@ function normalizeVersion(tagName: string): string {
  */
 function compareVersions(a: string, b: string): number {
   const parse = (v: string): { main: number[]; pre: string | undefined } => {
-    const [mainPart, prePart] = v.split('-', 2)
+    const { 0: mainPart, 1: prePart } = v.split('-', 2)
     const mainNums = (mainPart ?? '')
       .split('.')
       .map(n => Number.parseInt(n, 10))
