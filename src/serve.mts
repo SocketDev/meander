@@ -149,6 +149,28 @@ export function routeToFile(
   return asset
 }
 
+export function sanitizeRoutePathSegments(
+  relativePath: string,
+): string[] | undefined {
+  const pathSegments = normalizePath(relativePath).split('/')
+  const safeSegments: string[] = []
+  for (let index = 0, { length } = pathSegments; index < length; index += 1) {
+    const segment = pathSegments[index]!
+    const safeSegment = path.basename(segment)
+    if (
+      !segment ||
+      segment === '.' ||
+      segment === '..' ||
+      segment.includes('\0') ||
+      safeSegment !== segment
+    ) {
+      return undefined
+    }
+    safeSegments.push(safeSegment)
+  }
+  return safeSegments
+}
+
 export type ServeResult = {
   server: Server
   port: number
@@ -222,7 +244,12 @@ export async function serve(
       return
     }
 
-    const target = path.resolve(outDir, relative)
+    const safeSegments = sanitizeRoutePathSegments(relative)
+    if (!safeSegments) {
+      res.writeHead(400).end('bad request')
+      return
+    }
+    const target = path.join(outDir, ...safeSegments)
     /* v8 ignore start -- defense-in-depth traversal guard; routeToFile strips `..` before we get here. */
     if (!isPathInside(outDir, target)) {
       res.writeHead(400).end('bad request')
