@@ -217,45 +217,49 @@
     const name = span.getAttribute('data-def-name')
     const locs = locsFromSpan(span)
 
-    const header = '<div class="def-tooltip-name">' + name + '</div>'
+    tooltip.replaceChildren()
+    const header = document.createElement('div')
+    header.className = 'def-tooltip-name'
+    header.textContent = name
+    tooltip.appendChild(header)
     if (locs.length === 1) {
       const loc = locs[0]
-      tooltip.innerHTML =
-        header +
-        '<div class="def-tooltip-location">' +
-        locFile(loc) +
-        ':' +
-        locLine(loc) +
-        ' (Part ' +
-        locPart(loc) +
-        ')</div>' +
-        '<div class="def-tooltip-hint">Click symbol to go to definition</div>'
+      appendTooltipText(
+        tooltip,
+        'def-tooltip-location',
+        locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')',
+      )
+      appendTooltipText(
+        tooltip,
+        'def-tooltip-hint',
+        'Click symbol to go to definition',
+      )
     } else {
-      const items = locs
-        .map(function (loc) {
-          return (
-            '<div class="def-tooltip-location">' +
-            locFile(loc) +
-            ':' +
-            locLine(loc) +
-            ' (Part ' +
-            locPart(loc) +
-            ')</div>'
-          )
-        })
-        .join('')
-      tooltip.innerHTML =
-        header +
-        items +
-        '<div class="def-tooltip-hint">Click to pick a location (' +
-        locs.length +
-        ' defined)</div>'
+      for (const loc of locs) {
+        appendTooltipText(
+          tooltip,
+          'def-tooltip-location',
+          locFile(loc) + ':' + locLine(loc) + ' (Part ' + locPart(loc) + ')',
+        )
+      }
+      appendTooltipText(
+        tooltip,
+        'def-tooltip-hint',
+        'Click to pick a location (' + locs.length + ' defined)',
+      )
     }
 
     const rect = span.getBoundingClientRect()
     tooltip.style.display = 'block'
     tooltip.style.left = rect.left + 'px'
     tooltip.style.top = rect.bottom + 4 + 'px'
+  }
+
+  function appendTooltipText(parent, className, text) {
+    const element = document.createElement('div')
+    element.className = className
+    element.textContent = text
+    parent.appendChild(element)
   }
 
   function hideTooltip() {

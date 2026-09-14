@@ -22,6 +22,7 @@ import { createServer } from 'node:http'
 import type { Server } from 'node:http'
 import path from 'node:path'
 import { getDefaultLogger } from '@socketsecurity/lib-stable/logger/default'
+import { normalizePath } from '@socketsecurity/lib-stable/paths/normalize'
 
 const logger = getDefaultLogger()
 
@@ -53,6 +54,17 @@ export function escapeRegex(s: string): string {
 }
 
 export { MIME }
+
+export function isPathInside(rootPath: string, targetPath: string): boolean {
+  const relativePath = normalizePath(path.relative(rootPath, targetPath))
+  return (
+    !relativePath.includes('\0') &&
+    !path.isAbsolute(relativePath) &&
+    !path.win32.isAbsolute(relativePath) &&
+    relativePath !== '..' &&
+    !relativePath.startsWith('../')
+  )
+}
 
 /**
  * Read the slug + part ids + documents flag from manifest.json
@@ -212,7 +224,7 @@ export async function serve(
 
     const target = path.resolve(outDir, relative)
     /* v8 ignore start -- defense-in-depth traversal guard; routeToFile strips `..` before we get here. */
-    if (target !== outDir && !target.startsWith(outDir + '/')) {
+    if (!isPathInside(outDir, target)) {
       res.writeHead(400).end('bad request')
       return
     }
