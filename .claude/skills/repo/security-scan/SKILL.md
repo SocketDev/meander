@@ -9,7 +9,7 @@ user-invocable: true
 <task>
 Multi-tool security scanning pipeline for the meander walkthrough
 generator. Orchestrates AgentShield + zizmor (already wired into
-`.github/workflows/ci.yml`) and a graded review.
+`.github/workflows/ci-verify.yml`) and a graded review.
 </task>
 
 <context>

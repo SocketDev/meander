@@ -84,7 +84,7 @@ GitHub Pages serves it.
 <summary>The GitHub Pages deploy steps</summary>
 
 ```yaml
-# .github/workflows/pages.yml
+# .github/workflows/docs-deploy-demo-site.yml
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -109,7 +109,7 @@ Replace `--base-path=/your-repo` with your repo's URL path
 project-level Pages deploy at the root, drop the option.
 
 See meander's own
-[`.github/workflows/pages.yml`](../../.github/workflows/pages.yml)
+[`.github/workflows/docs-deploy-demo-site.yml`](../../.github/workflows/docs-deploy-demo-site.yml)
 for a working reference.
 
 </details>

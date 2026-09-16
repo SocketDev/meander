@@ -1,4 +1,5 @@
-name: 🌐 Deploy (Val Town)
+name: 'deploy: val town'
+run-name: 'deploy: val town'
 
 # Deploys the comment backend val to Val Town when val source
 # changes on main. Also runnable manually via workflow_dispatch.
@@ -46,7 +47,7 @@ on:
       - 'assets/val/**'
       - 'src/deploy-val.mts'
       - 'src/publish.mts'
-      - '.github/workflows/valtown.yml'
+      - '.github/workflows/deploy-val-town.yml'
       - '.github/actions/**'
       - '.config/repo/external-tools.json'
       - 'package.json'
@@ -64,7 +65,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Upload val files to Val Town
+    name: Upload val files to val town
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -95,7 +96,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Setup and install
+      - name: Set up and install
         if: steps.deployment.outputs.enabled == 'true'
         uses: ./.github/actions/fleet/setup-and-install
         with:
