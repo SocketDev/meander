@@ -36,7 +36,7 @@ needs:
 | `meander blob key *` | `val:write` (manage val env vars)           |
 
 For CI deploys of the comment backend (via
-`.github/workflows/valtown.yml`), scope the token to
+`.github/workflows/deploy-val-town.yml`), scope the token to
 **`val:write` only** - nothing broader. No blob, no user. The
 publish workflow needs `blob:write` separately.
 
@@ -162,7 +162,7 @@ generate` emits to `<outDir>/` (default `pages/`); a Pages
 workflow uploads that directory:
 
 ```yaml
-# .github/workflows/pages.yml — see this repo's own example
+# .github/workflows/docs-deploy-demo-site.yml — see this repo's own example
 - run: pnpm exec meander generate meander.config.json
 - uses: actions/upload-pages-artifact@<sha>
   with:
