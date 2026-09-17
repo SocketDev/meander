@@ -3,8 +3,9 @@
  *
  * Invoked from `pnpm run check` via scripts/check.mts so a
  * malformed tools file (typo in a platform key, missing
- * checksum, etc.) fails the same check run that catches lint
- * + type errors. Same pattern as meander.config.json validation.
+ * checksum, etc.) fails the same check run that catches lint.
+ *
+ * - Type errors. Same pattern as meander.config.json validation.
  */
 import { readFileSync } from 'node:fs'
 import path from 'node:path'

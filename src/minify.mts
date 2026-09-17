@@ -38,11 +38,11 @@ export type MinifyHtmlOptions = {
 
 /**
  * SVGO config — preset-default with two overrides off:
- * - cleanupIds: mermaid uses IDs for edge-to-node linking;
- * collapsing them breaks arrows.
- * - removeUnknownsAndDefaults: mermaid emits attributes the
- * default list wants to strip (preserveAspectRatio variants)
- * that browsers read.
+ *
+ * - CleanupIds: mermaid uses IDs for edge-to-node linking; collapsing them breaks
+ *   arrows.
+ * - RemoveUnknownsAndDefaults: mermaid emits attributes the default list wants to
+ *   strip (preserveAspectRatio variants) that browsers read.
  */
 const svgoConfig = {
   multipass: true,

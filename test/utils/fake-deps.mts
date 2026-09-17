@@ -61,10 +61,11 @@ export class FakeEnv implements EnvClient {
 
 /**
  * Scripted admin client. Tests configure either:
- * - a fixed `keyAudit` response, OR
- * - a function that recomputes the response on each call (so
- * simulated row-counts can change as rewrap progresses)
- * Same for `rewrap` — fixed response or a closure.
+ *
+ * - A fixed `keyAudit` response, OR
+ * - A function that recomputes the response on each call (so simulated row-counts
+ *   can change as rewrap progresses) Same for `rewrap` — fixed response or a
+ *   closure.
  */
 export class FakeAdmin implements AdminClient {
   audit: (() => KeyAuditResponse) | KeyAuditResponse

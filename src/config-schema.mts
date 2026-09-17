@@ -336,9 +336,10 @@ export const MeanderConfigSchema = Type.Object({
   /**
    * Optional hero panel content for the index page. Renders
    * above the parts TOC.
-   * - subtitle: a tagline shown beneath the site title.
-   * - description: a paragraph of intro copy (supports inline
-   * markdown — bold, italic, code, links).
+   *
+   * - Subtitle: a tagline shown beneath the site title.
+   * - Description: a paragraph of intro copy (supports inline markdown — bold,
+   *   italic, code, links).
    */
   hero: Type.Optional(
     Type.Object({
