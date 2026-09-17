@@ -741,7 +741,7 @@
       "type": "object",
       "properties": {
         "ci": {
-          "description": "Ship `.github/workflows/ci-verify.yml`.",
+          "description": "Ship `.github/workflows/ci.yml`.",
           "type": "boolean"
         },
         "weeklyUpdate": {

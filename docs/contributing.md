@@ -61,9 +61,9 @@ there.
 
 ## CI
 
-- `.github/workflows/ci-verify.yml` - lint + type-check + smoke test
+- `.github/workflows/ci.yml` - lint + type-check + smoke test
   - full test suite with coverage.
-- `.github/workflows/docs-deploy-demo-site.yml` - builds the fixture under
+- `.github/workflows/pages.yml` - builds the fixture under
   `--base-path=/meander` and deploys it to
   `https://socketdev.github.io/meander/` as a live demo.
 
