@@ -47,7 +47,7 @@ on:
       - 'assets/val/**'
       - 'src/deploy-val.mts'
       - 'src/publish.mts'
-      - '.github/workflows/deploy-val-town.yml'
+      - '.github/workflows/valtown.yml'
       - '.github/actions/**'
       - '.config/repo/external-tools.json'
       - 'package.json'
@@ -65,7 +65,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Upload val files to val town
+    name: Upload val files to Val Town
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,7 +96,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up and install
+      - name: Setup and install
         if: steps.deployment.outputs.enabled == 'true'
         uses: ./.github/actions/fleet/setup-and-install
         with:
