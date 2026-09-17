@@ -1,5 +1,5 @@
-name: 📦 Publish npm
-run-name: Publish npm
+name: 'publish: npm'
+run-name: 'publish: npm'
 
 # Cascade-owned — every npm-publishing repo carries the byte-identical copy
 # (adopt by copying the template once; the sync then keeps it in lock-step;
@@ -53,11 +53,16 @@ on:
         default: ''
       checkout-ref:
         description: >-
-          Backfill only — the branch/tag/SHA whose CONTENT is republished.
-          The workflow definition always comes from the dispatched ref,
-          main, so historical content stays reachable.
+          Backfill or reserved-release resume — the tag, branch, or SHA whose
+          content is published while the workflow definition stays on main.
         type: string
         default: ''
+      resume-reserved:
+        description: >-
+          Resume an unpublished release from its existing vVERSION tag.
+          Requires checkout-ref to name that exact tag.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -68,19 +73,16 @@ concurrency:
 
 jobs:
   npm-publish:
+    cache-mode: read
     name: Publish npm
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && (vars.NPM_PUBLISH_RUNNER || 'macos-14') || vars.ODAI_RUNNER || 'ubuntu-latest' }}
     # npm's trusted-publisher config pins this GitHub environment name; the
     # OIDC token exchange 404s if the job runs outside it.
-    environment: npm-publish
+    environment: publish-npm
     permissions:
       contents: read
       # npm provenance / trusted publishing mints its OIDC token here.
       id-token: write
-    env:
-      # Socket Firewall + CLI auth for the sfw-wrapped setup + pnpm install —
-      # sfw and socket-cli read SOCKET_API_KEY from the org-wide secret.
-      SOCKET_API_KEY: ${{ secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW }}
     steps:
       # First step can't call the local ./.github/actions/fleet/checkout
       # composite (nothing checked out yet); bootstrap the workspace with the
@@ -111,16 +113,51 @@ jobs:
           git remote add origin "${SERVER_URL}/${REPOSITORY}"
           # Backfill's content ref wins; otherwise the dispatched ref.
           FETCH_REF="${CHECKOUT_REF:-${TRIGGER_REF}}"
-          FETCH_ARGS=(--prune --depth 1 origin "${FETCH_REF}")
+          FETCH_ARGS=(--prune origin "${FETCH_REF}")
           # --tags stays on the fetch line itself so the
           # version-derivation-jobs-have-tags gate can see it.
           if [ -n "${GITHUB_TOKEN}" ]; then
             AUTH_B64="$(printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 | tr -d '\n')"
-            git -c "http.${SERVER_URL}/.extraheader=AUTHORIZATION: basic ${AUTH_B64}" fetch --tags "${FETCH_ARGS[@]}"
+            export GIT_CONFIG_COUNT=1
+            export GIT_CONFIG_KEY_0="http.${SERVER_URL}/.extraheader"
+            export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${AUTH_B64}"
+            git fetch --tags "${FETCH_ARGS[@]}"
           else
             git fetch --tags "${FETCH_ARGS[@]}"
           fi
           git checkout -q --detach FETCH_HEAD
+
+      - name: Establish trusted release content
+        id: content-trust
+        shell: bash
+        env:
+          BACKFILL_VERSION: ${{ inputs.backfill-version }}
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DISPATCH_REF: ${{ github.ref }}
+          RESUME_RESERVED: ${{ inputs.resume-reserved }}
+        run: |
+          set -euo pipefail
+          if [ "$DISPATCH_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$CHECKOUT_REF" ]; then
+            echo "trusted=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$RESUME_RESERVED" != "true" ] || [ -n "$BACKFILL_VERSION" ] || [[ ! "$CHECKOUT_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          TAG_SHA="$(git rev-parse "refs/tags/$CHECKOUT_REF^{commit}")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [ "$TAG_SHA" != "$HEAD_SHA" ] || ! git merge-base --is-ancestor "$TAG_SHA" "refs/remotes/origin/$DEFAULT_BRANCH"; then
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "trusted=true" >> "$GITHUB_OUTPUT"
 
       # `latest` is what an untagged install of the package resolves to, so it belongs
       # to whichever branch carries the line customers actually consume. For
@@ -163,7 +200,10 @@ jobs:
 
       - name: Set up and install
         uses: ./.github/actions/fleet/setup-and-install
+        env:
+          SOCKET_API_KEY: ${{ steps.content-trust.outputs.trusted == 'true' && secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW || '' }}
         with:
+          socket-api-token: ${{ steps.content-trust.outputs.trusted == 'true' && secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW || '' }}
           # Forward the backfill content ref — setup-and-install re-checks-out
           # internally (fleet checkout falls back to the TRIGGERING ref when
           # unset), which would silently swap the backfill content back to
@@ -171,36 +211,86 @@ jobs:
           # version. Empty forwards as unset, so normal dispatches keep the
           # dispatched-ref re-checkout.
           checkout-ref: ${{ inputs.checkout-ref }}
-          # Reuse the PR App for a contents:read token scoped to wheelhouse.
+          # Reuse the Release App for a contents:read token scoped to wheelhouse.
           # Both credentials enable the private release fallback. Without the
           # key, hydration still pulls public GHCR anonymously.
-          payload-token-client-id: ${{ vars.SOCKET_PR_CLIENT_ID }}
-          payload-token-private-key: ${{ secrets.SOCKET_PR_APP_PRIVATE_KEY }}
+          payload-token-client-id: ${{ steps.content-trust.outputs.trusted == 'true' && (secrets.SOCKET_RELEASE_CLIENT_ID || vars.SOCKET_RELEASE_CLIENT_ID) || '' }}
+          payload-token-private-key: ${{ steps.content-trust.outputs.trusted == 'true' && secrets.SOCKET_RELEASE_APP_PRIVATE_KEY || '' }}
+      - name: Validate reserved release resume
+        if: ${{ inputs.resume-reserved == true }}
+        env:
+          BACKFILL_VERSION: ${{ inputs.backfill-version }}
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p 'require("./package.json").version')"
+          if [ -n "$BACKFILL_VERSION" ] || [ "$CHECKOUT_REF" != "v$VERSION" ]; then
+            echo "::error::Reserved release resume requires checkout-ref v$VERSION without backfill-version." >&2
+            exit 1
+          fi
+          HEAD_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-parse "$CHECKOUT_REF^{commit}")"
+          if [ "$HEAD_SHA" != "$TAG_SHA" ]; then
+            echo "::error::Reserved release resume checked out $HEAD_SHA, but $CHECKOUT_REF resolves to $TAG_SHA." >&2
+            exit 1
+          fi
+      - name: Build
+        run: pnpm run build
+      - name: Install cargo-llvm-cov
+        if: ${{ inputs.backfill-version == '' }}
+        run: pnpm run setup:rust-coverage
       - name: Run full coverage
         # Backfill republishes already-released historical content. Its hard
         # content checks replace current-branch qualification.
         if: ${{ inputs.backfill-version == '' }}
         run: pnpm run cover
-      - name: Build
-        run: pnpm run build
+      - name: Set up odai
+        if: ${{ inputs.backfill-version == '' && inputs.resume-reserved != true }}
+        uses: ./.github/actions/fleet/setup-odai
+        with:
+          allow-fill: 'true'
+          require-ready: 'true'
       - name: 'Mint release token'
-        if: ${{ inputs.backfill-version == '' }}
+        if: ${{ inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' }}
         id: release-app
         uses: ./.github/actions/fleet/github-release-app-token
         with:
-          client-id: ${{ vars.SOCKET_RELEASE_CLIENT_ID }}
+          client-id: ${{ secrets.SOCKET_RELEASE_CLIENT_ID || vars.SOCKET_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.SOCKET_RELEASE_APP_PRIVATE_KEY }}
           repositories: ${{ github.event.repository.name }}
+      - name: Verify browser bridge signing runner
+        if: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" != 'macOS' ]; then
+            echo '::error::Browser bridge signing requires a macOS NPM_PUBLISH_RUNNER.' >&2
+            exit 1
+          fi
+      - name: Prepare browser bridge signing
+        if: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' }}
+        env:
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_DEVELOPER_ID_APPLICATION_CERTS_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERTS_P12 }}
+          APPLE_DEVELOPER_ID_APPLICATION_CERTS_P12_PASS: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERTS_P12_PASS }}
+          APPLE_ID: ${{ secrets.APPLE_ID || vars.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+        run: pnpm run browser-bridge:signing-setup
       # The version resolver consumes a prerelease hint, uses configured odai
       # for patch/minor, or defaults to minor. Backfills keep their version.
       - name: Publish
         env:
+          APPLE_TEAM_ID: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' && (secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID) || '' }}
           BACKFILL_VERSION: ${{ inputs.backfill-version }}
-          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+          BROWSER_BRIDGE_RELEASE_ENABLED: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' && 'true' || 'false' }}
+          CHECKOUT_REF: ${{ inputs.resume-reserved != true && inputs.checkout-ref || '' }}
+          CHROME_EXTENSION_CRX_PRIVATE_KEY_PEM: ${{ vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' && secrets.CHROME_EXTENSION_CRX_PRIVATE_KEY_PEM || '' }}
           DIST_TAG: ${{ inputs.dist-tag }}
           RELEASE_APP_TOKEN: ${{ steps.release-app.outputs.token }}
           GH_TOKEN: ${{ steps.release-app.outputs.token }}
         # CHECKOUT_REF forwards on its own so a checkout-ref dispatch WITHOUT
         # backfill-version is refused by the script instead of silently
         # bump-publishing historical content.
-        run: node scripts/fleet/npm-publish.mts --tag "$DIST_TAG" ${BACKFILL_VERSION:+--backfill "$BACKFILL_VERSION"} ${CHECKOUT_REF:+--checkout-ref "$CHECKOUT_REF"} ${{ inputs.publish != true && '--dry-run' || '' }}
+        run: node scripts/fleet/npm-publish.mts --tag "$DIST_TAG" ${BACKFILL_VERSION:+--backfill "$BACKFILL_VERSION"} ${CHECKOUT_REF:+--checkout-ref "$CHECKOUT_REF"} ${{ inputs.resume-reserved == true && '--resume-reserved' || '' }} ${{ inputs.publish != true && '--dry-run' || '' }}
+      - name: Remove browser bridge signing keychain
+        if: ${{ always() && vars.BROWSER_BRIDGE_RELEASE_ENABLED == 'true' && inputs.publish == true && inputs.backfill-version == '' && steps.content-trust.outputs.trusted == 'true' }}
+        run: pnpm run browser-bridge:signing-cleanup
