@@ -178,7 +178,7 @@
     "types:fix": "node scripts/fleet/types/fix.mts",
     "browser:bridge": "node scripts/fleet/browser/bridge/cli.mts",
     "browser:doctor": "node scripts/fleet/browser/bridge/doctor.mts",
-    "browser:setup": "node scripts/fleet/setup/browser-bridge.mts",
+    "browser:setup": "node scripts/fleet/setup/browser/bridge.mts",
     "browser:verify-installed": "node scripts/fleet/browser/bridge/verify-installed.mts",
     "check:deps": "node scripts/fleet/check.mts --category=deps",
     "check:hooks": "node scripts/fleet/check.mts --category=hooks",
@@ -190,7 +190,10 @@
     "github:browser": "node scripts/fleet/browser/github-auth.mts",
     "npm:trust:browser": "node scripts/fleet/registry-infra/npm/settings/trusted-publisher/browser.mts",
     "remote:github:release": "node scripts/fleet/release/github/remote.mts",
-    "worktree:create": "node scripts/fleet/worktree/create/run.mts"
+    "worktree:create": "node scripts/fleet/worktree/create/run.mts",
+    "npm:scan": "node scripts/fleet/npm/scan.mts",
+    "ai-balancer:doctor": "node scripts/fleet/ai/balancer/doctor.mts",
+    "ai-balancer:savings": "node scripts/fleet/ai-balancer-savings.mts"
   },
   "dependencies": {
     "@sinclair/typebox": "catalog:",

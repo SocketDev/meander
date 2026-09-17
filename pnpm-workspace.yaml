@@ -36,8 +36,8 @@ catalog:
   # test/ code uses the canonical name because vitest aliases that
   # to local src/.
   '@socketregistry/packageurl-js-stable': 'npm:@socketregistry/packageurl-js@1.5.2'
-  '@socketsecurity/lib': 7.0.1
-  '@socketsecurity/lib-stable': 'npm:@socketsecurity/lib@7.0.1'
+  '@socketsecurity/lib': 7.0.2
+  '@socketsecurity/lib-stable': 'npm:@socketsecurity/lib@7.0.2'
   '@socketsecurity/registry': 2.0.5
   '@socketsecurity/registry-stable': 'npm:@socketsecurity/registry@2.0.5'
   '@socketsecurity/sdk': 4.1.4
@@ -554,12 +554,6 @@ patchedDependencies:
   # The patch preserves both contracts under the single dependency override.
   # Regenerate the patch with its catalog version when updating the pin.
   '@polka/url@1.0.0-next.29': patches/fleet/@polka__url@1.0.0-next.29.patch
-  # dedup: public runtime helpers (managed by socket-wheelhouse sync):
-  # The bundled debug loader must read DEBUG at runtime so fleet debugNs
-  # honors namespace selection, wildcards, and exclusions.
-  # Generated terminal authorization and process accessors support setup
-  # through the shared public library API without a version change.
-  '@socketsecurity/lib@7.0.1': patches/fleet/@socketsecurity__lib@7.0.1.patch
   # default-export interop (managed by socket-wheelhouse sync; do not edit):
   # 5.0.7 dropped the default export from BOTH builds. The CJS half breaks
   # minimatch@9's compiled `__importDefault`, which reads `.default` and
