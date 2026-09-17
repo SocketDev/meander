@@ -15,7 +15,7 @@ on:
       - 'src/**'
       - 'assets/**'
       - 'test/fixtures/test-docs/**'
-      - '.github/workflows/pages.yml'
+      - '.github/workflows/docs-deploy-demo-site.yml'
       - '.github/actions/**'
       - '.config/repo/external-tools.json'
       - 'package.json'
@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Setup and install
+      - name: Set up and install
         uses: ./.github/actions/fleet/setup-and-install
         with:
           socket-api-token: ${{ secrets.SOCKET_API_TOKEN_FOR_CLI_AND_SFW }}
@@ -67,13 +67,13 @@ jobs:
           # default (see meander.config.json's `outDir`).
           touch test/fixtures/test-docs/pages/.nojekyll
 
-      - name: Upload Pages artifact
+      - name: Upload pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0 (2026-04-08)
         with:
           path: test/fixtures/test-docs/pages
 
   deploy:
-    name: Deploy to Pages
+    name: Deploy to pages
     needs: build
     runs-on: ubuntu-latest
     permissions:

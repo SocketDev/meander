@@ -128,7 +128,7 @@ first, then reference that env var in the shell:
 
 Reduce `permissions` to the narrowest set that still lets the job
 function. `contents: read` is the right default for most jobs and
-matches what meander's `.github/workflows/ci.yml` declares.
+matches what meander's `.github/workflows/ci-verify.yml` declares.
 
 Note: meander's `.github/zizmor.yml` config disables the
 `secrets-outside-env` rule. Don't re-flag findings the upstream
@@ -270,7 +270,7 @@ gh api repos/actions/checkout/git/refs/tags/v5.0.0 --jq .object.sha
 ```
 
 Pin to the SHA, trail with a human-readable comment. Meander's
-`.github/workflows/ci.yml` is the reference pattern.
+`.github/workflows/ci-verify.yml` is the reference pattern.
 
 ### Template injection from issue / PR fields
 
@@ -398,10 +398,10 @@ Findings: {critical: 0, high: 4, medium: 2, low: 0}
 Summary: 4 high-severity zizmor findings in pages.yml — fix before release
 === END HANDOFF ===
 
-- [HIGH] .github/workflows/pages.yml:60 — unpinned action `SocketDev/socket-registry/…@main`
+- [HIGH] .github/workflows/docs-deploy-demo-site.yml:60 — unpinned action `SocketDev/socket-registry/…@main`
   Fix: pin to a full SHA; grab via `gh api`.
 
-- [HIGH] .github/workflows/pages.yml:75 — unpinned action `actions/upload-pages-artifact@v5`
+- [HIGH] .github/workflows/docs-deploy-demo-site.yml:75 — unpinned action `actions/upload-pages-artifact@v5`
   Fix: pin to a full SHA…
 
 …
