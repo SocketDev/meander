@@ -57,6 +57,7 @@ export const runtimeExternals = [
 const rolldownSpecifier = /^rolldown(?:\/|$)/
 
 export const cliBuildConfig: BuildOptions = {
+  experimental: { attachDebugInfo: 'none' },
   external: [...nodeBuiltins, ...runtimeExternals, rolldownSpecifier],
   input: path.join(rootPath, 'src/cli.mts'),
   output: {

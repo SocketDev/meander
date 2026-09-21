@@ -21,6 +21,7 @@ const logger = getDefaultLogger()
 export async function bundleValSource(entryPath: string): Promise<string> {
   const { build } = await import('rolldown')
   const result = await build({
+    experimental: { attachDebugInfo: 'none' },
     input: entryPath,
     platform: 'neutral',
     external: [/^npm:/, /^https:\/\//, /^jsr:/],
