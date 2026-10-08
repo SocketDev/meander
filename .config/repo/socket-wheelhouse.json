@@ -8,10 +8,6 @@
   "repo": {
     "type": "solo"
   },
-  "bundle": {
-    "ref": "fleet-pack-e670893ac860d1aa90bcd8994759534ffc503adb",
-    "cascadeSha": "e670893ac860d1aa90bcd8994759534ffc503adb"
-  },
   "build": {
     "from": "npm-registry",
     "type": "js"
