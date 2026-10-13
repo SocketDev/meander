@@ -30,6 +30,14 @@ pnpm install -g @socketsecurity/meander
 
 ## Usage
 
+### Documentation
+
+- [Feature and configuration reference](docs/features.md): generator options,
+  themes, security, and output behavior.
+- [Command and deployment guide](docs/deploying.md): CLI workflows,
+  publishing, and Val Town setup.
+- [Comment API](docs/comment-api.md): endpoints used by the hosted comment layer.
+
 ### 1. Annotate your source
 
 Add block comments anywhere in your source files. The comment
